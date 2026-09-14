@@ -1,0 +1,131 @@
+@model DebiCheckMandate
+@{
+    ViewData["Title"] = "Mandate " + Model.AccountReference;
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Mandate @Model.AccountReference</h1>
+        <p class="lede">
+            @(Model.Client is null ? "" : Model.Client.FirstName + " " + Model.Client.Surname)
+            &middot; <partial name="_MandateStatus" model="Model.Status" />
+        </p>
+    </div>
+    @if (Model.Status is not MandateStatus.Cancelled and not MandateStatus.Rejected)
+    {
+        <form asp-action="Cancel" method="post"
+              onsubmit="return confirm('Cancel this mandate with the debtor bank?');">
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="hidden" name="reasonCode" value="01" />
+            <button type="submit" class="btn btn-danger">Cancel mandate</button>
+        </form>
+    }
+</div>
+
+@if (Model.Status == MandateStatus.SubmittedToBank && Model.MandateType != MandateType.DebiCheckTt1RealTime)
+{
+    <div class="alert alert-warn">
+        This mandate is waiting on the debtor&rsquo;s bank. A file token is not an approval
+        &mdash; the result arrives on the NetConnector postback, and collections must not be
+        attempted until it does.
+    </div>
+}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.25rem;">
+    <div class="card">
+        <div class="card-head"><h3>Collection instruction</h3></div>
+        <div class="card-body">
+            <table class="data">
+                <tbody>
+                <tr><td class="muted">Route</td><td>@Model.MandateType</td></tr>
+                <tr><td class="muted">Amount</td><td class="num">R @Model.CollectionAmount.ToString("N2")</td></tr>
+                @if (Model.FirstCollectionDiffers)
+                {
+                    <tr>
+                        <td class="muted">First collection</td>
+                        <td class="num">R @(Model.FirstCollectionAmount?.ToString("N2") ?? "-")</td>
+                    </tr>
+                }
+                <tr><td class="muted">First collection date</td><td>@(Model.FirstCollectionDate?.ToString("dd MMM yyyy") ?? "-")</td></tr>
+                <tr><td class="muted">Frequency</td><td>@Model.Frequency</td></tr>
+                <tr><td class="muted">Collection day code</td><td class="mono">@(Model.CollectionDayCode ?? "-")</td></tr>
+                <tr><td class="muted">Tracking days</td><td>@Model.TrackingDays</td></tr>
+                <tr><td class="muted">Template</td><td class="mono">@(Model.MandateTemplateId ?? "-")</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Netcash response</h3></div>
+        <div class="card-body">
+            <table class="data">
+                <tbody>
+                <tr><td class="muted">Contract reference</td><td class="mono">@(Model.ContractReference ?? "-")</td></tr>
+                <tr><td class="muted">Mandate reference</td><td class="mono">@(Model.MandateReference ?? "-")</td></tr>
+                <tr><td class="muted">Error code</td><td class="mono">@(Model.ErrorCode ?? "-")</td></tr>
+                <tr><td class="muted">Bank response</td><td class="mono">@(Model.BankResponseCode ?? "-")</td></tr>
+                <tr><td class="muted">Bankserv response</td><td class="mono">@(Model.BankservResponseCode ?? "-")</td></tr>
+                <tr><td class="muted">RMS applied</td><td>@(Model.RmsApplied?.ToString() ?? "-")</td></tr>
+                <tr><td class="muted">File token</td><td class="mono small">@(Model.FileToken ?? "-")</td></tr>
+                </tbody>
+            </table>
+            @if (!string.IsNullOrWhiteSpace(Model.ResponseMessage))
+            {
+                <p class="small muted" style="margin-top:.75rem;margin-bottom:0;">@Model.ResponseMessage</p>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Debtor account</h3></div>
+        <div class="card-body">
+            @if (Model.BankAccount is null)
+            {
+                <p class="muted small mb-0">No account linked.</p>
+            }
+            else
+            {
+                <table class="data">
+                    <tbody>
+                    <tr><td class="muted">Bank</td><td>@Model.BankAccount.BankName</td></tr>
+                    <tr><td class="muted">Account</td><td class="mono">@Model.BankAccount.MaskedAccountNumber</td></tr>
+                    <tr><td class="muted">Branch</td><td class="mono">@Model.BankAccount.BranchCode</td></tr>
+                    <tr><td class="muted">Type</td><td>@Model.BankAccount.AccountType</td></tr>
+                    <tr><td class="muted">Holder</td><td>@Model.BankAccount.AccountHolderName</td></tr>
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h3>Audit trail</h3>
+        <span class="muted small">Every state change, in order</span>
+    </div>
+    <div class="card-body">
+        @if (Model.Events.Count == 0)
+        {
+            <p class="muted small mb-0">Nothing recorded yet.</p>
+        }
+        else
+        {
+            <ul class="timeline">
+                @foreach (var e in Model.Events.OrderByDescending(x => x.OccurredUtc))
+                {
+                    <li>
+                        <div class="when">@e.OccurredUtc.ToString("dd MMM yyyy HH:mm:ss") UTC</div>
+                        <div class="what">@e.EventType</div>
+                        <div class="detail">@e.Detail</div>
+                        @if (e.FromStatus is not null && e.ToStatus is not null && e.FromStatus != e.ToStatus)
+                        {
+                            <div class="muted small">@e.FromStatus &rarr; @e.ToStatus</div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

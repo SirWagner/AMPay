@@ -1,0 +1,30 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment unavailable &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+<div class="checkout-page">
+    <div class="checkout-card">
+        <div class="checkout-head">
+            <div class="mark">Payment unavailable</div>
+            <div class="sub">Please try again later</div>
+        </div>
+        <div class="checkout-body" style="text-align:center;">
+            <p>
+                This payment link cannot be opened at the moment. Nothing has been charged.
+            </p>
+            <p class="small muted mb-0">
+                Contact the business that sent you this link.
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+@{
+    ViewData["Title"] = "Something went wrong";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Something went wrong &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="mark">AM-Pay</div>
+        <div class="sub">A Netcash ISV</div>
+
+        <h1 style="font-size:1.25rem;">Something went wrong</h1>
+        <p class="muted small">
+            The error has been logged. If you were part-way through capturing a client, the work
+            saved so far is safe &mdash; reopen the client and carry on from the step you were on.
+        </p>
+
+        <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Back to the dashboard</a>
+    </div>
+</div>
+</body>
+</html>

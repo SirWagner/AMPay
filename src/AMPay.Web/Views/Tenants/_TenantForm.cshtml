@@ -1,0 +1,70 @@
+@model AMPay.Web.Models.TenantModel
+
+<div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+<div class="card">
+    <div class="card-head"><h2>Business</h2></div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="field">
+                <label asp-for="Name"></label>
+                <input asp-for="Name" />
+                <span asp-validation-for="Name" class="field-error"></span>
+            </div>
+            <div class="field">
+                <label asp-for="TradingName"></label>
+                <input asp-for="TradingName" />
+            </div>
+            <div class="field">
+                <label asp-for="RegistrationNumber"></label>
+                <input asp-for="RegistrationNumber" placeholder="2019/123456/07" />
+            </div>
+            <div class="field">
+                <label asp-for="NcrNumber"></label>
+                <input asp-for="NcrNumber" placeholder="NCRCP9166" />
+                <span class="hint">Required for a credit provider originating DebiCheck mandates.</span>
+            </div>
+            <div class="field">
+                <label asp-for="Status"></label>
+                <select asp-for="Status" asp-items="Html.GetEnumSelectList<TenantStatus>()"></select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h2>Netcash</h2></div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="field">
+                <label asp-for="NetcashAccountNumber"></label>
+                <input asp-for="NetcashAccountNumber" maxlength="11" inputmode="numeric" placeholder="5xxxxxxxxxx" />
+                <span class="hint">Eleven digits, starting with 5.</span>
+                <span asp-validation-for="NetcashAccountNumber" class="field-error"></span>
+            </div>
+        </div>
+
+        <div class="gap-note" style="margin-top:1rem;">
+            <strong>Note:</strong> service keys are never captured on this screen. Slots are
+            created here; the key values are written into user-secrets or Azure Key Vault so a
+            database dump can never expose a live payment credential.
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h2>Contact</h2></div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="field">
+                <label asp-for="ContactEmail"></label>
+                <input asp-for="ContactEmail" type="email" />
+                <span asp-validation-for="ContactEmail" class="field-error"></span>
+            </div>
+            <div class="field">
+                <label asp-for="ContactNumber"></label>
+                <input asp-for="ContactNumber" type="tel" />
+            </div>
+        </div>
+    </div>
+</div>

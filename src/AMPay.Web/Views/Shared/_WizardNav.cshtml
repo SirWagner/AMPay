@@ -1,0 +1,32 @@
+@model AMPay.Web.Models.WizardContext
+@{
+    var current = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+}
+<div class="wizard-steps">
+    @foreach (var (step, label, action) in OnboardingSteps.All)
+    {
+        var done = Model.CompletedSteps.Contains(step);
+        var isCurrent = string.Equals(action, current, StringComparison.OrdinalIgnoreCase)
+                        || (current == "General" && step == OnboardingStep.General)
+                        || (current == "Edit" && step == OnboardingStep.General);
+
+        var built = step <= OnboardingStep.OtherDetails;
+        var cls = (isCurrent ? "active " : "") + (done ? "done" : "");
+
+        @if (built)
+        {
+            <a class="@cls" asp-controller="Clients" asp-action="@action" asp-route-id="@Model.ClientId">
+                <span class="num">@(done && !isCurrent ? "✓" : ((int)step).ToString())</span>
+                <span>@label</span>
+            </a>
+        }
+        else
+        {
+            <a class="@cls" asp-controller="Clients" asp-action="Step"
+               asp-route-id="@Model.ClientId" asp-route-step="@step" title="Not built yet">
+                <span class="num">@((int)step)</span>
+                <span class="muted">@label</span>
+            </a>
+        }
+    }
+</div>

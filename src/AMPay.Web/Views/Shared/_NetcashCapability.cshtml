@@ -1,0 +1,43 @@
+@model AMPay.Web.Services.NetcashCapability
+@*
+    Tells the operator what is and is not configured, before they start work rather than
+    after they submit it. Stub mode is shown as information; a genuine gap is shown as a
+    blocker with the specific thing that is missing.
+*@
+@{
+    var (cssClass, heading) = Model.State switch
+    {
+        AMPay.Web.Services.CapabilityState.Stubbed =>
+            ("alert-info", "Running on stubs"),
+        AMPay.Web.Services.CapabilityState.Ready =>
+            ("alert-success", $"{Model.FriendlyServiceName} is ready"),
+        AMPay.Web.Services.CapabilityState.ReadyUnvalidated =>
+            ("alert-warn", $"{Model.FriendlyServiceName} has not been validated recently"),
+        AMPay.Web.Services.CapabilityState.Rejected =>
+            ("alert-error", $"Netcash rejected this {Model.FriendlyServiceName} key"),
+        _ =>
+            ("alert-error", $"{Model.FriendlyServiceName} is not configured")
+    };
+}
+
+@if (Model.State != AMPay.Web.Services.CapabilityState.Ready)
+{
+    <div class="alert @cssClass">
+        <strong>@heading.</strong>
+        @Model.Message
+
+        @if (Model.Remedy is not null)
+        {
+            <div style="margin-top:.4rem;">@Model.Remedy</div>
+        }
+
+        @if (!Model.IsUsable)
+        {
+            <div style="margin-top:.6rem;">
+                <a asp-controller="ServiceKeys" asp-action="Index" class="btn btn-outline btn-sm">
+                    Open Netcash service keys
+                </a>
+            </div>
+        }
+    </div>
+}

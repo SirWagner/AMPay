@@ -1,0 +1,22 @@
+@model AMPay.Web.Models.TenantModel
+@{
+    ViewData["Title"] = "New customer";
+}
+
+<div class="page-head">
+    <h1>Onboard a customer</h1>
+    <p class="lede">
+        A new business trading under the AM-Pay Netcash ISV number. Service key slots are
+        created automatically; the key values go into the secret store afterwards.
+    </p>
+</div>
+
+<form asp-action="Create" method="post">
+    <partial name="_TenantForm" model="Model" />
+    <div class="card">
+        <div class="card-foot">
+            <button type="submit" class="btn btn-primary">Create customer</button>
+            <a asp-action="Index" class="btn btn-outline">Cancel</a>
+        </div>
+    </div>
+</form>

@@ -1,0 +1,189 @@
+@model Tenant
+@{
+    ViewData["Title"] = "Netcash service keys";
+    var resolved = ViewBag.Resolved as Dictionary<Guid, bool> ?? new();
+    var missing = Enum.GetValues<NetcashServiceId>()
+        .Where(s => Model.ServiceKeys.All(k => k.ServiceId != s))
+        .ToList();
+}
+
+<div class="page-head">
+    <h1>Netcash service keys</h1>
+    <p class="lede">
+        @Model.Name &middot; Netcash account
+        <span class="mono">@(Model.NetcashAccountNumber ?? "not set")</span>
+    </p>
+</div>
+
+@if (string.IsNullOrWhiteSpace(Model.NetcashAccountNumber))
+{
+    <div class="alert alert-warn">
+        This customer has no Netcash account number, so keys cannot be validated.
+        <a asp-controller="Tenants" asp-action="Edit" asp-route-id="@Model.Id">Set it first.</a>
+    </div>
+}
+
+@{
+    var capabilities = ViewBag.Capabilities as IReadOnlyList<AMPay.Web.Services.NetcashCapability>
+                       ?? Array.Empty<AMPay.Web.Services.NetcashCapability>();
+}
+
+@if (capabilities.Count > 0)
+{
+    <div class="card">
+        <div class="card-head">
+            <h2>What works right now</h2>
+            <span class="muted small">@capabilities.Count(c => c.IsUsable) of @capabilities.Count usable</span>
+        </div>
+        <div class="card-body">
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                    <tr><th>Service</th><th>State</th><th>What this means</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var c in capabilities)
+                    {
+                        <tr>
+                            <td><strong>@c.FriendlyServiceName</strong></td>
+                            <td>
+                                <span class="badge @(c.State switch {
+                                                        AMPay.Web.Services.CapabilityState.Ready => "badge-green",
+                                                        AMPay.Web.Services.CapabilityState.Stubbed => "badge-navy",
+                                                        AMPay.Web.Services.CapabilityState.ReadyUnvalidated => "badge-amber",
+                                                        _ => "badge-red" })">
+                                    @(c.IsUsable ? (c.IsSimulated ? "Stubbed" : "Usable") : "Blocked")
+                                </span>
+                            </td>
+                            <td class="small">
+                                @c.Message
+                                @if (c.Remedy is not null)
+                                {
+                                    <div class="muted" style="margin-top:.25rem;">@c.Remedy</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-head">
+        <h2>Keys</h2>
+        <form asp-action="Validate" method="post">
+            <input type="hidden" name="tenantId" value="@Model.Id" />
+            <button type="submit" class="btn btn-primary btn-sm"
+                    @(string.IsNullOrWhiteSpace(Model.NetcashAccountNumber) ? "disabled" : "")>
+                Validate against Netcash
+            </button>
+        </form>
+    </div>
+
+    <div class="card-body">
+        <div class="alert alert-info">
+            Validation is a button, not a background job, on purpose: Netcash locks the merchant
+            account after three failed attempts inside ten minutes, and only a successful call
+            clears the lockout.
+        </div>
+
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Id</th>
+                    <th>Secret name</th>
+                    <th>Value loaded</th>
+                    <th>Status</th>
+                    <th>Last validated</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var key in Model.ServiceKeys.OrderBy(k => k.ServiceId))
+                {
+                    var hasValue = resolved.TryGetValue(key.Id, out var v) && v;
+                    <tr>
+                        <td><strong>@key.ServiceId</strong></td>
+                        <td class="mono">@((int)key.ServiceId)</td>
+                        <td class="mono small">@key.SecretName</td>
+                        <td>
+                            @if (hasValue)
+                            {
+                                <span class="badge badge-green">Loaded</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-amber">Not loaded</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge @(key.Status switch {
+                                                    ServiceKeyStatus.Validated => "badge-green",
+                                                    ServiceKeyStatus.Unverified => "badge-grey",
+                                                    _ => "badge-red" })">@key.Status</span>
+                            @if (!string.IsNullOrWhiteSpace(key.LastValidationMessage))
+                            {
+                                <div class="muted small">@key.LastValidationMessage</div>
+                            }
+                        </td>
+                        <td class="muted small">
+                            @(key.LastValidatedUtc?.ToString("dd MMM yyyy HH:mm") ?? "never")
+                            @if (key.NeedsRevalidation && key.LastValidatedUtc is not null)
+                            {
+                                <div><span class="badge badge-amber">Over 24h</span></div>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h2>Loading a key value</h2></div>
+    <div class="card-body">
+        <p class="small">
+            Key values are never typed into this application. In development, load them into
+            user-secrets from the <span class="mono">src/AMPay.Web</span> directory:
+        </p>
+
+        <pre class="mono" style="background:var(--surface-2);padding:.9rem;border-radius:var(--radius);overflow-x:auto;border:1px solid var(--border);">@foreach (var key in Model.ServiceKeys.OrderBy(k => k.ServiceId))
+{
+@:dotnet user-secrets set "@key.SecretName" "<the @key.ServiceId service key GUID>"
+}</pre>
+
+        <div class="gap-note">
+            <strong>Gap:</strong> in production these come from Azure Key Vault. Add the vault
+            as a configuration source in <span class="mono">Program.cs</span> &mdash; the
+            secret store resolves both spellings, so the same names work unchanged.
+        </div>
+    </div>
+</div>
+
+@if (missing.Count > 0)
+{
+    <div class="card">
+        <div class="card-head"><h2>Add another service</h2></div>
+        <div class="card-body">
+            <form asp-action="Add" method="post" style="display:flex;gap:.75rem;align-items:flex-end;">
+                <input type="hidden" name="tenantId" value="@Model.Id" />
+                <div class="field" style="flex:0 0 260px;">
+                    <label for="serviceId">Service</label>
+                    <select id="serviceId" name="serviceId">
+                        @foreach (var s in missing)
+                        {
+                            <option value="@s">@s (@((int)s))</option>
+                        }
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-outline">Add slot</button>
+            </form>
+        </div>
+    </div>
+}

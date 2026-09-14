@@ -1,0 +1,74 @@
+@model List<ApplicationUser>
+@{
+    ViewData["Title"] = "Users";
+    var roles = ViewBag.Roles as Dictionary<Guid, string> ?? new();
+    var tenantNames = ViewBag.TenantNames as Dictionary<Guid, string> ?? new();
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Users</h1>
+        <p class="lede">
+            Who can sign in, and what they can reach. A user with no customer account is
+            platform staff and can act across every customer.
+        </p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">Add a user</a>
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="empty">No users yet.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Name</th><th>Email</th><th>Role</th><th>Customer account</th>
+                    <th>Status</th><th>Last signed in</th><th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var u in Model)
+                {
+                    var role = roles.GetValueOrDefault(u.Id, "-");
+                    <tr>
+                        <td><strong>@u.FullName</strong></td>
+                        <td class="small">@u.Email</td>
+                        <td>
+                            <span class="badge @(role == AppRoles.SuperAdmin ? "badge-navy" : "badge-grey")">@role</span>
+                        </td>
+                        <td class="small">
+                            @if (u.TenantId is null)
+                            {
+                                <span class="muted">Platform &mdash; all customers</span>
+                            }
+                            else
+                            {
+                                @tenantNames.GetValueOrDefault(u.TenantId.Value, "unknown")
+                            }
+                        </td>
+                        <td>
+                            <span class="badge @(u.IsActive ? "badge-green" : "badge-red")">
+                                @(u.IsActive ? "Active" : "Deactivated")
+                            </span>
+                        </td>
+                        <td class="muted small">@(u.LastLoginUtc?.ToString("dd MMM yyyy HH:mm") ?? "never")</td>
+                        <td>
+                            <form asp-action="ToggleActive" method="post">
+                                <input type="hidden" name="id" value="@u.Id" />
+                                <button type="submit" class="btn @(u.IsActive ? "btn-danger" : "btn-outline") btn-sm">
+                                    @(u.IsActive ? "Deactivate" : "Reactivate")
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -1,0 +1,113 @@
+@using AMPay.Infrastructure.Identity
+@using AMPay.Infrastructure.Netcash
+@using AMPay.Web.Services
+@using Microsoft.Extensions.Options
+@inject ICurrentTenant CurrentTenant
+@inject IOptions<NetcashOptions> NetcashOptions
+@{
+    await CurrentTenant.LoadAsync();
+    var current = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    string Active(string controller) =>
+        string.Equals(current, controller, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+@if (NetcashOptions.Value.UseStubs)
+{
+    <div class="stub-banner">
+        Netcash integration is running on stubs &mdash; no live payment calls are being made.
+        Set <span class="mono">Netcash:UseStubs</span> to false once the live clients are implemented.
+    </div>
+}
+
+<div class="shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="mark">AM-Pay</span>
+            <span class="sub">A Netcash ISV</span>
+        </div>
+
+        <div class="sidebar-section">Operations</div>
+        <a class="nav-link @Active("Home")" asp-controller="Home" asp-action="Index">Dashboard</a>
+        <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
+        <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
+        <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
+
+        @if (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin))
+        {
+            <div class="sidebar-section">Administration</div>
+            @if (User.IsInRole(AppRoles.SuperAdmin))
+            {
+                <a class="nav-link @Active("Tenants")" asp-controller="Tenants" asp-action="Index">Customers</a>
+            }
+            <a class="nav-link @Active("ServiceKeys")" asp-controller="ServiceKeys" asp-action="Index">Netcash service keys</a>
+            <a class="nav-link @Active("Users")" asp-controller="Users" asp-action="Index">Users</a>
+        }
+
+        <div class="sidebar-foot">
+            @if (CurrentTenant.IsPlatformUser)
+            {
+                <div><span class="badge badge-green">Platform</span></div>
+                <div style="margin-top:.4rem;">
+                    Acting on:<br />
+                    <strong style="color:#cfd8ea;">@(CurrentTenant.TenantName ?? "no customer selected")</strong>
+                </div>
+                <a asp-controller="Tenants" asp-action="Index" style="color:var(--green-accent);">Switch customer</a>
+            }
+            else
+            {
+                <div>@CurrentTenant.TenantName</div>
+            }
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <div>
+                <strong style="font-family:var(--font-heading);color:var(--navy-deeper);">
+                    @ViewData["Title"]
+                </strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <div class="who">
+                    <strong>@(User.Identity?.Name ?? "Not signed in")</strong>
+                    @if (User.IsInRole(AppRoles.SuperAdmin)) { <span>Super administrator</span> }
+                    else if (User.IsInRole(AppRoles.TenantAdmin)) { <span>Customer administrator</span> }
+                    else if (User.IsInRole(AppRoles.Capturer)) { <span>Capturer</span> }
+                    else { <span>Viewer</span> }
+                </div>
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    <button type="submit" class="btn btn-outline btn-sm">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        <main class="content">
+            @if (TempData["Success"] is string ok)
+            {
+                <div class="alert alert-success">@ok</div>
+            }
+            @if (TempData["Error"] is string err)
+            {
+                <div class="alert alert-error">@err</div>
+            }
+            @if (TempData["Info"] is string info)
+            {
+                <div class="alert alert-info">@info</div>
+            }
+
+            @RenderBody()
+        </main>
+    </div>
+</div>
+
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

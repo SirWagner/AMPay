@@ -1,0 +1,98 @@
+@model AMPay.Web.Models.EmploymentStepModel
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    ViewData["Title"] = "Employment";
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">Step 2 of 13 &mdash; employment. Where the income comes from, and when.</p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <form asp-action="Employment" method="post">
+            <input type="hidden" asp-for="ClientId" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="card">
+                <div class="card-head"><h2>Employer</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="EmployerName"></label>
+                            <input asp-for="EmployerName" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Occupation"></label>
+                            <input asp-for="Occupation" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Department"></label>
+                            <input asp-for="Department" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="EmployeeNumber"></label>
+                            <input asp-for="EmployeeNumber" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="EmploymentType"></label>
+                            <select asp-for="EmploymentType">
+                                <option value="">&mdash;</option>
+                                @foreach (var t in new[] { "Permanent", "Contract", "Temporary", "Self-employed", "Pensioner", "Unemployed" })
+                                {
+                                    <option value="@t">@t</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label asp-for="EmployedSince"></label>
+                            <input asp-for="EmployedSince" type="date" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="WorkTelephone"></label>
+                            <input asp-for="WorkTelephone" type="tel" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="SupervisorName"></label>
+                            <input asp-for="SupervisorName" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Pay cycle</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="PayFrequency"></label>
+                            <select asp-for="PayFrequency">
+                                <option value="">&mdash;</option>
+                                @foreach (var f in new[] { "Monthly", "Fortnightly", "Weekly" })
+                                {
+                                    <option value="@f">@f</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label asp-for="SalaryDay"></label>
+                            <input asp-for="SalaryDay" type="number" min="1" max="31" />
+                            <span class="hint">
+                                Used to suggest a collection day &mdash; collections land best
+                                shortly after payday.
+                            </span>
+                            <span asp-validation-for="SalaryDay" class="field-error"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-primary">Save and continue</button>
+                    <a asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Skip to summary</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

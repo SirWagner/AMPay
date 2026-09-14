@@ -1,0 +1,151 @@
+@model AMPay.Web.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="page-head">
+    <h1>@(Model.TenantName ?? "AM-Pay platform")</h1>
+    <p class="lede">
+        @if (Model.IsPlatformUser && Model.TenantName is null)
+        {
+            <text>Platform view across every customer trading under the AM-Pay Netcash ISV number.</text>
+        }
+        else
+        {
+            <text>DebiCheck onboarding, mandate origination and Pay Now collections.</text>
+        }
+    </p>
+</div>
+
+<div class="stat-grid">
+    @if (Model.IsPlatformUser && Model.TenantName is null)
+    {
+        <div class="stat">
+            <div class="label">Customers</div>
+            <div class="value">@Model.CustomerCount</div>
+            <div class="note">Trading under the AM-Pay ISV</div>
+        </div>
+    }
+
+    <div class="stat">
+        <div class="label">Clients captured</div>
+        <div class="value">@Model.ClientCount</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Authenticated mandates</div>
+        <div class="value accent">@Model.AuthenticatedMandates</div>
+        <div class="note">Collectable today</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">Awaiting the bank</div>
+        <div class="value">@Model.PendingMandates</div>
+        <div class="note">TT2 postback outstanding</div>
+    </div>
+
+    @if (Model.MonthlyCollectionValue > 0)
+    {
+        <div class="stat">
+            <div class="label">Mandated per cycle</div>
+            <div class="value">R @Model.MonthlyCollectionValue.ToString("N2")</div>
+            <div class="note">Sum of authenticated mandates</div>
+        </div>
+    }
+
+    <div class="stat">
+        <div class="label">Pay Now collected</div>
+        <div class="value">R @Model.PayNowCollected.ToString("N2")</div>
+    </div>
+</div>
+
+@if (Model.IsPlatformUser && Model.TenantName is null)
+{
+    <div class="card">
+        <div class="card-body">
+            <h3>Select a customer to begin</h3>
+            <p class="muted small mb-0">
+                You are signed in as a platform administrator and are not currently scoped to a
+                customer account. Choose one to capture clients or originate mandates on its behalf.
+            </p>
+        </div>
+        <div class="card-foot">
+            <a asp-controller="Tenants" asp-action="Index" class="btn btn-primary">Choose a customer</a>
+            <a asp-controller="Tenants" asp-action="Create" class="btn btn-outline">Onboard a new customer</a>
+        </div>
+    </div>
+}
+else
+{
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1.25rem;">
+        <div class="card">
+            <div class="card-head">
+                <h3>Recent clients</h3>
+                <a asp-controller="Clients" asp-action="Create" class="btn btn-primary btn-sm">Capture a client</a>
+            </div>
+            @if (Model.RecentClients.Count == 0)
+            {
+                <div class="empty">No clients captured yet.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                        <tr><th>Number</th><th>Name</th><th>Status</th><th>Captured</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var c in Model.RecentClients)
+                        {
+                            <tr>
+                                <td class="mono">@c.ClientNumber</td>
+                                <td><a asp-controller="Clients" asp-action="Details" asp-route-id="@c.Id">@c.Name</a></td>
+                                <td>
+                                    <span class="badge @(c.Status == ClientStatus.Active ? "badge-green" : "badge-grey")">
+                                        @c.Status
+                                    </span>
+                                </td>
+                                <td class="muted small">@c.CreatedUtc.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Recent mandates</h3>
+                <a asp-controller="Mandates" asp-action="Index" class="btn btn-outline btn-sm">View all</a>
+            </div>
+            @if (Model.RecentMandates.Count == 0)
+            {
+                <div class="empty">No mandates yet.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                        <tr><th>Reference</th><th>Client</th><th class="num">Amount</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var m in Model.RecentMandates)
+                        {
+                            <tr>
+                                <td class="mono">
+                                    <a asp-controller="Mandates" asp-action="Details" asp-route-id="@m.Id">@m.AccountReference</a>
+                                </td>
+                                <td>@m.ClientName</td>
+                                <td class="num">R @m.Amount.ToString("N2")</td>
+                                <td><partial name="_MandateStatus" model="m.Status" /></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

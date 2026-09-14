@@ -1,0 +1,108 @@
+@model AMPay.Web.Models.OtherDetailsStepModel
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    ViewData["Title"] = "Other details";
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">
+        Step 7 of 13 &mdash; categorisation and consent. Each consent is recorded separately
+        with its own timestamp, which is what POPIA expects.
+    </p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <form asp-action="OtherDetails" method="post">
+            <input type="hidden" asp-for="ClientId" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="card">
+                <div class="card-head"><h2>Categorisation</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="RiskCategory"></label>
+                            <select asp-for="RiskCategory">
+                                <option value="">&mdash;</option>
+                                @foreach (var r in new[] { "Low", "Medium", "High" })
+                                {
+                                    <option value="@r">@r</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label asp-for="ClientCategory"></label>
+                            <select asp-for="ClientCategory">
+                                <option value="">&mdash;</option>
+                                @foreach (var c in new[] { "New", "Returning", "VIP", "Watch list" })
+                                {
+                                    <option value="@c">@c</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label asp-for="Source"></label>
+                            <select asp-for="Source">
+                                <option value="">&mdash;</option>
+                                @foreach (var s in new[] { "Walk-in", "Referral", "Online", "Agent", "Repeat client" })
+                                {
+                                    <option value="@s">@s</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Consent</h2></div>
+                <div class="card-body">
+                    <div class="check" style="margin-bottom:1rem;">
+                        <input asp-for="DataProcessingConsent" type="checkbox" />
+                        <label asp-for="DataProcessingConsent">
+                            Consents to the processing of personal information (POPIA)
+                            <span class="hint" style="display:block;font-weight:400;">
+                                Required. The client cannot be activated without it.
+                            </span>
+                        </label>
+                    </div>
+                    <span asp-validation-for="DataProcessingConsent" class="field-error"></span>
+
+                    <div class="check" style="margin-bottom:1rem;">
+                        <input asp-for="CreditCheckConsent" type="checkbox" />
+                        <label asp-for="CreditCheckConsent">
+                            Consents to a credit bureau enquiry
+                            <span class="hint" style="display:block;font-weight:400;">
+                                Needed before any bureau check is run against this client.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="check" style="margin-bottom:1rem;">
+                        <input asp-for="MarketingConsent" type="checkbox" />
+                        <label asp-for="MarketingConsent">
+                            Consents to direct marketing
+                            <span class="hint" style="display:block;font-weight:400;">
+                                Optional, and deliberately separate &mdash; POPIA does not allow
+                                it to be bundled with the consent above.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="field wide">
+                        <label asp-for="Comments"></label>
+                        <textarea asp-for="Comments"></textarea>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-primary">Save and finish</button>
+                    <a asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Skip to summary</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

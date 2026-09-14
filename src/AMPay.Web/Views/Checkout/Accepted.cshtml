@@ -1,0 +1,44 @@
+@model PayNowTransaction
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment received &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+<div class="checkout-page">
+    <div class="checkout-card">
+        <div class="checkout-head">
+            <div class="mark">Thank you</div>
+            <div class="sub">Payment received</div>
+        </div>
+        <div class="checkout-body" style="text-align:center;">
+            <div style="font-size:3rem;color:var(--green-accent);line-height:1;">&check;</div>
+
+            @if (Model is not null)
+            {
+                <div class="checkout-amount" style="margin-top:.75rem;">
+                    <span class="cur">R</span>@Model.Amount.ToString("N2")
+                </div>
+                <p class="muted">@Model.Description</p>
+                <p class="small muted">
+                    Reference <span class="mono">@Model.PaymentReference</span>
+                </p>
+            }
+            else
+            {
+                <p style="margin-top:1rem;">Your payment has been submitted.</p>
+            }
+        </div>
+        <div class="checkout-foot">
+            Keep this reference. Your receipt will be confirmed once the payment settles.
+        </div>
+    </div>
+</div>
+</body>
+</html>

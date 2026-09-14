@@ -1,0 +1,17 @@
+@model AMPay.Domain.Enums.MandateStatus
+@{
+    var (css, label) = Model switch
+    {
+        MandateStatus.Authenticated => ("badge-green", "Authenticated"),
+        MandateStatus.SubmittedToBank => ("badge-amber", "Awaiting bank"),
+        MandateStatus.AwaitingDebtorAuthentication => ("badge-amber", "Awaiting debtor"),
+        MandateStatus.PendingMasterfile => ("badge-navy", "Masterfile pending"),
+        MandateStatus.Rejected => ("badge-red", "Rejected"),
+        MandateStatus.Failed => ("badge-red", "Failed"),
+        MandateStatus.Cancelled => ("badge-grey", "Cancelled"),
+        MandateStatus.Amended => ("badge-navy", "Amended"),
+        MandateStatus.Expired => ("badge-grey", "Expired"),
+        _ => ("badge-grey", "Draft")
+    };
+}
+<span class="badge @css">@label</span>

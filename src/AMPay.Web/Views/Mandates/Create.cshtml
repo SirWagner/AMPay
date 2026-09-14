@@ -1,0 +1,176 @@
+@model AMPay.Web.Models.CreateMandateModel
+@{
+    ViewData["Title"] = "New DebiCheck mandate";
+    var capability = ViewBag.Capability as AMPay.Web.Services.NetcashCapability;
+    var canSubmit = capability?.IsUsable ?? true;
+}
+
+<div class="page-head">
+    <h1>New DebiCheck mandate</h1>
+    <p class="lede">
+        @Model.ClientName &middot; client <span class="mono">@Model.ClientNumber</span>
+    </p>
+</div>
+
+@if (capability is not null)
+{
+    <partial name="_NetcashCapability" model="capability" />
+}
+
+<form asp-action="Create" method="post">
+    <input type="hidden" asp-for="ClientId" />
+    <input type="hidden" asp-for="ClientName" />
+    <input type="hidden" asp-for="ClientNumber" />
+
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="card">
+        <div class="card-head"><h2>Authentication route</h2></div>
+        <div class="card-body">
+            <p class="muted small">
+                The two routes behave differently, and the difference matters to the operator
+                standing in front of the client.
+            </p>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
+                <label class="card" style="margin:0;padding:1rem;cursor:pointer;">
+                    <div class="check">
+                        <input type="radio" asp-for="MandateType" value="@MandateType.DebiCheckTt1RealTime" />
+                        <div>
+                            <strong>TT1 &mdash; real time</strong>
+                            <p class="muted small mb-0" style="margin-top:.35rem;">
+                                The debtor&rsquo;s bank answers inside the request, so you know
+                                now whether the mandate is good. Needs a mandate template
+                                configured for real-time use.
+                            </p>
+                        </div>
+                    </div>
+                </label>
+
+                <label class="card" style="margin:0;padding:1rem;cursor:pointer;">
+                    <div class="check">
+                        <input type="radio" asp-for="MandateType" value="@MandateType.DebiCheckTt2Batch" />
+                        <div>
+                            <strong>TT2 &mdash; batch</strong>
+                            <p class="muted small mb-0" style="margin-top:.35rem;">
+                                Goes up in a file. The masterfile entry is created first, then
+                                the bank answers later on a postback &mdash; so the mandate is
+                                not collectable when you leave this screen.
+                            </p>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h2>Mandate</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="AccountReference"></label>
+                    <input asp-for="AccountReference" maxlength="32" />
+                    <span class="hint">Netcash field 101. Must be unique in this customer&rsquo;s masterfile.</span>
+                    <span asp-validation-for="AccountReference" class="field-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="MandateTemplateId"></label>
+                    @if (Model.AvailableTemplates.Count > 0)
+                    {
+                        <select asp-for="MandateTemplateId">
+                            @foreach (var t in Model.AvailableTemplates)
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input asp-for="MandateTemplateId" placeholder="NCDCT000000001" maxlength="14" />
+                    }
+                    <span class="hint">Configured on the Netcash side. A non real-time template rejects TT1 with error 325.</span>
+                    <span asp-validation-for="MandateTemplateId" class="field-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="BankAccountId"></label>
+                    <select asp-for="BankAccountId">
+                        @foreach (var a in Model.BankAccounts)
+                        {
+                            <option value="@a.Id">@a.Label</option>
+                        }
+                    </select>
+                    <span asp-validation-for="BankAccountId" class="field-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="CollectionAmount"></label>
+                    <input asp-for="CollectionAmount" type="number" step="0.01" min="0.01" />
+                    <span class="hint">In rands. Converted to cents at the Netcash boundary.</span>
+                    <span asp-validation-for="CollectionAmount" class="field-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Frequency"></label>
+                    <select asp-for="Frequency" asp-items="Html.GetEnumSelectList<DebitFrequency>()"></select>
+                </div>
+
+                <div class="field">
+                    <label asp-for="CollectionDayCode"></label>
+                    <input asp-for="CollectionDayCode" maxlength="7" />
+                </div>
+
+                <div class="field">
+                    <label asp-for="FirstCollectionDate"></label>
+                    <input asp-for="FirstCollectionDate" type="date" />
+                </div>
+
+                <div class="field">
+                    <label asp-for="TrackingDays"></label>
+                    <input asp-for="TrackingDays" type="number" min="1" max="10" />
+                    <span asp-validation-for="TrackingDays" class="field-error"></span>
+                </div>
+            </div>
+
+            <div class="check" style="margin-top:1rem;">
+                <input asp-for="FirstCollectionDiffers" type="checkbox" id="firstDiffers" />
+                <label asp-for="FirstCollectionDiffers"></label>
+            </div>
+
+            <div class="form-grid" style="margin-top:1rem;" id="firstAmountWrap">
+                <div class="field">
+                    <label asp-for="FirstCollectionAmount"></label>
+                    <input asp-for="FirstCollectionAmount" type="number" step="0.01" min="0" />
+                    <span asp-validation-for="FirstCollectionAmount" class="field-error"></span>
+                </div>
+            </div>
+        </div>
+        <div class="card-foot">
+            <button type="submit" class="btn btn-primary" disabled="@(!canSubmit)">
+                Submit to Netcash
+            </button>
+            <a asp-controller="Clients" asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Cancel</a>
+
+            @if (!canSubmit)
+            {
+                <span class="muted small">
+                    Load the debit order service key before submitting a mandate.
+                </span>
+            }
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        (function () {
+            var toggle = document.getElementById('firstDiffers');
+            var wrap = document.getElementById('firstAmountWrap');
+            function sync() { if (wrap) wrap.hidden = !toggle.checked; }
+            toggle?.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+}

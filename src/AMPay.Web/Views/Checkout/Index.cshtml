@@ -1,0 +1,110 @@
+@model AMPay.Web.Models.CheckoutModel
+@{
+    ViewData["Title"] = "Pay Now";
+    var transactions = ViewBag.Transactions as List<PayNowTransaction> ?? new List<PayNowTransaction>();
+    var capability = ViewBag.Capability as AMPay.Web.Services.NetcashCapability;
+    var canSubmit = capability?.IsUsable ?? true;
+}
+
+<div class="page-head">
+    <h1>Pay Now</h1>
+    <p class="lede">
+        Create a payment link. The customer pays on Netcash&rsquo;s hosted page by card, instant
+        EFT or PayShap &mdash; card details never reach this application.
+    </p>
+</div>
+
+@if (capability is not null)
+{
+    <partial name="_NetcashCapability" model="capability" />
+}
+
+<div style="display:grid;grid-template-columns:minmax(320px,400px) 1fr;gap:1.25rem;align-items:start;">
+    <form asp-action="Create" method="post">
+        <div class="card">
+            <div class="card-head"><h2>New payment</h2></div>
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+                <div class="field" style="margin-bottom:1rem;">
+                    <label asp-for="Amount"></label>
+                    <input asp-for="Amount" type="number" step="0.01" min="1" />
+                    <span asp-validation-for="Amount" class="field-error"></span>
+                </div>
+
+                <div class="field" style="margin-bottom:1rem;">
+                    <label asp-for="Description"></label>
+                    <input asp-for="Description" placeholder="Loan instalment, March" />
+                    <span asp-validation-for="Description" class="field-error"></span>
+                </div>
+
+                <div class="field" style="margin-bottom:1rem;">
+                    <label asp-for="CustomerName"></label>
+                    <input asp-for="CustomerName" />
+                </div>
+
+                <div class="field" style="margin-bottom:1rem;">
+                    <label asp-for="CustomerEmail"></label>
+                    <input asp-for="CustomerEmail" type="email" />
+                    <span asp-validation-for="CustomerEmail" class="field-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="CustomerMobile"></label>
+                    <input asp-for="CustomerMobile" type="tel" />
+                </div>
+            </div>
+            <div class="card-foot">
+                <button type="submit" class="btn btn-primary" disabled="@(!canSubmit)">
+                    Create payment link
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Recent payments</h2>
+            <span class="muted small">@transactions.Count shown</span>
+        </div>
+        @if (transactions.Count == 0)
+        {
+            <div class="empty">No Pay Now transactions yet.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                    <tr><th>Reference</th><th>Description</th><th class="num">Amount</th><th>Status</th><th>Created</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var t in transactions)
+                    {
+                        <tr>
+                            <td class="mono small">@t.PaymentReference</td>
+                            <td>@t.Description</td>
+                            <td class="num">R @t.Amount.ToString("N2")</td>
+                            <td>
+                                <span class="badge @(t.Status switch {
+                                                        PaymentStatus.Complete => "badge-green",
+                                                        PaymentStatus.Declined => "badge-red",
+                                                        PaymentStatus.Redirected => "badge-amber",
+                                                        _ => "badge-grey" })">@t.Status</span>
+                            </td>
+                            <td class="muted small">@t.CreatedUtc.ToString("dd MMM HH:mm")</td>
+                            <td>
+                                @if (t.Status is not PaymentStatus.Complete)
+                                {
+                                    <a asp-action="Pay" asp-route-reference="@t.PaymentReference"
+                                       class="btn btn-outline btn-sm" target="_blank">Open link</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

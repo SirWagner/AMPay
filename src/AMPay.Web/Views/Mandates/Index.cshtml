@@ -1,0 +1,81 @@
+@model List<DebiCheckMandate>
+@{
+    ViewData["Title"] = "DebiCheck mandates";
+}
+
+<div class="page-head">
+    <h1>DebiCheck mandates</h1>
+    <p class="lede">Every authority to collect, and where each one stands with the debtor&rsquo;s bank.</p>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
+            <div class="field" style="flex:0 0 220px;">
+                <label for="status">Status</label>
+                <select id="status" name="status">
+                    <option value="">All</option>
+                    @foreach (var s in Enum.GetValues<MandateStatus>())
+                    {
+                        <option value="@s" selected="@(ViewBag.Status?.ToString() == s.ToString())">@s</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="btn btn-navy">Filter</button>
+            @if (ViewBag.Status is not null)
+            {
+                <a asp-action="Index" class="btn btn-outline">Clear</a>
+            }
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <p>No mandates yet.</p>
+            <a asp-controller="Clients" asp-action="Index" class="btn btn-primary">Pick a client to start one</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Reference</th>
+                    <th>Client</th>
+                    <th>Route</th>
+                    <th class="num">Amount</th>
+                    <th>Status</th>
+                    <th>Contract reference</th>
+                    <th>Created</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var m in Model)
+                {
+                    <tr>
+                        <td class="mono"><a asp-action="Details" asp-route-id="@m.Id">@m.AccountReference</a></td>
+                        <td>@(m.Client is null ? "-" : m.Client.FirstName + " " + m.Client.Surname)</td>
+                        <td class="small">
+                            @(m.MandateType switch
+                            {
+                                MandateType.DebiCheckTt1RealTime => "TT1 real-time",
+                                MandateType.DebiCheckTt2Batch => "TT2 batch",
+                                MandateType.DebiCheckDelayedTt1 => "Delayed TT1",
+                                _ => "eMandate"
+                            })
+                        </td>
+                        <td class="num">R @m.CollectionAmount.ToString("N2")</td>
+                        <td><partial name="_MandateStatus" model="m.Status" /></td>
+                        <td class="mono small">@(m.ContractReference ?? "-")</td>
+                        <td class="muted small">@m.CreatedUtc.ToString("dd MMM yyyy HH:mm")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

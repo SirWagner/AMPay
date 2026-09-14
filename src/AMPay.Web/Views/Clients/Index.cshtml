@@ -1,0 +1,108 @@
+@model List<Client>
+@{
+    ViewData["Title"] = "Clients";
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Clients</h1>
+        <p class="lede">Everyone captured for DebiCheck collections.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">Capture a client</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
+            <div class="field" style="flex:1 1 260px;">
+                <label for="q">Search</label>
+                <input type="text" id="q" name="q" value="@ViewBag.Query"
+                       placeholder="Name, client number or ID number" />
+            </div>
+            <div class="field" style="flex:0 0 180px;">
+                <label for="status">Status</label>
+                <select id="status" name="status">
+                    <option value="">All</option>
+                    @foreach (var s in Enum.GetValues<ClientStatus>())
+                    {
+                        <option value="@s" selected="@(ViewBag.Status?.ToString() == s.ToString())">@s</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="btn btn-navy">Search</button>
+            @if (!string.IsNullOrWhiteSpace(ViewBag.Query as string) || ViewBag.Status is not null)
+            {
+                <a asp-action="Index" class="btn btn-outline">Clear</a>
+            }
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <p>No clients match.</p>
+            <a asp-action="Create" class="btn btn-primary">Capture the first one</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>Name</th>
+                    <th>ID number</th>
+                    <th>Status</th>
+                    <th>Mandates</th>
+                    <th>Captured</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var c in Model)
+                {
+                    var authenticated = c.Mandates.Count(m => m.Status == MandateStatus.Authenticated);
+                    <tr>
+                        <td class="mono">@c.ClientNumber</td>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@c.Id"><strong>@c.FullName</strong></a>
+                        </td>
+                        <td class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(c.IdNumber)</td>
+                        <td>
+                            <span class="badge @(c.Status switch {
+                                                    ClientStatus.Active => "badge-green",
+                                                    ClientStatus.Suspended => "badge-amber",
+                                                    ClientStatus.Closed => "badge-red",
+                                                    _ => "badge-grey" })">@c.Status</span>
+                        </td>
+                        <td>
+                            @if (c.Mandates.Count == 0)
+                            {
+                                <span class="muted small">None</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-navy">@authenticated of @c.Mandates.Count active</span>
+                            }
+                        </td>
+                        <td class="muted small">@c.CreatedUtc.ToString("dd MMM yyyy")</td>
+                        <td>
+                            <div class="row-actions">
+                                <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-outline btn-sm">Edit</a>
+                                @if (c.Status == ClientStatus.Active)
+                                {
+                                    <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@c.Id"
+                                       class="btn btn-primary btn-sm">New mandate</a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -1,0 +1,97 @@
+@model AMPay.Web.Models.CreateUserModel
+@{
+    ViewData["Title"] = "New user";
+    var isPlatform = User.IsInRole(AppRoles.SuperAdmin);
+}
+
+<div class="page-head">
+    <h1>Add a user</h1>
+    <p class="lede">
+        The temporary password is shown to you once and is not emailed. Hand it over directly
+        and have them change it.
+    </p>
+</div>
+
+<form asp-action="Create" method="post">
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="card">
+        <div class="card-head"><h2>Person</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="FullName"></label>
+                    <input asp-for="FullName" />
+                    <span asp-validation-for="FullName" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Email"></label>
+                    <input asp-for="Email" type="email" autocomplete="off" />
+                    <span asp-validation-for="Email" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Password"></label>
+                    <input asp-for="Password" type="text" autocomplete="new-password" />
+                    <span class="hint">At least 12 characters, with an uppercase letter, a digit and a symbol.</span>
+                    <span asp-validation-for="Password" class="field-error"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h2>Access</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="Role"></label>
+                    <select asp-for="Role">
+                        @foreach (var (name, description) in AppRoles.All)
+                        {
+                            if (name == AppRoles.SuperAdmin && !isPlatform) { continue; }
+                            <option value="@name">@name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Role" class="field-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="TenantId"></label>
+                    <select asp-for="TenantId">
+                        @if (isPlatform)
+                        {
+                            <option value="">Platform &mdash; no customer (super admin only)</option>
+                        }
+                        @foreach (var (id, name) in Model.Tenants)
+                        {
+                            <option value="@id">@name</option>
+                        }
+                    </select>
+                    <span asp-validation-for="TenantId" class="field-error"></span>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1rem;margin-bottom:0;box-shadow:none;">
+                <div class="card-body">
+                    <h3 style="font-size:.9rem;">What each role can do</h3>
+                    <table class="data">
+                        <tbody>
+                        @foreach (var (name, description) in AppRoles.All)
+                        {
+                            if (name == AppRoles.SuperAdmin && !isPlatform) { continue; }
+                            <tr>
+                                <td style="white-space:nowrap;"><strong>@name</strong></td>
+                                <td class="small">@description</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card-foot">
+            <button type="submit" class="btn btn-primary">Create user</button>
+            <a asp-action="Index" class="btn btn-outline">Cancel</a>
+        </div>
+    </div>
+</form>

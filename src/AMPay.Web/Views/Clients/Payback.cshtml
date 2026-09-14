@@ -1,0 +1,129 @@
+@model AMPay.Web.Models.PaybackStepModel
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    ViewData["Title"] = "Payback";
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">
+        Step 5 of 13 &mdash; payback. These values become the DebiCheck mandate, so they use
+        Netcash&rsquo;s own vocabulary.
+    </p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <form asp-action="Payback" method="post">
+            <input type="hidden" asp-for="ClientId" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="card">
+                <div class="card-head"><h2>The loan</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="LoanAmount"></label>
+                            <input asp-for="LoanAmount" type="number" step="0.01" min="0" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="InstalmentAmount"></label>
+                            <input asp-for="InstalmentAmount" type="number" step="0.01" min="0" />
+                            <span class="hint">Becomes the mandate collection amount.</span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="NumberOfInstalments"></label>
+                            <input asp-for="NumberOfInstalments" type="number" min="1" max="600" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="AgreementDate"></label>
+                            <input asp-for="AgreementDate" type="date" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Collection schedule</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="Frequency"></label>
+                            <select asp-for="Frequency" asp-items="Html.GetEnumSelectList<DebitFrequency>()"></select>
+                            <span class="hint">Matches the Netcash DebitFrequency values exactly.</span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="CollectionDay"></label>
+                            <select asp-for="CollectionDay">
+                                <option value="">&mdash;</option>
+                                @for (var d = 1; d <= 31; d++)
+                                {
+                                    <option value="@d.ToString("D2")">@d</option>
+                                }
+                                <option value="LDOM">Last day of month</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="CollectionDayCode"></label>
+                            <input asp-for="CollectionDayCode" maxlength="7" />
+                            <span class="hint">Netcash field 250. Leave blank if your template sets it.</span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="FirstCollectionDate"></label>
+                            <input asp-for="FirstCollectionDate" type="date" />
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="TrackingDays"></label>
+                            <input asp-for="TrackingDays" type="number" min="1" max="10" />
+                            <span class="hint">
+                                How many days the bank keeps trying if the account is short.
+                                Netcash allows 1 to 10.
+                            </span>
+                            <span asp-validation-for="TrackingDays" class="field-error"></span>
+                        </div>
+                    </div>
+
+                    <div class="check" style="margin-top:1rem;">
+                        <input asp-for="FirstCollectionDiffers" type="checkbox" id="firstDiffers" />
+                        <label asp-for="FirstCollectionDiffers">
+                            The first collection is a different amount
+                            <span class="hint" style="display:block;font-weight:400;">
+                                Common for a pro-rata first month or an initiation fee.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="form-grid" style="margin-top:1rem;" id="firstAmountWrap">
+                        <div class="field">
+                            <label asp-for="FirstCollectionAmount"></label>
+                            <input asp-for="FirstCollectionAmount" type="number" step="0.01" min="0" />
+                            <span asp-validation-for="FirstCollectionAmount" class="field-error"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-primary">Save and continue</button>
+                    <a asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Skip to summary</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var toggle = document.getElementById('firstDiffers');
+            var wrap = document.getElementById('firstAmountWrap');
+            function sync() { if (wrap) wrap.hidden = !toggle.checked; }
+            toggle?.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+}

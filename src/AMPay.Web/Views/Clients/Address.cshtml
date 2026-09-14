@@ -1,0 +1,91 @@
+@model AMPay.Web.Models.AddressStepModel
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    ViewData["Title"] = "Address";
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">
+        Step 6 of 13 &mdash; address and contact. The mobile number matters most: DebiCheck
+        reaches the debtor on it to authenticate the mandate.
+    </p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <form asp-action="Address" method="post">
+            <input type="hidden" asp-for="ClientId" />
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="AddressType" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="card">
+                <div class="card-head"><h2>Physical address</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field wide">
+                            <label asp-for="Line1"></label>
+                            <input asp-for="Line1" />
+                        </div>
+                        <div class="field wide">
+                            <label asp-for="Line2"></label>
+                            <input asp-for="Line2" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Suburb"></label>
+                            <input asp-for="Suburb" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="City"></label>
+                            <input asp-for="City" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="Province"></label>
+                            <select asp-for="Province">
+                                <option value="">&mdash;</option>
+                                @foreach (var p in new[] { "Eastern Cape", "Free State", "Gauteng", "KwaZulu-Natal", "Limpopo", "Mpumalanga", "Northern Cape", "North West", "Western Cape" })
+                                {
+                                    <option value="@p">@p</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label asp-for="PostalCode"></label>
+                            <input asp-for="PostalCode" maxlength="10" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Contact</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="MobileNumber"></label>
+                            <input asp-for="MobileNumber" type="tel" placeholder="0825551234" />
+                            <span class="hint">Required for DebiCheck. Ten digits, starting with 0.</span>
+                            <span asp-validation-for="MobileNumber" class="field-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="HomeTelephone"></label>
+                            <input asp-for="HomeTelephone" type="tel" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="EmailAddress"></label>
+                            <input asp-for="EmailAddress" type="email" />
+                            <span asp-validation-for="EmailAddress" class="field-error"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-primary">Save and continue</button>
+                    <a asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Skip to summary</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

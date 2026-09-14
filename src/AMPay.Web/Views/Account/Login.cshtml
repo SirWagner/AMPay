@@ -1,0 +1,50 @@
+@model AMPay.Web.Controllers.LoginViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="mark">AM-Pay</div>
+        <div class="sub">A Netcash ISV</div>
+
+        <h1 style="font-size:1.25rem;">Sign in</h1>
+        <p class="muted small">DebiCheck onboarding and collections console.</p>
+
+        <form asp-action="Login" method="post">
+            <input type="hidden" asp-for="ReturnUrl" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="field" style="margin-bottom:1rem;">
+                <label asp-for="Email"></label>
+                <input asp-for="Email" type="email" autocomplete="username" autofocus />
+                <span asp-validation-for="Email" class="field-error"></span>
+            </div>
+
+            <div class="field" style="margin-bottom:1rem;">
+                <label asp-for="Password"></label>
+                <input asp-for="Password" type="password" autocomplete="current-password" />
+                <span asp-validation-for="Password" class="field-error"></span>
+            </div>
+
+            <div class="check" style="margin-bottom:1.25rem;">
+                <input asp-for="RememberMe" type="checkbox" />
+                <label asp-for="RememberMe"></label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                Sign in
+            </button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

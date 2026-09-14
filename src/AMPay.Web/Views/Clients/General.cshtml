@@ -1,0 +1,143 @@
+@model AMPay.Web.Models.GeneralStepModel
+@{
+    var wizard = ViewBag.Wizard as AMPay.Web.Models.WizardContext;
+    var isNew = Model.ClientId is null;
+    ViewData["Title"] = isNew ? "New client" : "General details";
+}
+
+<div class="page-head">
+    <h1>@(isNew ? "Capture a new client" : Model.FirstName + " " + Model.Surname)</h1>
+    <p class="lede">
+        Step 1 of 13 &mdash; general details. Everything the DebiCheck mandate needs about who
+        this person is.
+    </p>
+</div>
+
+<div class="@(wizard is null ? "" : "wizard")">
+    @if (wizard is not null)
+    {
+        <partial name="_WizardNav" model="wizard" />
+    }
+
+    <div>
+        <form asp-action="General" method="post">
+            <input type="hidden" asp-for="ClientId" />
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="card">
+                <div class="card-head"><h2>Identity</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="ClientNumber"></label>
+                            <input asp-for="ClientNumber" readonly="@(!isNew)" />
+                            <span class="hint">Becomes the Netcash account reference (field 101).</span>
+                            <span asp-validation-for="ClientNumber" class="field-error"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Title"></label>
+                            <select asp-for="Title">
+                                <option value="">&mdash;</option>
+                                @foreach (var t in new[] { "Mr", "Mrs", "Ms", "Miss", "Dr", "Prof" })
+                                {
+                                    <option value="@t">@t</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="FirstName"></label>
+                            <input asp-for="FirstName" />
+                            <span asp-validation-for="FirstName" class="field-error"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="MiddleNames"></label>
+                            <input asp-for="MiddleNames" />
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Surname"></label>
+                            <input asp-for="Surname" />
+                            <span asp-validation-for="Surname" class="field-error"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Identification</h2></div>
+                <div class="card-body">
+                    <div class="check" style="margin-bottom:1rem;">
+                        <input asp-for="IsSaIdNumber" type="checkbox" />
+                        <label asp-for="IsSaIdNumber">
+                            This client uses a South African ID number
+                            <span class="hint" style="display:block;font-weight:400;">
+                                Clear this for a passport or a company registration number.
+                                Netcash validates SA ID numbers with a check digit.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="IdNumber"></label>
+                            <input asp-for="IdNumber" />
+                            <span asp-validation-for="IdNumber" class="field-error"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="DateOfBirth"></label>
+                            <input asp-for="DateOfBirth" type="date" />
+                            <span class="hint">Filled in from the ID number when left blank.</span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Gender"></label>
+                            <select asp-for="Gender">
+                                <option value="">&mdash;</option>
+                                <option value="Female">Female</option>
+                                <option value="Male">Male</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="MaritalStatus"></label>
+                            <select asp-for="MaritalStatus">
+                                <option value="">&mdash;</option>
+                                @foreach (var s in new[] { "Single", "Married (ANC)", "Married (COP)", "Divorced", "Widowed", "Life partner" })
+                                {
+                                    <option value="@s">@s</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Nationality"></label>
+                            <input asp-for="Nationality" />
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="PreferredLanguage"></label>
+                            <select asp-for="PreferredLanguage">
+                                <option value="">&mdash;</option>
+                                @foreach (var l in new[] { "English", "Afrikaans", "isiZulu", "isiXhosa", "Sesotho", "Setswana", "Sepedi", "Xitsonga", "siSwati", "Tshivenda", "isiNdebele" })
+                                {
+                                    <option value="@l">@l</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-primary">
+                        @(isNew ? "Create and continue" : "Save and continue")
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline">Cancel</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

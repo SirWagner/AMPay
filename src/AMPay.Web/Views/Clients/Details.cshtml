@@ -1,0 +1,174 @@
+@model Client
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    ViewData["Title"] = Model.FullName;
+    var mobile = Model.Addresses.Select(a => a.MobileNumber).FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+    var primary = Model.BankAccounts.FirstOrDefault(a => a.IsPrimary) ?? Model.BankAccounts.FirstOrDefault();
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@Model.FullName</h1>
+        <p class="lede">
+            Client <span class="mono">@Model.ClientNumber</span> &middot;
+            <span class="badge @(Model.Status == ClientStatus.Active ? "badge-green" : "badge-grey")">@Model.Status</span>
+        </p>
+    </div>
+    <div class="row-actions">
+        @if (Model.Status == ClientStatus.Draft)
+        {
+            <form asp-action="Activate" method="post">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit" class="btn btn-primary">Activate client</button>
+            </form>
+        }
+        else if (Model.Status == ClientStatus.Active)
+        {
+            <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
+               class="btn btn-primary">New DebiCheck mandate</a>
+        }
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline">Edit</a>
+    </div>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        @if (Model.Status == ClientStatus.Draft)
+        {
+            <div class="alert alert-info">
+                This client is still a draft. Activation needs a bank account, a mobile number
+                and POPIA consent &mdash; then DebiCheck mandates can be created.
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-head"><h2>Ready for DebiCheck?</h2></div>
+            <div class="card-body">
+                <table class="data">
+                    <tbody>
+                    <tr>
+                        <td>Bank account captured</td>
+                        <td>@Html.Raw(Model.BankAccounts.Count > 0
+                                ? "<span class='badge badge-green'>Yes</span>"
+                                : "<span class='badge badge-red'>Missing</span>")</td>
+                        <td class="muted small">@(primary is null ? "" : $"{primary.BankName} {primary.MaskedAccountNumber}")</td>
+                    </tr>
+                    <tr>
+                        <td>Account verified (AVS)</td>
+                        <td>@Html.Raw(primary?.AvsVerified == true
+                                ? "<span class='badge badge-green'>Verified</span>"
+                                : "<span class='badge badge-grey'>Not verified</span>")</td>
+                        <td class="muted small">Optional, but it prevents a failed first collection.</td>
+                    </tr>
+                    <tr>
+                        <td>Mobile number</td>
+                        <td>@Html.Raw(!string.IsNullOrWhiteSpace(mobile)
+                                ? "<span class='badge badge-green'>Yes</span>"
+                                : "<span class='badge badge-red'>Missing</span>")</td>
+                        <td class="muted small">@mobile</td>
+                    </tr>
+                    <tr>
+                        <td>POPIA consent</td>
+                        <td>@Html.Raw(Model.OtherDetails?.DataProcessingConsent == true
+                                ? "<span class='badge badge-green'>Given</span>"
+                                : "<span class='badge badge-red'>Missing</span>")</td>
+                        <td class="muted small">@Model.OtherDetails?.DataProcessingConsentUtc?.ToString("dd MMM yyyy HH:mm")</td>
+                    </tr>
+                    <tr>
+                        <td>Instalment amount</td>
+                        <td>@Html.Raw(Model.Payback?.InstalmentAmount > 0
+                                ? "<span class='badge badge-green'>Set</span>"
+                                : "<span class='badge badge-amber'>Not set</span>")</td>
+                        <td class="muted small">
+                            @(Model.Payback?.InstalmentAmount is null ? "" : "R " + Model.Payback.InstalmentAmount.Value.ToString("N2"))
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;">
+            <div class="card">
+                <div class="card-head"><h3>Identity</h3></div>
+                <div class="card-body">
+                    <table class="data">
+                        <tbody>
+                        <tr><td class="muted">ID number</td><td class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(Model.IdNumber)</td></tr>
+                        <tr><td class="muted">Date of birth</td><td>@Model.DateOfBirth?.ToString("dd MMM yyyy")</td></tr>
+                        <tr><td class="muted">Gender</td><td>@Model.Gender</td></tr>
+                        <tr><td class="muted">Marital status</td><td>@Model.MaritalStatus</td></tr>
+                        <tr><td class="muted">Language</td><td>@Model.PreferredLanguage</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3>Affordability</h3></div>
+                <div class="card-body">
+                    @if (Model.Financial is null)
+                    {
+                        <p class="muted small mb-0">Not captured.</p>
+                    }
+                    else
+                    {
+                        <table class="data">
+                            <tbody>
+                            <tr><td class="muted">Gross income</td><td class="num">R @(Model.Financial.GrossMonthlyIncome?.ToString("N2") ?? "-")</td></tr>
+                            <tr><td class="muted">Net income</td><td class="num">R @(Model.Financial.NetMonthlyIncome?.ToString("N2") ?? "-")</td></tr>
+                            <tr><td class="muted">Expenses</td><td class="num">R @(Model.Financial.TotalMonthlyExpenses?.ToString("N2") ?? "-")</td></tr>
+                            <tr><td class="muted">Debt repayments</td><td class="num">R @(Model.Financial.TotalMonthlyDebtRepayments?.ToString("N2") ?? "-")</td></tr>
+                            <tr>
+                                <td><strong>Disposable</strong></td>
+                                <td class="num"><strong>R @(Model.Financial.DisposableIncome?.ToString("N2") ?? "-")</strong></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>DebiCheck mandates</h3>
+                @if (Model.Status == ClientStatus.Active)
+                {
+                    <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
+                       class="btn btn-primary btn-sm">New mandate</a>
+                }
+            </div>
+            @if (Model.Mandates.Count == 0)
+            {
+                <div class="empty">No mandates yet.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                        <tr><th>Reference</th><th>Route</th><th class="num">Amount</th><th>Status</th><th>Created</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var m in Model.Mandates.OrderByDescending(x => x.CreatedUtc))
+                        {
+                            <tr>
+                                <td class="mono">
+                                    <a asp-controller="Mandates" asp-action="Details" asp-route-id="@m.Id">@m.AccountReference</a>
+                                </td>
+                                <td class="small">@(m.MandateType == MandateType.DebiCheckTt1RealTime ? "TT1 real-time" : "TT2 batch")</td>
+                                <td class="num">R @m.CollectionAmount.ToString("N2")</td>
+                                <td><partial name="_MandateStatus" model="m.Status" /></td>
+                                <td class="muted small">@m.CreatedUtc.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

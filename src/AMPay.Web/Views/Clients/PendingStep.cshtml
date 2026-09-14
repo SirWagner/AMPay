@@ -1,0 +1,62 @@
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var step = (AMPay.Web.Models.OnboardingStep)ViewBag.Step;
+    var clientId = (Guid)ViewBag.ClientId;
+    var label = AMPay.Web.Models.OnboardingSteps.All.First(s => s.Step == step).Label;
+
+    var (what, why) = step switch
+    {
+        AMPay.Web.Models.OnboardingStep.References =>
+            ("Add, edit and remove the client's references.",
+             "Plain CRUD over the ClientReference entity, which already exists."),
+        AMPay.Web.Models.OnboardingStep.Budgets =>
+            ("Capture budget lines against the client.",
+             "Plain CRUD over the ClientBudget entity, which already exists."),
+        AMPay.Web.Models.OnboardingStep.CreditCheck =>
+            ("Run and review credit bureau enquiries.",
+             "Blocked on a decision: Compuscan / Experian directly, or Netcash risk reports (service id 3). See ICreditBureauClient."),
+        AMPay.Web.Models.OnboardingStep.Notes =>
+            ("Diary notes against the client file.",
+             "Plain CRUD over the ClientNote entity, which already exists."),
+        AMPay.Web.Models.OnboardingStep.Documents =>
+            ("Upload ID, payslip, proof of bank account and proof of address.",
+             "Needs Azure Blob Storage: a private container, server-side encryption, and downloads served through an authorised action rather than a public URL."),
+        AMPay.Web.Models.OnboardingStep.Photo =>
+            ("Capture the client's photograph from a webcam or an upload.",
+             "Needs the same blob storage as Documents, plus getUserMedia in the browser."),
+        _ => ("Not built yet.", "")
+    };
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">Step @((int)step) of 13 &mdash; @label.ToLowerInvariant().</p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <div class="card">
+            <div class="card-head">
+                <h2>@label</h2>
+                <span class="badge badge-amber">Not built yet</span>
+            </div>
+            <div class="card-body">
+                <p>@what</p>
+
+                <div class="gap-note">
+                    <strong>Gap:</strong> @why
+                </div>
+
+                <p class="muted small" style="margin-top:1rem;margin-bottom:0;">
+                    None of the remaining steps block a DebiCheck mandate, which is why they are
+                    last. Steps 1 to 7 carry everything Netcash needs to authenticate a collection.
+                </p>
+            </div>
+            <div class="card-foot">
+                <a asp-action="Details" asp-route-id="@clientId" class="btn btn-primary">Back to the summary</a>
+            </div>
+        </div>
+    </div>
+</div>

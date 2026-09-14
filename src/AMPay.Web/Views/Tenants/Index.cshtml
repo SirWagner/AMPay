@@ -1,0 +1,89 @@
+@{
+    ViewData["Title"] = "Customers";
+    var rows = ViewBag.Rows as List<(Tenant Tenant, int Clients, int Keys)> ?? new();
+    var selected = ViewBag.SelectedTenantId as Guid?;
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Customers</h1>
+        <p class="lede">
+            The businesses trading under the AM-Pay Netcash ISV number. Choose one to work
+            inside it; every client and mandate you capture belongs to the customer selected here.
+        </p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">Onboard a customer</a>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Customer</th>
+                <th>NCR</th>
+                <th>Netcash account</th>
+                <th>Status</th>
+                <th class="num">Clients</th>
+                <th class="num">Keys</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var (tenant, clients, keys) in rows)
+            {
+                <tr style="@(tenant.Id == selected ? "background:var(--green-light);" : "")">
+                    <td>
+                        <strong>@tenant.Name</strong>
+                        @if (tenant.IsPlatformOwner)
+                        {
+                            <span class="badge badge-navy">Platform</span>
+                        }
+                        @if (tenant.Id == selected)
+                        {
+                            <span class="badge badge-green">Working here</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(tenant.TradingName) && tenant.TradingName != tenant.Name)
+                        {
+                            <div class="muted small">t/a @tenant.TradingName</div>
+                        }
+                    </td>
+                    <td class="mono small">@(tenant.NcrNumber ?? "-")</td>
+                    <td class="mono small">
+                        @if (string.IsNullOrWhiteSpace(tenant.NetcashAccountNumber))
+                        {
+                            <span class="badge badge-amber">Not set</span>
+                        }
+                        else
+                        {
+                            @tenant.NetcashAccountNumber
+                        }
+                    </td>
+                    <td>
+                        <span class="badge @(tenant.Status switch {
+                                                TenantStatus.Active => "badge-green",
+                                                TenantStatus.Onboarding => "badge-amber",
+                                                _ => "badge-grey" })">@tenant.Status</span>
+                    </td>
+                    <td class="num">@clients</td>
+                    <td class="num">@keys</td>
+                    <td>
+                        <div class="row-actions">
+                            @if (!tenant.IsPlatformOwner && tenant.Id != selected)
+                            {
+                                <form asp-action="Select" method="post">
+                                    <input type="hidden" name="id" value="@tenant.Id" />
+                                    <button type="submit" class="btn btn-primary btn-sm">Work here</button>
+                                </form>
+                            }
+                            <a asp-controller="ServiceKeys" asp-action="Index" asp-route-tenantId="@tenant.Id"
+                               class="btn btn-outline btn-sm">Service keys</a>
+                            <a asp-action="Edit" asp-route-id="@tenant.Id" class="btn btn-outline btn-sm">Edit</a>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

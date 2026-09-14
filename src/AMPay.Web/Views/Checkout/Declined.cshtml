@@ -1,0 +1,38 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment not completed &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+<div class="checkout-page">
+    <div class="checkout-card">
+        <div class="checkout-head">
+            <div class="mark">Payment not completed</div>
+            <div class="sub">Nothing has been charged</div>
+        </div>
+        <div class="checkout-body" style="text-align:center;">
+            <p>
+                The payment was not completed. No money has left your account, and you can
+                try again using the same link.
+            </p>
+            @if (ViewBag.Reference is string reference)
+            {
+                <p class="small muted">
+                    Reference <span class="mono">@reference</span>
+                </p>
+                <a asp-action="Pay" asp-route-reference="@reference" class="btn btn-primary">Try again</a>
+            }
+        </div>
+        <div class="checkout-foot">
+            If this keeps happening, contact the business that sent you this link.
+        </div>
+    </div>
+</div>
+</body>
+</html>

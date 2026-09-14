@@ -1,0 +1,66 @@
+@model PayNowTransaction
+@{
+    Layout = null;
+    var form = (AMPay.Domain.Netcash.PayNowCheckoutForm)ViewBag.Form;
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pay R @Model.Amount.ToString("N2") &middot; AM-Pay</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body>
+<div class="checkout-page">
+    <div class="checkout-card">
+        <div class="checkout-head">
+            <div class="mark">@(Model.Tenant?.TradingName ?? Model.Tenant?.Name ?? "AM-Pay")</div>
+            <div class="sub">Secured by Netcash</div>
+        </div>
+
+        <div class="checkout-body">
+            <div class="checkout-amount">
+                <span class="cur">R</span>@Model.Amount.ToString("N2")
+            </div>
+
+            <p style="text-align:center;color:var(--text-muted);margin:.35rem 0 0;">
+                @Model.Description
+            </p>
+
+            <div class="checkout-methods">
+                <span class="method-chip">Card</span>
+                <span class="method-chip">Instant EFT</span>
+                <span class="method-chip">PayShap</span>
+                <span class="method-chip">QR</span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.CustomerName))
+            {
+                <p class="small muted" style="text-align:center;">Billed to @Model.CustomerName</p>
+            }
+
+            <form method="post" action="@form.PostUrl" id="payNowForm">
+                @foreach (var field in form.Fields)
+                {
+                    <input type="hidden" name="@field.Key" value="@field.Value" />
+                }
+                <button type="submit" class="btn btn-primary"
+                        style="width:100%;justify-content:center;margin-top:1rem;padding:.7rem;">
+                    Pay R @Model.Amount.ToString("N2")
+                </button>
+            </form>
+
+            <p class="small muted" style="text-align:center;margin-top:1rem;margin-bottom:0;">
+                Reference <span class="mono">@Model.PaymentReference</span>
+            </p>
+        </div>
+
+        <div class="checkout-foot">
+            You will be taken to Netcash to complete this payment.
+            AM-Pay never sees or stores your card details.
+        </div>
+    </div>
+</div>
+</body>
+</html>
