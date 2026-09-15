@@ -4,9 +4,9 @@
     {
       "name": "ampay-web",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/AMPay.Web", "--no-launch-profile"],
-      "port": 5210,
-      "url": "http://localhost:5210"
+      "runtimeArgs": ["run", "--project", "src/AMPay.Web", "--launch-profile", "https"],
+      "port": 7027,
+      "url": "https://localhost:7027"
     }
   ]
 }
