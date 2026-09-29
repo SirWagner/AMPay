@@ -70,13 +70,26 @@ public class AffordabilityNorms
     }
 }
 
-/// <summary>Inputs to an affordability assessment.</summary>
+/// <summary>
+/// Inputs to an affordability assessment.
+/// <para>
+/// <paramref name="OtherMonthlyIncome"/> is income beyond the payslip - the "Other Income"
+/// line of the Maxmoney budget. It counts towards both gross income (and so the client's
+/// Regulation 23A band) and net income: it is not taxed through payroll, so there is no
+/// separate net figure for it.
+/// </para>
+/// </summary>
 public record AffordabilityInput(
     decimal GrossMonthlyIncome,
     decimal NetMonthlyIncome,
     decimal DeclaredMonthlyExpenses,
     decimal ExistingDebtRepayments,
-    decimal ProposedInstalment);
+    decimal ProposedInstalment,
+    decimal OtherMonthlyIncome = 0m)
+{
+    public decimal TotalGrossIncome => GrossMonthlyIncome + OtherMonthlyIncome;
+    public decimal TotalNetIncome => NetMonthlyIncome + OtherMonthlyIncome;
+}
 
 /// <summary>The assessment, with its reasoning.</summary>
 public record AffordabilityResult

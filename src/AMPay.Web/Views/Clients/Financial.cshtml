@@ -2,12 +2,15 @@
 @{
     var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
     ViewData["Title"] = "Financial";
+
+    string R(decimal value) => "R " + value.ToString("N2");
+    var non = Model.NetOfNet;
 }
 
 <div class="page-head">
     <h1>@wizard.ClientName</h1>
     <p class="lede">
-        @OnboardingSteps.Caption(OnboardingStep.Financial) &mdash; financial. Income against commitments: the basis of the
+        @OnboardingSteps.Caption(OnboardingStep.Financial) &mdash; financial. Income against the monthly budget: the basis of the
         affordability assessment the National Credit Act requires.
     </p>
 </div>
@@ -16,8 +19,13 @@
     <partial name="_WizardNav" model="wizard" />
 
     <div>
-        <form asp-action="Financial" method="post">
+        <form asp-action="Financial" method="post" id="financialForm">
             <input type="hidden" asp-for="ClientId" />
+
+            @* Enter in any field submits the form through its first submit button. Without
+               this, that would be "Remove" or "Add expense" rather than Save. *@
+            <button type="submit" name="command" value="save" class="default-submit" tabindex="-1" aria-hidden="true"></button>
+
             <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
 
             <div class="card">
@@ -32,12 +40,13 @@
                         <div class="field">
                             <label asp-for="NetMonthlyIncome"></label>
                             <input asp-for="NetMonthlyIncome" type="number" step="0.01" min="0" />
-                            <span class="hint">Take-home pay after deductions.</span>
+                            <span class="hint">Own salary: take-home pay after deductions.</span>
                             <span asp-validation-for="NetMonthlyIncome" class="field-error"></span>
                         </div>
                         <div class="field">
                             <label asp-for="OtherIncome"></label>
                             <input asp-for="OtherIncome" type="number" step="0.01" min="0" />
+                            <span class="hint">Counts towards NET of NET and affordability.</span>
                         </div>
                         <div class="field">
                             <label asp-for="OtherIncomeSource"></label>
@@ -47,29 +56,158 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-head"><h2>Commitments</h2></div>
+            <div class="card" id="budget">
+                <div class="card-head"><h2>Budget</h2></div>
                 <div class="card-body">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label asp-for="TotalMonthlyExpenses"></label>
-                            <input asp-for="TotalMonthlyExpenses" type="number" step="0.01" min="0" />
-                        </div>
-                        <div class="field">
-                            <label asp-for="TotalMonthlyDebtRepayments"></label>
-                            <input asp-for="TotalMonthlyDebtRepayments" type="number" step="0.01" min="0" />
-                        </div>
+                    <p class="muted small mt-0">
+                        Monthly amounts. Credit card, loan and vehicle instalments are debt: they are deducted on top of
+                        living expenses, never counted towards the Regulation 23A minimum.
+                    </p>
+
+                    <div class="table-wrap">
+                        <table class="data budget-table">
+                            <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Note</th>
+                                <th class="num">Amount</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @for (var i = 0; i < Model.Budget.Count; i++)
+                            {
+                                var line = Model.Budget[i];
+                                <tr>
+                                    <td>
+                                        <input type="hidden" asp-for="Budget[i].Id" />
+                                        <input type="hidden" asp-for="Budget[i].Category" />
+                                        @if (line.IsCustom)
+                                        {
+                                            <input asp-for="Budget[i].Description" placeholder="What is it for?" aria-label="Expense description" />
+                                            <span asp-validation-for="Budget[i].Description" class="field-error"></span>
+                                        }
+                                        else
+                                        {
+                                            <text>@line.Description</text>
+                                            @if (line.Hint is not null)
+                                            {
+                                                <div class="muted small">@line.Hint</div>
+                                            }
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (line.Kind == BudgetLineKind.DebtInstalment)
+                                        {
+                                            <span class="badge badge-navy">Debt</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge badge-grey">Expense</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <input asp-for="Budget[i].Note" aria-label="Note for @(line.Description ?? "expense")" />
+                                    </td>
+                                    <td class="num">
+                                        <input asp-for="Budget[i].Amount" type="number" step="0.01" min="0"
+                                               class="budget-amount" data-kind="@line.Kind"
+                                               aria-label="Amount for @(line.Description ?? "expense")" />
+                                        <span asp-validation-for="Budget[i].Amount" class="field-error"></span>
+                                    </td>
+                                    <td>
+                                        @if (line.IsCustom)
+                                        {
+                                            <button type="submit" name="command" value="remove:@i" formnovalidate
+                                                    class="btn btn-danger btn-sm">Remove</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                            <tfoot>
+                            <tr class="total">
+                                <td colspan="3">Living expenses</td>
+                                <td class="num" id="totalExpense">@R(Model.TotalExpenses)</td>
+                                <td></td>
+                            </tr>
+                            <tr class="total">
+                                <td colspan="3">Debt instalments</td>
+                                <td class="num" id="totalDebt">@R(Model.TotalDebtInstalments)</td>
+                                <td></td>
+                            </tr>
+                            </tfoot>
+                        </table>
                     </div>
 
-                    @if (Model.Disposable is not null)
+                    <div class="row-actions" style="margin-top:1rem;">
+                        <button type="submit" name="command" value="add-expense" formnovalidate class="btn btn-outline btn-sm">
+                            + Add expense
+                        </button>
+                        <button type="submit" name="command" value="recalculate" formnovalidate class="btn btn-outline btn-sm">
+                            Recalculate NET of NET
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="netOfNet">
+                <div class="card-head"><h2>NET of NET</h2></div>
+                <div class="card-body">
+                    @if (non is null)
                     {
-                        <div class="alert @(Model.Disposable > 0 ? "alert-success" : "alert-warn")" style="margin-top:1rem;">
-                            Disposable income: <strong>R @Model.Disposable.Value.ToString("N2")</strong>
-                            @if (Model.Disposable <= 0)
+                        <p class="muted small mb-0">Capture gross and net monthly income to see what is left each month.</p>
+                    }
+                    else
+                    {
+                        <table class="data net-of-net">
+                            <tbody>
+                            <tr><td>Net income</td><td class="num">@R(non.NetIncome)</td></tr>
+                            @if (non.OtherIncome > 0)
                             {
-                                <text> &mdash; this client has nothing left to service a new instalment.</text>
+                                <tr><td>Plus other income</td><td class="num">@R(non.OtherIncome)</td></tr>
                             }
+                            <tr>
+                                <td>
+                                    Less living expenses
+                                    <div class="muted small">
+                                        @if (non.StatutoryMinimumApplied)
+                                        {
+                                            <text>Budget of @R(non.DeclaredExpenses) is below the Regulation 23A minimum of
+                                                @R(non.StatutoryMinimumExpenses) for this income, so the minimum is used.</text>
+                                        }
+                                        else
+                                        {
+                                            <text>Budget; above the Regulation 23A minimum of @R(non.StatutoryMinimumExpenses).</text>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="num">(@R(non.AppliedExpenses))</td>
+                            </tr>
+                            <tr><td>Less debt instalments</td><td class="num">(@R(non.DebtInstalments))</td></tr>
+                            <tr class="total">
+                                <td>NET of NET</td>
+                                <td class="num">@R(non.NetOfNet)</td>
+                            </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="alert @(non.NetOfNet > 0 ? "alert-success" : "alert-warn") small" style="margin-top:1rem;">
+                            @if (non.NetOfNet > 0)
+                            {
+                                <text>A new loan's instalment must fit within <strong>@R(non.NetOfNet)</strong> a month.</text>
+                            }
+                            else
+                            {
+                                <text>Nothing is left to service a new instalment. Lending to this client would be reckless under s80 of the National Credit Act.</text>
+                            }
+                            Instalments on loans already held with us are deducted when a loan is assessed.
                         </div>
+
+                        <p class="muted small mb-0" id="netOfNetStale" hidden>
+                            Figures changed since this was calculated &mdash; recalculate or save to update it.
+                        </p>
                     }
                 </div>
             </div>
@@ -89,10 +227,38 @@
                     </div>
                 </div>
                 <div class="card-foot">
-                    <button type="submit" class="btn btn-primary">Save and continue</button>
+                    <button type="submit" name="command" value="save" class="btn btn-primary">Save and continue</button>
                     <a asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Skip to summary</a>
                 </div>
             </div>
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // Live totals only. NET of NET needs the Regulation 23A bands, which live on the
+        // server; rather than copy them here, the figure is marked stale until recalculated.
+        (function () {
+            var form = document.getElementById('financialForm');
+            var fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            function total(kind) {
+                var sum = 0;
+                form.querySelectorAll('.budget-amount[data-kind="' + kind + '"]').forEach(function (el) {
+                    var v = parseFloat(el.value);
+                    if (!isNaN(v)) sum += v;
+                });
+                return 'R ' + fmt.format(sum);
+            }
+
+            form.addEventListener('input', function (e) {
+                if (e.target.type !== 'number') return;
+                document.getElementById('totalExpense').textContent = total('Expense');
+                document.getElementById('totalDebt').textContent = total('DebtInstalment');
+                var stale = document.getElementById('netOfNetStale');
+                if (stale) stale.hidden = false;
+            });
+        })();
+    </script>
+}

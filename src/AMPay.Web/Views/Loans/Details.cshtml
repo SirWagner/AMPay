@@ -110,6 +110,10 @@
 
                 <dl class="detail-list">
                     <dt>Net income</dt><dd>@R(assessment.NetMonthlyIncome)</dd>
+                    @if (assessment.OtherMonthlyIncome > 0)
+                    {
+                        <dt>Other income</dt><dd>@R(assessment.OtherMonthlyIncome)</dd>
+                    }
                     <dt>Expenses used</dt>
                     <dd>
                         @R(Math.Max(assessment.DeclaredMonthlyExpenses, assessment.StatutoryMinimumExpenses))

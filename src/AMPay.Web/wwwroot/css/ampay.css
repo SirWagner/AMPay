@@ -1045,3 +1045,27 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
 @media (max-width: 960px) {
     .dash .chart-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------------------------------------------------------------- budget */
+
+.budget-table td { vertical-align: top; }
+.budget-table input:not([type=hidden]) {
+    padding: .35rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font: inherit;
+    color: var(--text-body);
+    background: #fff;
+    width: 100%;
+    min-width: 8rem;
+}
+.budget-table td.num input { text-align: right; max-width: 10rem; }
+.budget-table input:focus {
+    outline: none;
+    border-color: var(--green-accent);
+    box-shadow: 0 0 0 3px rgba(74, 170, 60, .15);
+}
+.net-of-net { max-width: 36rem; }
+
+/* The form's default button: reachable by Enter, invisible to everyone else. */
+.default-submit { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }

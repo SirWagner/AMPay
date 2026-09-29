@@ -239,3 +239,19 @@ public enum DocumentReviewStatus
     Approved = 1,
     Rejected = 2
 }
+
+/// <summary>
+/// What a budget line is, for the NCA affordability test. Income is not a line kind: it is
+/// captured once, on the Financial step, and never duplicated here.
+/// </summary>
+public enum BudgetLineKind
+{
+    /// <summary>A living expense. Tested against the Regulation 23A minimum as a whole.</summary>
+    Expense = 1,
+
+    /// <summary>
+    /// An instalment to a credit provider. Deducted on top of living expenses, never in
+    /// place of them: the Regulation 23A norm is a floor on living costs alone.
+    /// </summary>
+    DebtInstalment = 2
+}

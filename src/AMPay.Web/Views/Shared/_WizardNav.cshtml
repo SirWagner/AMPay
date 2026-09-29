@@ -22,6 +22,15 @@
                 <span>@label</span>
             </a>
         }
+        else if (step == OnboardingStep.Budgets)
+        {
+            // The budget is captured on the Financial step, against the income it spends.
+            <a class="@cls" asp-controller="Clients" asp-action="Financial"
+               asp-route-id="@Model.ClientId" asp-fragment="budget">
+                <span class="num">@(done ? "✓" : OnboardingSteps.Position(step).ToString())</span>
+                <span>@label</span>
+            </a>
+        }
         else if (built)
         {
             <a class="@cls" asp-controller="Clients" asp-action="@action" asp-route-id="@Model.ClientId">

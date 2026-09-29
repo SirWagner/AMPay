@@ -90,6 +90,37 @@ public class AffordabilityTests
         Assert.Equal(3_000m, result.DiscretionaryIncome);
     }
 
+    // ----------------------------------------------------------------- other income
+
+    [Fact]
+    public void OtherIncome_CountsTowardsNetIncome_AndTheIncomeBand()
+    {
+        // R10 000 salary plus R2 000 other income is a R12 000 household for Regulation
+        // 23A: a norm of 1 167.88 + 9% of 5 750 = R1 685.38, not the R1 505.38 of salary alone.
+        var result = Service().Assess(new AffordabilityInput(
+            GrossMonthlyIncome: 10_000m,
+            NetMonthlyIncome: 8_500m,
+            DeclaredMonthlyExpenses: 200m,
+            ExistingDebtRepayments: 0m,
+            ProposedInstalment: 1_000m,
+            OtherMonthlyIncome: 2_000m));
+
+        Assert.Equal(1_685.38m, result.StatutoryMinimumExpenses);
+        Assert.Equal(8_814.62m, result.DiscretionaryIncome);
+        Assert.Contains("plus other income R 2,000.00", result.Reasoning);
+    }
+
+    [Fact]
+    public void OtherIncomeAlone_IsStillInsufficient()
+    {
+        // This lender advances against a payslip. Declared other income with no salary on
+        // file is a capture gap, not something to lend against.
+        var result = Service().Assess(new AffordabilityInput(
+            0m, 0m, 0m, 0m, 500m, OtherMonthlyIncome: 6_000m));
+
+        Assert.Equal(AffordabilityOutcome.Insufficient, result.Outcome);
+    }
+
     // ----------------------------------------------------------------- outcomes
 
     [Fact]

@@ -26,6 +26,9 @@ public class AffordabilityAssessment
     public decimal GrossMonthlyIncome { get; set; }
     public decimal NetMonthlyIncome { get; set; }
 
+    /// <summary>Income beyond the payslip, counted towards both gross and net.</summary>
+    public decimal OtherMonthlyIncome { get; set; }
+
     /// <summary>What the client declared they spend.</summary>
     public decimal DeclaredMonthlyExpenses { get; set; }
 

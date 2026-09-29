@@ -97,8 +97,10 @@ public class LoanOriginationTests
         Assert.Null(LoanOrigination.AffordabilityInputFor(null, 1_000m));
 
     [Fact]
-    public void AffordabilityInput_UsesNetPay_AndIgnoresUnevidencedOtherIncome()
+    public void AffordabilityInput_CarriesNetPay_AndOtherIncomeSeparately()
     {
+        // Kept apart so the assessment can say where the income came from, and so the
+        // snapshot shows what was on the payslip and what was declared on top of it.
         var input = LoanOrigination.AffordabilityInputFor(new ClientFinancial
         {
             GrossMonthlyIncome = 20_000m,
@@ -110,6 +112,9 @@ public class LoanOriginationTests
 
         Assert.NotNull(input);
         Assert.Equal(16_000m, input!.NetMonthlyIncome);
+        Assert.Equal(5_000m, input.OtherMonthlyIncome);
+        Assert.Equal(21_000m, input.TotalNetIncome);
+        Assert.Equal(25_000m, input.TotalGrossIncome);
         Assert.Equal(6_000m, input.DeclaredMonthlyExpenses);
         Assert.Equal(1_500m, input.ExistingDebtRepayments);
         Assert.Equal(1_200m, input.ProposedInstalment);
@@ -165,10 +170,22 @@ public class LoanOriginationTests
         Assert.Equal(loanId, a.LoanId);
         Assert.Equal("user-1", a.AssessedByUserId);
         Assert.Equal(16_000m, a.NetMonthlyIncome);
+        Assert.Equal(0m, a.OtherMonthlyIncome);
         Assert.Equal(result.Outcome, a.Outcome);
         Assert.Equal(result.DiscretionaryIncome, a.DiscretionaryIncome);
         Assert.Equal(result.Reasoning, a.Reasoning);
         Assert.False(a.WasOverridden);
+    }
+
+    [Fact]
+    public void ToAssessment_SnapshotsOtherIncome()
+    {
+        var input = new AffordabilityInput(20_000m, 16_000m, 6_000m, 1_500m, 1_200m, OtherMonthlyIncome: 3_000m);
+        var result = new AffordabilityService(Options.Create(new AffordabilityNorms())).Assess(input);
+
+        var a = LoanOrigination.ToAssessment(Guid.NewGuid(), input, result, "user-1");
+
+        Assert.Equal(3_000m, a.OtherMonthlyIncome);
     }
 
     // ----------------------------------------------------------------- loan numbers

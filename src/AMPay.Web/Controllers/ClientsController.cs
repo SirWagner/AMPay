@@ -1,3 +1,4 @@
+using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Domain.Netcash;
@@ -27,17 +28,20 @@ public class ClientsController : Controller
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
     private readonly INetcashValidationService _validation;
+    private readonly IAffordabilityService _affordability;
     private readonly ILogger<ClientsController> _log;
 
     public ClientsController(
         AppDbContext db,
         ICurrentTenant tenant,
         INetcashValidationService validation,
+        IAffordabilityService affordability,
         ILogger<ClientsController> log)
     {
         _db = db;
         _tenant = tenant;
         _validation = validation;
+        _affordability = affordability;
         _log = log;
     }
 
@@ -272,40 +276,85 @@ public class ClientsController : Controller
     public async Task<IActionResult> Financial(Guid id)
     {
         ViewData["Title"] = "Financial";
-        var client = await LoadClientAsync(id, c => c.Financial);
+        var client = await LoadClientAsync(id, c => c.Financial, c => c.Budgets);
         if (client is null) return NotFound();
 
         await PopulateWizardAsync(id);
 
         var f = client.Financial;
-        return View(new FinancialStepModel
+        var model = new FinancialStepModel
         {
             ClientId = id,
             GrossMonthlyIncome = f?.GrossMonthlyIncome,
             NetMonthlyIncome = f?.NetMonthlyIncome,
             OtherIncome = f?.OtherIncome,
             OtherIncomeSource = f?.OtherIncomeSource,
-            TotalMonthlyExpenses = f?.TotalMonthlyExpenses,
-            TotalMonthlyDebtRepayments = f?.TotalMonthlyDebtRepayments,
+            Budget = BudgetLinesFor(client.Budgets, f),
             BankName = f?.BankName,
             YearsAtBank = f?.YearsAtBank
-        });
+        };
+        model.NetOfNet = NetOfNetFor(model);
+
+        return View(model);
     }
 
+    /// <summary>
+    /// Saves the step, or - for <paramref name="command"/> "add-expense", "remove:{index}"
+    /// or "recalculate" - redraws the form with the change and a fresh NET of NET, saving
+    /// nothing. Round-tripping keeps the Regulation 23A calculation in one place, on the
+    /// server, rather than duplicated in script.
+    /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Financial(FinancialStepModel model)
+    public async Task<IActionResult> Financial(FinancialStepModel model, string? command)
     {
         ViewData["Title"] = "Financial";
-        var client = await LoadClientAsync(model.ClientId, c => c.Financial);
+        var client = await LoadClientAsync(model.ClientId, c => c.Financial, c => c.Budgets);
         if (client is null) return NotFound();
+
+        NormaliseBudget(model);
+
+        if (!string.IsNullOrEmpty(command) && command != "save")
+        {
+            if (command == "add-expense")
+            {
+                model.Budget.Add(new BudgetLineModel
+                {
+                    Category = BudgetCategories.Custom,
+                    Kind = BudgetLineKind.Expense
+                });
+            }
+            else if (command.StartsWith("remove:", StringComparison.Ordinal) &&
+                     int.TryParse(command["remove:".Length..], out var index) &&
+                     index >= 0 && index < model.Budget.Count &&
+                     model.Budget[index].IsCustom)
+            {
+                model.Budget.RemoveAt(index);
+            }
+
+            // Posted values would otherwise win over the model, and after a removal every
+            // row below it would show its neighbour's figures. Validation waits for Save.
+            ModelState.Clear();
+            model.NetOfNet = NetOfNetFor(model);
+            await PopulateWizardAsync(model.ClientId);
+            return View(model);
+        }
 
         if (model.NetMonthlyIncome > model.GrossMonthlyIncome)
             ModelState.AddModelError(nameof(model.NetMonthlyIncome),
                 "Net income cannot exceed gross income.");
 
+        for (var i = 0; i < model.Budget.Count; i++)
+        {
+            var line = model.Budget[i];
+            if (line.IsCustom && line.Amount > 0 && string.IsNullOrWhiteSpace(line.Description))
+                ModelState.AddModelError($"{nameof(model.Budget)}[{i}].{nameof(line.Description)}",
+                    "Say what this expense is.");
+        }
+
         if (!ModelState.IsValid)
         {
+            model.NetOfNet = NetOfNetFor(model);
             await PopulateWizardAsync(model.ClientId);
             return View(model);
         }
@@ -318,16 +367,191 @@ public class ClientsController : Controller
         f.NetMonthlyIncome = model.NetMonthlyIncome;
         f.OtherIncome = model.OtherIncome;
         f.OtherIncomeSource = model.OtherIncomeSource;
-        f.TotalMonthlyExpenses = model.TotalMonthlyExpenses;
-        f.TotalMonthlyDebtRepayments = model.TotalMonthlyDebtRepayments;
         f.BankName = model.BankName;
         f.YearsAtBank = model.YearsAtBank;
+
+        SaveBudget(client, model.Budget);
+
+        // The totals the loan affordability assessment reads. Derived, never typed.
+        f.TotalMonthlyExpenses = model.TotalExpenses;
+        f.TotalMonthlyDebtRepayments = model.TotalDebtInstalments;
 
         client.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        TempData["Success"] = "Financial details saved.";
+        TempData["Success"] = "Financial details and budget saved.";
         return RedirectToAction(nameof(Banking), new { id = client.Id });
+    }
+
+    /// <summary>
+    /// The budget as the form shows it: one line per standard category, then custom lines.
+    /// <para>
+    /// A client captured before the budget existed has only the two totals. They are
+    /// carried into Other and Loans, so the first save does not quietly zero them.
+    /// </para>
+    /// </summary>
+    private static List<BudgetLineModel> BudgetLinesFor(
+        IEnumerable<ClientBudget> saved, ClientFinancial? financial)
+    {
+        var rows = saved.ToList();
+        var carryOver = rows.Count == 0;
+
+        var lines = BudgetCategories.Standard.Select(c =>
+        {
+            var row = rows.FirstOrDefault(r => r.Category == c.Key);
+            var line = new BudgetLineModel
+            {
+                Id = row?.Id,
+                Category = c.Key,
+                Kind = c.Kind,
+                Description = c.Label,
+                Amount = row?.Amount,
+                Note = row?.Notes,
+                Hint = c.Hint
+            };
+
+            if (carryOver && financial is not null)
+            {
+                var earlier = c.Key switch
+                {
+                    "Other" => financial.TotalMonthlyExpenses,
+                    "Loans" => financial.TotalMonthlyDebtRepayments,
+                    _ => null
+                };
+
+                if (earlier > 0)
+                {
+                    line.Amount = earlier;
+                    line.Note = "Carried over from the total captured before the budget.";
+                }
+            }
+
+            return line;
+        }).ToList();
+
+        lines.AddRange(rows
+            .Where(r => BudgetCategories.Find(r.Category) is null)
+            .OrderBy(r => r.DisplayOrder)
+            .Select(r => new BudgetLineModel
+            {
+                Id = r.Id,
+                Category = BudgetCategories.Custom,
+                Kind = BudgetLineKind.Expense,
+                Description = r.Description,
+                Amount = r.Amount,
+                Note = r.Notes
+            }));
+
+        return lines;
+    }
+
+    /// <summary>
+    /// Rebuilds the posted budget from the catalogue. The form carries each line's category
+    /// and figures; the kind and label come from here, so a tampered post cannot move an
+    /// expense into debt or rename a standard line.
+    /// </summary>
+    private static void NormaliseBudget(FinancialStepModel model)
+    {
+        var posted = model.Budget ?? new List<BudgetLineModel>();
+
+        var standard = BudgetCategories.Standard.Select(c =>
+        {
+            var line = posted.FirstOrDefault(l => l.Category == c.Key) ?? new BudgetLineModel();
+            line.Category = c.Key;
+            line.Kind = c.Kind;
+            line.Description = c.Label;
+            line.Hint = c.Hint;
+            return line;
+        });
+
+        var custom = posted
+            .Where(l => BudgetCategories.Find(l.Category) is null)
+            .Select(l =>
+            {
+                l.Category = BudgetCategories.Custom;
+                l.Kind = BudgetLineKind.Expense;
+                l.Description = l.Description?.Trim();
+                return l;
+            });
+
+        model.Budget = standard.Concat(custom).ToList();
+    }
+
+    /// <summary>
+    /// Writes the budget lines. Existing rows are matched only among this client's own
+    /// budget - an id posted from another client's form matches nothing and is ignored.
+    /// </summary>
+    private void SaveBudget(Client client, List<BudgetLineModel> lines)
+    {
+        var existing = client.Budgets.ToList();
+        var kept = new HashSet<Guid>();
+        var today = DateTime.UtcNow.Date;
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+
+            // An added line left empty is a line nobody wanted.
+            if (line.IsCustom && string.IsNullOrWhiteSpace(line.Description) && !(line.Amount > 0))
+                continue;
+
+            var row = existing.FirstOrDefault(r => line.Id is not null && r.Id == line.Id)
+                      ?? (line.IsCustom ? null : existing.FirstOrDefault(r => r.Category == line.Category));
+
+            if (row is null)
+            {
+                // Through the DbSet, not client.Budgets - see GetOrCreate.
+                row = new ClientBudget { ClientId = client.Id };
+                _db.ClientBudgets.Add(row);
+            }
+
+            row.Kind = line.Kind;
+            row.Category = line.Category;
+            row.Description = line.Description ?? "";
+            row.Amount = line.Amount ?? 0m;
+            row.Notes = string.IsNullOrWhiteSpace(line.Note) ? null : line.Note.Trim();
+            row.DisplayOrder = i;
+            row.BudgetDate = today;
+
+            kept.Add(row.Id);
+        }
+
+        _db.ClientBudgets.RemoveRange(existing.Where(r => !kept.Contains(r.Id)));
+    }
+
+    /// <summary>
+    /// NET of NET for the figures on the form: the affordability assessment with a nil
+    /// instalment. Null until gross and net pay are captured.
+    /// </summary>
+    private NetOfNetView? NetOfNetFor(FinancialStepModel model) =>
+        NetOfNetFor(model.GrossMonthlyIncome, model.NetMonthlyIncome, model.OtherIncome,
+            model.TotalExpenses, model.TotalDebtInstalments);
+
+    private NetOfNetView? NetOfNetFor(
+        decimal? gross, decimal? net, decimal? other, decimal expenses, decimal debt)
+    {
+        if (!(gross > 0) || !(net > 0)) return null;
+
+        var input = new AffordabilityInput(
+            GrossMonthlyIncome: gross ?? 0m,
+            NetMonthlyIncome: net ?? 0m,
+            DeclaredMonthlyExpenses: expenses,
+            ExistingDebtRepayments: debt,
+            ProposedInstalment: 0m,
+            OtherMonthlyIncome: other ?? 0m);
+
+        var result = _affordability.Assess(input);
+
+        return new NetOfNetView
+        {
+            NetIncome = input.NetMonthlyIncome,
+            OtherIncome = input.OtherMonthlyIncome,
+            DeclaredExpenses = expenses,
+            StatutoryMinimumExpenses = result.StatutoryMinimumExpenses,
+            AppliedExpenses = result.AppliedExpenses,
+            DebtInstalments = debt,
+            NetOfNet = result.DiscretionaryIncome
+        };
     }
 
     // ------------------------------------------------------------- step 4
@@ -646,7 +870,11 @@ public class ClientsController : Controller
     /// <summary>
     /// Steps 8 to 13: References, Budgets, Credit check, Notes, Documents, Photograph.
     /// <para>
-    /// GAP - not yet built. References, Budgets and Notes are plain CRUD over entities that
+    /// Budgets is captured on the Financial step, beside the income it is set against, and
+    /// this sends it there.
+    /// </para>
+    /// <para>
+    /// GAP - not yet built. References and Notes are plain CRUD over entities that
     /// already exist. Credit check needs a bureau decision (see ICreditBureauClient), and
     /// Documents and Photograph need Azure Blob Storage wired up. None of them block a
     /// DebiCheck mandate, which is why they are last.
@@ -657,6 +885,9 @@ public class ClientsController : Controller
     {
         var client = await LoadClientAsync(id);
         if (client is null) return NotFound();
+
+        if (step == OnboardingStep.Budgets)
+            return RedirectToAction(nameof(Financial), "Clients", new { id }, "budget");
 
         await PopulateWizardAsync(id, step);
 
@@ -688,6 +919,11 @@ public class ClientsController : Controller
 
         await _tenant.LoadAsync();
         _tenant.EnsureCanAccess(client.TenantId);
+
+        var f = client.Financial;
+        ViewBag.NetOfNet = f is null ? null
+            : NetOfNetFor(f.GrossMonthlyIncome, f.NetMonthlyIncome, f.OtherIncome,
+                f.TotalMonthlyExpenses ?? 0m, f.TotalMonthlyDebtRepayments ?? 0m);
 
         await PopulateWizardAsync(id);
         return View(client);
@@ -812,6 +1048,8 @@ public class ClientsController : Controller
         if (client.BankAccounts.Count > 0) done.Add(OnboardingStep.Banking);
         if (client.Addresses.Count > 0) done.Add(OnboardingStep.Address);
         if (client.OtherDetails is not null) done.Add(OnboardingStep.OtherDetails);
+        if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0))
+            done.Add(OnboardingStep.Budgets);
 
         // Documents count as done only once the required ones are actually accepted -
         // uploading a file is not the same as having it pass.

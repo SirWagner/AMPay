@@ -26,10 +26,14 @@ public class AffordabilityService : IAffordabilityService
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var statutoryMinimum = Round(_norms.MinimumExpensesFor(input.GrossMonthlyIncome));
+        // Other income moves the client up the bands as surely as salary does: the norm is
+        // what a household on that total income is assumed to spend.
+        var statutoryMinimum = Round(_norms.MinimumExpensesFor(input.TotalGrossIncome));
 
         // Without income there is nothing to assess. This is a data gap, not a decline -
         // the distinction matters, because a decline is reportable and a gap is fixable.
+        // Salary is required even when there is other income: this lender advances against
+        // a payslip, and other income alone is declared rather than evidenced.
         if (input.NetMonthlyIncome <= 0 || input.GrossMonthlyIncome <= 0)
         {
             return new AffordabilityResult
@@ -48,7 +52,7 @@ public class AffordabilityService : IAffordabilityService
         }
 
         var applied = Math.Max(Round(input.DeclaredMonthlyExpenses), statutoryMinimum);
-        var discretionary = Round(input.NetMonthlyIncome - applied - input.ExistingDebtRepayments);
+        var discretionary = Round(input.TotalNetIncome - applied - input.ExistingDebtRepayments);
         var surplus = Round(discretionary - input.ProposedInstalment);
 
         var utilisation = discretionary > 0
@@ -64,8 +68,13 @@ public class AffordabilityService : IAffordabilityService
             : $" The declared expenses of {Money(input.DeclaredMonthlyExpenses)} exceed the " +
               $"Regulation 23A minimum of {Money(statutoryMinimum)} and were used.";
 
+        var income = input.OtherMonthlyIncome > 0
+            ? $"Net income {Money(input.NetMonthlyIncome)} plus other income " +
+              $"{Money(input.OtherMonthlyIncome)}"
+            : $"Net income {Money(input.NetMonthlyIncome)}";
+
         var basis =
-            $"Net income {Money(input.NetMonthlyIncome)} less expenses {Money(applied)} " +
+            $"{income} less expenses {Money(applied)} " +
             $"less existing debt {Money(input.ExistingDebtRepayments)} leaves discretionary " +
             $"income of {Money(discretionary)}.{floorNote}";
 

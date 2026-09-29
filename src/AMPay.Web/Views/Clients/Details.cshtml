@@ -2,6 +2,7 @@
 @{
     var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
     ViewData["Title"] = Model.FullName;
+    var netOfNet = ViewBag.NetOfNet as NetOfNetView;
     var mobile = Model.Addresses.Select(a => a.MobileNumber).FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
     var primary = Model.BankAccounts.FirstOrDefault(a => a.IsPrimary) ?? Model.BankAccounts.FirstOrDefault();
 
@@ -136,12 +137,26 @@
                             <tbody>
                             <tr><td class="muted">Gross income</td><td class="num">R @(Model.Financial.GrossMonthlyIncome?.ToString("N2") ?? "-")</td></tr>
                             <tr><td class="muted">Net income</td><td class="num">R @(Model.Financial.NetMonthlyIncome?.ToString("N2") ?? "-")</td></tr>
-                            <tr><td class="muted">Expenses</td><td class="num">R @(Model.Financial.TotalMonthlyExpenses?.ToString("N2") ?? "-")</td></tr>
-                            <tr><td class="muted">Debt repayments</td><td class="num">R @(Model.Financial.TotalMonthlyDebtRepayments?.ToString("N2") ?? "-")</td></tr>
-                            <tr>
-                                <td><strong>Disposable</strong></td>
-                                <td class="num"><strong>R @(Model.Financial.DisposableIncome?.ToString("N2") ?? "-")</strong></td>
-                            </tr>
+                            @if (Model.Financial.OtherIncome > 0)
+                            {
+                                <tr><td class="muted">Other income</td><td class="num">R @Model.Financial.OtherIncome.Value.ToString("N2")</td></tr>
+                            }
+                            <tr><td class="muted">Budgeted expenses</td><td class="num">R @(Model.Financial.TotalMonthlyExpenses?.ToString("N2") ?? "-")</td></tr>
+                            <tr><td class="muted">Debt instalments</td><td class="num">R @(Model.Financial.TotalMonthlyDebtRepayments?.ToString("N2") ?? "-")</td></tr>
+                            @if (netOfNet is not null)
+                            {
+                                @if (netOfNet.StatutoryMinimumApplied)
+                                {
+                                    <tr>
+                                        <td class="muted">Regulation 23A minimum used</td>
+                                        <td class="num">R @netOfNet.StatutoryMinimumExpenses.ToString("N2")</td>
+                                    </tr>
+                                }
+                                <tr>
+                                    <td><strong>NET of NET</strong></td>
+                                    <td class="num"><strong>R @netOfNet.NetOfNet.ToString("N2")</strong></td>
+                                </tr>
+                            }
                             </tbody>
                         </table>
                     }

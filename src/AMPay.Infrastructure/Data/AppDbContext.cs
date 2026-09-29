@@ -116,8 +116,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ClientReference>().HasOne(x => x.Client).WithMany(c => c.References)
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
-        b.Entity<ClientBudget>().HasOne(x => x.Client).WithMany(c => c.Budgets)
-            .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ClientBudget>(e =>
+        {
+            e.Property(x => x.Category).HasMaxLength(40);
+            e.HasOne(x => x.Client).WithMany(c => c.Budgets)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
         b.Entity<ClientCreditEnquiry>().HasOne(x => x.Client).WithMany(c => c.CreditEnquiries)
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ClientNote>().HasOne(x => x.Client).WithMany(c => c.Notes)

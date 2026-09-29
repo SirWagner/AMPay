@@ -254,11 +254,12 @@ public class FinancialStepModel
     [Display(Name = "Other income source")]
     public string? OtherIncomeSource { get; set; }
 
-    [Display(Name = "Total monthly expenses"), Range(0, 10_000_000)]
-    public decimal? TotalMonthlyExpenses { get; set; }
-
-    [Display(Name = "Total monthly debt repayments"), Range(0, 10_000_000)]
-    public decimal? TotalMonthlyDebtRepayments { get; set; }
+    /// <summary>
+    /// The budget: every standard category in Maxmoney order, then any lines the operator
+    /// added. The expense and debt totals are always the sums of these lines - there is no
+    /// separate total to type in and disagree with them.
+    /// </summary>
+    public List<BudgetLineModel> Budget { get; set; } = new();
 
     [Display(Name = "Bank")]
     public string? BankName { get; set; }
@@ -266,9 +267,66 @@ public class FinancialStepModel
     [Display(Name = "Years at bank"), Range(0, 80)]
     public int? YearsAtBank { get; set; }
 
-    public decimal? Disposable =>
-        NetMonthlyIncome is null ? null
-        : NetMonthlyIncome - (TotalMonthlyExpenses ?? 0m) - (TotalMonthlyDebtRepayments ?? 0m);
+    public decimal TotalExpenses =>
+        Budget.Where(l => l.Kind == BudgetLineKind.Expense).Sum(l => l.Amount ?? 0m);
+
+    public decimal TotalDebtInstalments =>
+        Budget.Where(l => l.Kind == BudgetLineKind.DebtInstalment).Sum(l => l.Amount ?? 0m);
+
+    /// <summary>Set by the controller; null until there is income to work from.</summary>
+    public NetOfNetView? NetOfNet { get; set; }
+}
+
+public class BudgetLineModel
+{
+    /// <summary>Null for a line not yet saved.</summary>
+    public Guid? Id { get; set; }
+
+    /// <summary>A BudgetCategories key, or BudgetCategories.Custom.</summary>
+    public string? Category { get; set; }
+
+    /// <summary>Display only. The server re-derives it from the category on every post.</summary>
+    public BudgetLineKind Kind { get; set; } = BudgetLineKind.Expense;
+
+    [StringLength(100)]
+    public string? Description { get; set; }
+
+    [Range(0, 10_000_000)]
+    public decimal? Amount { get; set; }
+
+    [StringLength(200)]
+    public string? Note { get; set; }
+
+    /// <summary>Display only: guidance for the standard category, if any.</summary>
+    public string? Hint { get; set; }
+
+    public bool IsCustom => Category == AMPay.Domain.Credit.BudgetCategories.Custom;
+}
+
+/// <summary>
+/// NET of NET, as Maxmoney calls it: what is left of the client's income each month once
+/// living expenses and existing debt are paid - before any new loan.
+/// <para>
+/// Living expenses are the greater of the budget and the Regulation 23A minimum, exactly as
+/// in the loan affordability assessment. It is the same calculation, run with a nil
+/// instalment, so the figure here is the one a loan will be tested against.
+/// </para>
+/// </summary>
+public class NetOfNetView
+{
+    public decimal NetIncome { get; init; }
+    public decimal OtherIncome { get; init; }
+    public decimal TotalIncome => NetIncome + OtherIncome;
+
+    public decimal DeclaredExpenses { get; init; }
+    public decimal StatutoryMinimumExpenses { get; init; }
+    public decimal AppliedExpenses { get; init; }
+    public bool StatutoryMinimumApplied => StatutoryMinimumExpenses > DeclaredExpenses;
+
+    public decimal DebtInstalments { get; init; }
+
+    /// <summary>The NET of NET: the largest instalment a new loan could have.</summary>
+    public decimal NetOfNet { get; init; }
 }
 
 public class BankAccountModel

@@ -45,12 +45,25 @@ public class ClientReference
     public string? Comments { get; set; }
 }
 
-/// <summary>Budgets tab - the client's declared income and expenditure lines.</summary>
+/// <summary>
+/// One line of the client's monthly budget, captured on the Financial step. The expense and
+/// debt totals on <see cref="ClientFinancial"/> are the sums of these lines.
+/// </summary>
 public class ClientBudget
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ClientId { get; set; }
     public Client? Client { get; set; }
+
+    public BudgetLineKind Kind { get; set; } = BudgetLineKind.Expense;
+
+    /// <summary>
+    /// A <see cref="Credit.BudgetCategories"/> key, or <see cref="Credit.BudgetCategories.Custom"/>
+    /// for a line the operator added.
+    /// </summary>
+    public string? Category { get; set; }
+
+    public int DisplayOrder { get; set; }
 
     public string Description { get; set; } = string.Empty;
     public DateTime BudgetDate { get; set; } = DateTime.UtcNow.Date;

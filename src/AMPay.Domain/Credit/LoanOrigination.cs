@@ -64,7 +64,9 @@ public static class LoanOrigination
 
     /// <summary>
     /// The affordability inputs for a client, or null when there is no income on file to
-    /// assess. Uses net pay only: other income is declared, not evidenced by the payslip.
+    /// assess. Other income - rental, a second job, maintenance received - counts alongside
+    /// net pay, as it does in the Maxmoney budget and the NET of NET on the Financial step.
+    /// Declared expenses and debt are the totals of the client's budget lines.
     /// <para>
     /// <paramref name="ownInstalments"/> is what the client already owes <em>this</em>
     /// lender each month on other approved or disbursed loans. It is added to the debt
@@ -83,7 +85,8 @@ public static class LoanOrigination
             NetMonthlyIncome: financial.NetMonthlyIncome ?? 0m,
             DeclaredMonthlyExpenses: financial.TotalMonthlyExpenses ?? 0m,
             ExistingDebtRepayments: (financial.TotalMonthlyDebtRepayments ?? 0m) + ownInstalments,
-            ProposedInstalment: proposedInstalment);
+            ProposedInstalment: proposedInstalment,
+            OtherMonthlyIncome: financial.OtherIncome ?? 0m);
     }
 
     /// <summary>Snapshots an assessment so the decision can be evidenced later.</summary>
@@ -95,6 +98,7 @@ public static class LoanOrigination
 
             GrossMonthlyIncome = input.GrossMonthlyIncome,
             NetMonthlyIncome = input.NetMonthlyIncome,
+            OtherMonthlyIncome = input.OtherMonthlyIncome,
             DeclaredMonthlyExpenses = input.DeclaredMonthlyExpenses,
             ExistingDebtRepayments = input.ExistingDebtRepayments,
             StatutoryMinimumExpenses = result.StatutoryMinimumExpenses,
