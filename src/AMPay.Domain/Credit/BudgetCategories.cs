@@ -48,6 +48,16 @@ public static class BudgetCategories
             "Only tax not already deducted from net pay.")
     };
 
+    /// <summary>
+    /// The lines always on screen. Every other category is offered from a list and shown
+    /// once chosen or once it holds an amount - seventeen rows, mostly zero, buried the
+    /// three that nearly every client has.
+    /// </summary>
+    public static readonly IReadOnlySet<string> Main =
+        new HashSet<string> { "Groceries", "Travel", "MortgageRent" };
+
+    public static bool IsMain(string? key) => key is not null && Main.Contains(key);
+
     public static Category? Find(string? key) =>
         key is null ? null : Standard.FirstOrDefault(c => c.Key == key);
 

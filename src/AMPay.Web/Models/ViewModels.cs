@@ -300,7 +300,22 @@ public class BudgetLineModel
     /// <summary>Display only: guidance for the standard category, if any.</summary>
     public string? Hint { get; set; }
 
+    /// <summary>
+    /// Chosen from the "Add a budget line" list. Keeps an optional line on screen while it
+    /// is still empty, until it is removed.
+    /// </summary>
+    public bool Shown { get; set; }
+
     public bool IsCustom => Category == AMPay.Domain.Credit.BudgetCategories.Custom;
+
+    public bool IsMain => AMPay.Domain.Credit.BudgetCategories.IsMain(Category);
+
+    /// <summary>
+    /// On screen: the main lines, anything added by hand, and any line with a figure or a
+    /// note - a saved amount is never hidden.
+    /// </summary>
+    public bool IsVisible =>
+        IsMain || IsCustom || Shown || Amount > 0 || !string.IsNullOrWhiteSpace(Note);
 }
 
 /// <summary>

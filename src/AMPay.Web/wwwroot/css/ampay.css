@@ -1069,3 +1069,13 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
 
 /* The form's default button: reachable by Enter, invisible to everyone else. */
 .default-submit { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.budget-add { align-items: center; }
+.budget-add select {
+    padding: .3rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: .85rem;
+    background: #fff;
+    max-width: 100%;
+}

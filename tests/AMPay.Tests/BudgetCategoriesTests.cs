@@ -60,3 +60,35 @@ public class BudgetCategoriesTests
     private static ClientBudget Line(BudgetLineKind kind, decimal amount) =>
         new() { Kind = kind, Amount = amount, Description = "x" };
 }
+
+public class BudgetLineVisibilityTests
+{
+    [Theory]
+    [InlineData("Groceries")]
+    [InlineData("Travel")]
+    [InlineData("MortgageRent")]
+    public void TheMainLines_AreAlwaysShown(string key) =>
+        Assert.True(new AMPay.Web.Models.BudgetLineModel { Category = key }.IsVisible);
+
+    [Fact]
+    public void AnEmptyOptionalLine_WaitsInTheList() =>
+        Assert.False(new AMPay.Web.Models.BudgetLineModel { Category = "Loans" }.IsVisible);
+
+    [Fact]
+    public void AnOptionalLineWithAnAmount_IsNeverHidden() =>
+        // A saved loan instalment disappearing from view would be easy to miss - and it is
+        // still being deducted.
+        Assert.True(new AMPay.Web.Models.BudgetLineModel { Category = "Loans", Amount = 1_500m }.IsVisible);
+
+    [Fact]
+    public void AnOptionalLineChosenFromTheList_StaysWhileEmpty() =>
+        Assert.True(new AMPay.Web.Models.BudgetLineModel { Category = "Insurance", Shown = true }.IsVisible);
+
+    [Fact]
+    public void ACustomLine_IsShown() =>
+        Assert.True(new AMPay.Web.Models.BudgetLineModel { Category = BudgetCategories.Custom }.IsVisible);
+
+    [Fact]
+    public void ExactlyThreeLinesAreMain() =>
+        Assert.Equal(3, BudgetCategories.Standard.Count(c => BudgetCategories.IsMain(c.Key)));
+}

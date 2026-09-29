@@ -299,14 +299,15 @@ public class ClientsController : Controller
     }
 
     /// <summary>
-    /// Saves the step, or - for <paramref name="command"/> "add-expense", "remove:{index}"
-    /// or "recalculate" - redraws the form with the change and a fresh NET of NET, saving
-    /// nothing. Round-tripping keeps the Regulation 23A calculation in one place, on the
+    /// Saves the step, or - for <paramref name="command"/> "add" (the line chosen in
+    /// <paramref name="addLine"/>), "remove:{index}" or "recalculate" - redraws the form
+    /// with the change and a fresh NET of NET, saving nothing. Round-tripping keeps the Regulation 23A calculation in one place, on the
     /// server, rather than duplicated in script.
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Financial(FinancialStepModel model, string? command)
+    public async Task<IActionResult> Financial(
+        FinancialStepModel model, string? command, string? addLine)
     {
         ViewData["Title"] = "Financial";
         var client = await LoadClientAsync(model.ClientId, c => c.Financial, c => c.Budgets);
@@ -316,7 +317,7 @@ public class ClientsController : Controller
 
         if (!string.IsNullOrEmpty(command) && command != "save")
         {
-            if (command == "add-expense")
+            if (command == "add" && addLine == BudgetCategories.Custom)
             {
                 model.Budget.Add(new BudgetLineModel
                 {
@@ -324,12 +325,27 @@ public class ClientsController : Controller
                     Kind = BudgetLineKind.Expense
                 });
             }
+            else if (command == "add" && BudgetCategories.Find(addLine) is not null)
+            {
+                model.Budget.First(l => l.Category == addLine).Shown = true;
+            }
             else if (command.StartsWith("remove:", StringComparison.Ordinal) &&
                      int.TryParse(command["remove:".Length..], out var index) &&
-                     index >= 0 && index < model.Budget.Count &&
-                     model.Budget[index].IsCustom)
+                     index >= 0 && index < model.Budget.Count)
             {
-                model.Budget.RemoveAt(index);
+                var line = model.Budget[index];
+
+                if (line.IsCustom)
+                {
+                    model.Budget.RemoveAt(index);
+                }
+                else if (!line.IsMain)
+                {
+                    // Standard lines always exist; removing one clears it back into the list.
+                    line.Amount = null;
+                    line.Note = null;
+                    line.Shown = false;
+                }
             }
 
             // Posted values would otherwise win over the model, and after a removal every

@@ -60,8 +60,9 @@
                 <div class="card-head"><h2>Budget</h2></div>
                 <div class="card-body">
                     <p class="muted small mt-0">
-                        Monthly amounts. Credit card, loan and vehicle instalments are debt: they are deducted on top of
-                        living expenses, never counted towards the Regulation 23A minimum.
+                        Monthly amounts. Add anything else the client pays from the list below &mdash; including credit card,
+                        loan and vehicle instalments, which are debt: deducted on top of living expenses, never counted
+                        towards the Regulation 23A minimum.
                     </p>
 
                     <div class="table-wrap">
@@ -79,8 +80,15 @@
                             @for (var i = 0; i < Model.Budget.Count; i++)
                             {
                                 var line = Model.Budget[i];
+
+                                // Lines off screen are simply not posted; the server rebuilds
+                                // them empty. Budget.Index lets the rest bind despite the gaps.
+                                if (!line.IsVisible) continue;
+
                                 <tr>
                                     <td>
+                                        <input type="hidden" name="Budget.Index" value="@i" />
+                                        <input type="hidden" asp-for="Budget[i].Shown" />
                                         <input type="hidden" asp-for="Budget[i].Id" />
                                         <input type="hidden" asp-for="Budget[i].Category" />
                                         @if (line.IsCustom)
@@ -117,10 +125,11 @@
                                         <span asp-validation-for="Budget[i].Amount" class="field-error"></span>
                                     </td>
                                     <td>
-                                        @if (line.IsCustom)
+                                        @if (!line.IsMain)
                                         {
                                             <button type="submit" name="command" value="remove:@i" formnovalidate
-                                                    class="btn btn-danger btn-sm">Remove</button>
+                                                    class="btn btn-danger btn-sm"
+                                                    aria-label="Remove @(line.Description ?? "expense")">Remove</button>
                                         }
                                     </td>
                                 </tr>
@@ -141,9 +150,36 @@
                         </table>
                     </div>
 
-                    <div class="row-actions" style="margin-top:1rem;">
-                        <button type="submit" name="command" value="add-expense" formnovalidate class="btn btn-outline btn-sm">
-                            + Add expense
+                    <div class="row-actions budget-add" style="margin-top:1rem;">
+                        <label for="addLine" class="small">Add a budget line</label>
+                        <select id="addLine" name="addLine">
+                            @{
+                                var hidden = Model.Budget.Where(l => !l.IsVisible).ToList();
+                                var hiddenExpenses = hidden.Where(l => l.Kind == BudgetLineKind.Expense).ToList();
+                                var hiddenDebt = hidden.Where(l => l.Kind == BudgetLineKind.DebtInstalment).ToList();
+                            }
+                            @if (hiddenExpenses.Count > 0)
+                            {
+                                <optgroup label="Expenses">
+                                    @foreach (var l in hiddenExpenses)
+                                    {
+                                        <option value="@l.Category">@l.Description</option>
+                                    }
+                                </optgroup>
+                            }
+                            @if (hiddenDebt.Count > 0)
+                            {
+                                <optgroup label="Debt instalments">
+                                    @foreach (var l in hiddenDebt)
+                                    {
+                                        <option value="@l.Category">@l.Description</option>
+                                    }
+                                </optgroup>
+                            }
+                            <option value="@AMPay.Domain.Credit.BudgetCategories.Custom">Something else&hellip;</option>
+                        </select>
+                        <button type="submit" name="command" value="add" formnovalidate class="btn btn-outline btn-sm">
+                            + Add
                         </button>
                         <button type="submit" name="command" value="recalculate" formnovalidate class="btn btn-outline btn-sm">
                             Recalculate NET of NET
