@@ -70,7 +70,7 @@ public class MandatesController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Create(Guid clientId)
+    public async Task<IActionResult> Create(Guid clientId, Guid? loanId)
     {
         ViewData["Title"] = "New DebiCheck mandate";
 
@@ -123,8 +123,75 @@ public class MandatesController : Controller
         };
 
         model.MandateTemplateId = model.AvailableTemplates.FirstOrDefault();
+
+        // Originated from a loan: the loan is the source of truth for what is collected,
+        // so its figures replace anything left over on the legacy payback tab.
+        if (loanId is not null)
+        {
+            var (loan, problem) = await LoanForMandateAsync(loanId.Value, client.Id);
+            if (loan is null)
+            {
+                TempData["Error"] = problem;
+                return RedirectToAction("Details", "Loans", new { id = loanId });
+            }
+
+            model.LoanId = loan.Id;
+            model.LoanNumber = loan.LoanNumber;
+
+            // Each loan gets its own reference: field 101 must be unique in the Netcash
+            // masterfile, and a client with two loans needs two mandates.
+            model.AccountReference = loan.LoanNumber;
+
+            // The first instalment is the largest, because credit life falls with the
+            // balance - so it is the ceiling the mandate must allow.
+            model.CollectionAmount = loan.FirstInstalment;
+            model.Frequency = loan.Frequency;
+            model.CollectionDayCode = loan.CollectionDayCode;
+            model.FirstCollectionDate = loan.FirstCollectionDate;
+            model.FirstCollectionDiffers = false;
+            model.FirstCollectionAmount = null;
+            model.TrackingDays = loan.TrackingDays;
+        }
+
         return View(model);
     }
+
+    /// <summary>
+    /// The loan a mandate may be raised for: same client, approved or disbursed, and not
+    /// already carrying one. Returns the reason when it cannot be used.
+    /// </summary>
+    private async Task<(Loan? Loan, string? Problem)> LoanForMandateAsync(Guid loanId, Guid clientId)
+    {
+        var loan = await _db.Loans.FirstOrDefaultAsync(l => l.Id == loanId);
+
+        if (loan is null || loan.ClientId != clientId)
+            return (null, "That loan does not belong to this client.");
+
+        _tenant.EnsureCanAccess(loan.TenantId);
+
+        if (loan.Status is not (LoanStatus.Approved or LoanStatus.Disbursed))
+            return (null, "A DebiCheck mandate can only be originated for an approved loan.");
+
+        // A mandate that failed, was rejected by the debtor, or expired unauthenticated does
+        // not collect anything - so it must not stand in the way of trying again.
+        if (loan.MandateId is not null)
+        {
+            var existing = await _db.Mandates.AsNoTracking()
+                .Where(m => m.Id == loan.MandateId)
+                .Select(m => (MandateStatus?)m.Status)
+                .FirstOrDefaultAsync();
+
+            if (existing is not null && !IsDeadMandate(existing.Value))
+                return (null, "This loan already has a DebiCheck mandate.");
+        }
+
+        return (loan, null);
+    }
+
+    /// <summary>States from which a mandate will never collect.</summary>
+    public static bool IsDeadMandate(MandateStatus status) =>
+        status is MandateStatus.Failed or MandateStatus.Rejected
+            or MandateStatus.Cancelled or MandateStatus.Expired;
 
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -162,6 +229,15 @@ public class MandatesController : Controller
         if (model.FirstCollectionDiffers && model.FirstCollectionAmount is null)
             ModelState.AddModelError(nameof(model.FirstCollectionAmount),
                 "Enter the first collection amount.");
+
+        // Re-checked on post: the loan could have been cancelled, or given a mandate by a
+        // colleague, while this form sat open.
+        Loan? loan = null;
+        if (model.LoanId is not null)
+        {
+            (loan, var problem) = await LoanForMandateAsync(model.LoanId.Value, client.Id);
+            if (loan is null) ModelState.AddModelError(string.Empty, problem!);
+        }
 
         if (!ModelState.IsValid)
         {
@@ -207,6 +283,11 @@ public class MandatesController : Controller
         };
 
         _db.Mandates.Add(mandate);
+
+        // Linked before the Netcash call rather than after it, so a mandate that fails at
+        // the bank is still visibly attached to the loan it was meant to collect.
+        if (loan is not null) loan.MandateId = mandate.Id;
+
         await _db.SaveChangesAsync();
 
         var request = new DebiCheckAuthenticateRequest

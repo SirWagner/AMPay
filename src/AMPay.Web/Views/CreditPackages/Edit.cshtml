@@ -1,0 +1,132 @@
+@model AMPay.Web.Models.CreditPackageEditModel
+@{
+    var limits = (AMPay.Domain.Credit.NcaCreditLimits)ViewBag.Limits;
+    var customer = ViewBag.CustomerName as string;
+    var isNew = Model.Id == Guid.Empty;
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@(isNew ? "New credit package" : $"Edit {Model.Name}")</h1>
+        <p class="lede">
+            @if (isNew)
+            {
+                <text>A new price list for <strong>@customer</strong>. It starts from the Regular
+                terms &mdash; change what makes this package different.</text>
+            }
+            else
+            {
+                <text>New pricing applies to loans quoted from now on. Loans already raised keep
+                the rates they were agreed at.</text>
+            }
+        </p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline">Back to packages</a>
+</div>
+
+<form asp-action="@(isNew ? "Create" : "Edit")" method="post">
+    @if (!isNew)
+    {
+        <input type="hidden" asp-for="Id" />
+    }
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="card">
+        <div class="card-head"><h2>Package</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="Name"></label>
+                    <input asp-for="Name" placeholder="e.g. Public servants" autofocus="@isNew" />
+                    <span class="hint">What operators pick from when they raise a loan. Must be unique for this customer.</span>
+                    <span asp-validation-for="Name" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Tier">Tier</label>
+                    <select asp-for="Tier" asp-items="Html.GetEnumSelectList<CreditTier>()"></select>
+                    <span class="hint">Groups the package in reports and on the dashboard. Several packages can share a tier.</span>
+                    <span asp-validation-for="Tier" class="field-error"></span>
+                </div>
+                <div class="field wide">
+                    <label asp-for="Description"></label>
+                    <input asp-for="Description" placeholder="Who this package is for" />
+                </div>
+                <div class="field">
+                    <label>Availability</label>
+                    <label class="check">
+                        <input asp-for="IsActive" type="checkbox" />
+                        Available for new loans
+                    </label>
+                    <span class="hint">A withdrawn package is not offered for new loans; existing loans are unaffected.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h2>Pricing</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="MonthlyInterestPercent"></label>
+                    <input asp-for="MonthlyInterestPercent" type="number" step="0.01" min="0" />
+                    <span class="hint">Statutory maximum @((limits.MonthlyInterestCeiling * 100m).ToString("N2"))%.</span>
+                    <span asp-validation-for="MonthlyInterestPercent" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="MonthlyServiceFee"></label>
+                    <input asp-for="MonthlyServiceFee" type="number" step="0.01" min="0" />
+                    <span class="hint">VAT inclusive. Statutory maximum R @limits.MonthlyServiceFeeCeiling.ToString("N2").</span>
+                    <span asp-validation-for="MonthlyServiceFee" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="InitiationFeePercent"></label>
+                    <input asp-for="InitiationFeePercent" type="number" step="0.01" min="0" />
+                    <span class="hint">
+                        Always reduced to the statutory maximum when it would exceed it &mdash;
+                        at most R @limits.InitiationFeeCeiling.ToString("N2").
+                    </span>
+                    <span asp-validation-for="InitiationFeePercent" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="CreditLifePercent"></label>
+                    <input asp-for="CreditLifePercent" type="number" step="0.01" min="0" />
+                    <span class="hint">Of the outstanding balance. Statutory maximum @((limits.CreditLifeCeilingRate * 100m).ToString("N2"))%.</span>
+                    <span asp-validation-for="CreditLifePercent" class="field-error"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h2>Limits</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="MinLoanAmount"></label>
+                    <input asp-for="MinLoanAmount" type="number" step="1" min="1" />
+                    <span asp-validation-for="MinLoanAmount" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="MaxLoanAmount"></label>
+                    <input asp-for="MaxLoanAmount" type="number" step="1" min="1" />
+                    <span asp-validation-for="MaxLoanAmount" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="MinTermMonths"></label>
+                    <input asp-for="MinTermMonths" type="number" step="1" min="1" />
+                    <span asp-validation-for="MinTermMonths" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="MaxTermMonths"></label>
+                    <input asp-for="MaxTermMonths" type="number" step="1" min="1" />
+                    <span asp-validation-for="MaxTermMonths" class="field-error"></span>
+                </div>
+            </div>
+        </div>
+        <div class="card-foot">
+            <button type="submit" class="btn btn-primary">@(isNew ? "Create package" : "Save package")</button>
+            <a asp-action="Index" class="btn btn-outline">Cancel</a>
+        </div>
+    </div>
+</form>

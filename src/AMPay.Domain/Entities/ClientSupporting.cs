@@ -113,6 +113,22 @@ public class ClientDocument
 
     public DateTime UploadedUtc { get; set; } = DateTime.UtcNow;
     public string? UploadedByUserId { get; set; }
+
+    // ---- Review ----
+    // A document is uploaded by a capturer and passed by a reviewer. The two are separate
+    // people on purpose: the person who onboards a client should not be the only person who
+    // attests that the client's ID is genuine.
+
+    public DocumentReviewStatus ReviewStatus { get; set; } = DocumentReviewStatus.Pending;
+
+    public DateTime? ReviewedUtc { get; set; }
+    public string? ReviewedByUserId { get; set; }
+
+    /// <summary>Why a document was rejected. Required on rejection so the capturer can fix it.</summary>
+    public string? ReviewNotes { get; set; }
+
+    /// <summary>SHA-256 of the stored bytes. Detects a file swapped after it was approved.</summary>
+    public string? ContentHash { get; set; }
 }
 
 /// <summary>Take Picture tab - the client's photograph, captured from webcam or uploaded.</summary>

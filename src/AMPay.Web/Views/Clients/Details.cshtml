@@ -4,6 +4,15 @@
     ViewData["Title"] = Model.FullName;
     var mobile = Model.Addresses.Select(a => a.MobileNumber).FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
     var primary = Model.BankAccounts.FirstOrDefault(a => a.IsPrimary) ?? Model.BankAccounts.FirstOrDefault();
+
+    var idAccepted = Model.Documents.Any(d =>
+        d.DocumentType == DocumentType.IdDocument && d.ReviewStatus == DocumentReviewStatus.Approved);
+    var payslipAccepted = Model.Documents.Any(d =>
+        d.DocumentType == DocumentType.Payslip && d.ReviewStatus == DocumentReviewStatus.Approved);
+
+    // Status alone is not enough: clients onboarded before document review existed carry
+    // the Onboarded status with no documents on file. Mirrors the check LoansController makes.
+    var canRaiseLoan = ClientStatusInfo.CanBorrow(Model.Status) && idAccepted && payslipAccepted;
 }
 
 <div class="page-head flex-between">
@@ -11,22 +20,23 @@
         <h1>@Model.FullName</h1>
         <p class="lede">
             Client <span class="mono">@Model.ClientNumber</span> &middot;
-            <span class="badge @(Model.Status == ClientStatus.Active ? "badge-green" : "badge-grey")">@Model.Status</span>
+            <partial name="_ClientStatus" model="Model.Status" />
         </p>
     </div>
     <div class="row-actions">
-        @if (Model.Status == ClientStatus.Draft)
+        @if (Model.Status is ClientStatus.Draft or ClientStatus.Captured)
         {
             <form asp-action="Activate" method="post">
                 <input type="hidden" name="id" value="@Model.Id" />
-                <button type="submit" class="btn btn-primary">Activate client</button>
+                <button type="submit" class="btn btn-primary">Complete onboarding</button>
             </form>
         }
-        else if (Model.Status == ClientStatus.Active)
+        else if (canRaiseLoan)
         {
-            <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
-               class="btn btn-primary">New DebiCheck mandate</a>
+            <a asp-controller="Loans" asp-action="Create" asp-route-clientId="@Model.Id"
+               class="btn btn-primary">Raise a loan</a>
         }
+        <a asp-controller="Documents" asp-action="Client" asp-route-id="@Model.Id" class="btn btn-outline">Documents</a>
         <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline">Edit</a>
     </div>
 </div>
@@ -38,8 +48,8 @@
         @if (Model.Status == ClientStatus.Draft)
         {
             <div class="alert alert-info">
-                This client is still a draft. Activation needs a bank account, a mobile number
-                and POPIA consent &mdash; then DebiCheck mandates can be created.
+                Onboarding is not yet complete. A bank account, a mobile number and POPIA
+                consent are required before this client can be onboarded and credit advanced.
             </div>
         }
 
@@ -77,13 +87,20 @@
                         <td class="muted small">@Model.OtherDetails?.DataProcessingConsentUtc?.ToString("dd MMM yyyy HH:mm")</td>
                     </tr>
                     <tr>
-                        <td>Instalment amount</td>
-                        <td>@Html.Raw(Model.Payback?.InstalmentAmount > 0
-                                ? "<span class='badge badge-green'>Set</span>"
-                                : "<span class='badge badge-amber'>Not set</span>")</td>
+                        <td>Identity document accepted</td>
+                        <td>@Html.Raw(idAccepted
+                                ? "<span class='badge badge-green'>Accepted</span>"
+                                : "<span class='badge badge-amber'>Outstanding</span>")</td>
                         <td class="muted small">
-                            @(Model.Payback?.InstalmentAmount is null ? "" : "R " + Model.Payback.InstalmentAmount.Value.ToString("N2"))
+                            <a asp-controller="Documents" asp-action="Client" asp-route-id="@Model.Id">Manage documents</a>
                         </td>
+                    </tr>
+                    <tr>
+                        <td>Payslip accepted</td>
+                        <td>@Html.Raw(payslipAccepted
+                                ? "<span class='badge badge-green'>Accepted</span>"
+                                : "<span class='badge badge-amber'>Outstanding</span>")</td>
+                        <td class="muted small">Both are required before a loan can be raised.</td>
                     </tr>
                     </tbody>
                 </table>
@@ -134,8 +151,66 @@
 
         <div class="card">
             <div class="card-head">
+                <h3>Loans</h3>
+                @if (canRaiseLoan)
+                {
+                    <a asp-controller="Loans" asp-action="Create" asp-route-clientId="@Model.Id"
+                       class="btn btn-primary btn-sm">Raise a loan</a>
+                }
+            </div>
+            @if (Model.Loans.Count == 0)
+            {
+                <div class="empty">
+                    @if (canRaiseLoan)
+                    {
+                        <text>No loans yet. This client is onboarded and can be offered credit.</text>
+                    }
+                    else if (ClientStatusInfo.CanBorrow(Model.Status))
+                    {
+                        <text>No loans. This client is marked onboarded, but their identity document
+                        and payslip have not both been accepted &mdash;
+                        <a asp-controller="Documents" asp-action="Client" asp-route-id="@Model.Id">review the documents</a>
+                        before offering credit.</text>
+                    }
+                    else
+                    {
+                        <text>No loans. Credit can be offered once onboarding is complete and the
+                        identity document and payslip have been accepted.</text>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                        <tr>
+                            <th>Loan</th><th>Package</th><th class="num">Amount</th>
+                            <th class="num">Instalment</th><th>Term</th><th>Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var l in Model.Loans.OrderByDescending(l => l.CreatedUtc))
+                        {
+                            <tr>
+                                <td class="mono"><a asp-controller="Loans" asp-action="Details" asp-route-id="@l.Id">@l.LoanNumber</a></td>
+                                <td>@l.CreditPackage?.Name</td>
+                                <td class="num">R @l.Principal.ToString("N2")</td>
+                                <td class="num">R @l.FirstInstalment.ToString("N2")</td>
+                                <td>@l.NumberOfInstalments mo</td>
+                                <td><partial name="_LoanStatus" model="l.Status" /></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-head">
                 <h3>DebiCheck mandates</h3>
-                @if (Model.Status == ClientStatus.Active)
+                @if (ClientStatusInfo.CanBorrow(Model.Status))
                 {
                     <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
                        class="btn btn-primary btn-sm">New mandate</a>

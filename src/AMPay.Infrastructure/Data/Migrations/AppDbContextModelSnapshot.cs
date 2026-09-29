@@ -22,6 +22,81 @@ namespace AMPay.Infrastructure.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("AMPay.Domain.Entities.AffordabilityAssessment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AssessedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("AssessedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DeclaredMonthlyExpenses")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DiscretionaryIncome")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ExistingDebtRepayments")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("GrossMonthlyIncome")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("NetMonthlyIncome")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OverriddenByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OverrideReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("ProposedInstalment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Reasoning")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal>("StatutoryMinimumExpenses")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("SurplusAfterInstalment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UtilisationRatio")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<bool>("WasOverridden")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoanId", "AssessedUtc");
+
+                    b.ToTable("AffordabilityAssessments");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.Client", b =>
                 {
                     b.Property<Guid>("Id")
@@ -279,22 +354,42 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("ContentType")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
 
                     b.Property<int>("DocumentType")
                         .HasColumnType("int");
 
                     b.Property<string>("FileName")
                         .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("ReviewStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReviewedByUserId")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReviewedUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
 
                     b.Property<string>("StoragePath")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("UploadedByUserId")
                         .HasColumnType("nvarchar(max)");
@@ -304,7 +399,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClientId");
+                    b.HasIndex("ClientId", "ReviewStatus");
 
                     b.ToTable("ClientDocuments");
                 });
@@ -641,6 +736,76 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("ClientWallets");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.CreditPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("CreditLifeRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("InitiationFeeRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("MaxLoanAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MaxTermMonths")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MinLoanAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MinTermMonths")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MonthlyInterestRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<decimal>("MonthlyServiceFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Tier")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Tier");
+
+                    b.ToTable("CreditPackages");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.DebiCheckMandate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -752,6 +917,197 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "Status");
 
                     b.ToTable("Mandates");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.Loan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AgreementDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("BaseInstalment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("CapitalisedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CollectionDay")
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
+                    b.Property<string>("CollectionDayCode")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("CreditLifeRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<Guid>("CreditPackageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DecidedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DecidedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DecisionNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("DisbursedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("FinalInstalment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("FirstCollectionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("FirstInstalment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("InitiationFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("LoanNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid?>("MandateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("MonthlyInterestRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<decimal>("MonthlyServiceFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("NumberOfInstalments")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Principal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalCostOfCredit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalCreditLife")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalInterest")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalRepayable")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalServiceFees")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TrackingDays")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("CreditPackageId");
+
+                    b.HasIndex("MandateId");
+
+                    b.HasIndex("TenantId", "LoanNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("Loans");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.LoanScheduleEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("CapitalPortion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ClosingBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("CreditLifePremium")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("InstalmentNumber")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("InstalmentTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("InterestPortion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("OpeningBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ServiceFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoanId", "InstalmentNumber")
+                        .IsUnique();
+
+                    b.ToTable("LoanScheduleEntries");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.MandateEvent", b =>
@@ -1281,6 +1637,17 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.AffordabilityAssessment", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Loan", "Loan")
+                        .WithMany("Assessments")
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Loan");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.Client", b =>
                 {
                     b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
@@ -1435,6 +1802,17 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.CreditPackage", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.DebiCheckMandate", b =>
                 {
                     b.HasOne("AMPay.Domain.Entities.ClientBankAccount", "BankAccount")
@@ -1459,6 +1837,51 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.Loan", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany("Loans")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.CreditPackage", "CreditPackage")
+                        .WithMany("Loans")
+                        .HasForeignKey("CreditPackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.DebiCheckMandate", "Mandate")
+                        .WithMany()
+                        .HasForeignKey("MandateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("CreditPackage");
+
+                    b.Navigation("Mandate");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.LoanScheduleEntry", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Loan", "Loan")
+                        .WithMany("Schedule")
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Loan");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.MandateEvent", b =>
@@ -1590,6 +2013,8 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.Navigation("Financial");
 
+                    b.Navigation("Loans");
+
                     b.Navigation("Mandates");
 
                     b.Navigation("Notes");
@@ -1605,9 +2030,21 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Wallets");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.CreditPackage", b =>
+                {
+                    b.Navigation("Loans");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.DebiCheckMandate", b =>
                 {
                     b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.Loan", b =>
+                {
+                    b.Navigation("Assessments");
+
+                    b.Navigation("Schedule");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.NetcashBatch", b =>

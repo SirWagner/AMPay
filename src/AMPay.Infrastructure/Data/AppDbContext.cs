@@ -27,6 +27,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
     public DbSet<ClientPhoto> ClientPhotos => Set<ClientPhoto>();
 
+    public DbSet<CreditPackage> CreditPackages => Set<CreditPackage>();
+    public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<LoanScheduleEntry> LoanScheduleEntries => Set<LoanScheduleEntry>();
+    public DbSet<AffordabilityAssessment> AffordabilityAssessments => Set<AffordabilityAssessment>();
+
     public DbSet<DebiCheckMandate> Mandates => Set<DebiCheckMandate>();
     public DbSet<MandateEvent> MandateEvents => Set<MandateEvent>();
     public DbSet<PayNowTransaction> PayNowTransactions => Set<PayNowTransaction>();
@@ -43,6 +48,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         b.Entity<ClientBankAccount>().Ignore(x => x.MaskedAccountNumber);
         b.Entity<TenantServiceKey>().Ignore(x => x.NeedsRevalidation);
         b.Entity<DebiCheckMandate>().Ignore(x => x.IsCollectable);
+        b.Entity<Loan>().Ignore(x => x.LatestAssessment);
+        b.Entity<Loan>().Ignore(x => x.IsEditable);
 
         b.Entity<Tenant>(e =>
         {
@@ -115,8 +122,87 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ClientNote>().HasOne(x => x.Client).WithMany(c => c.Notes)
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
-        b.Entity<ClientDocument>().HasOne(x => x.Client).WithMany(c => c.Documents)
-            .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ClientDocument>(e =>
+        {
+            e.Property(x => x.FileName).HasMaxLength(260).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(120);
+            e.Property(x => x.StoragePath).HasMaxLength(500).IsRequired();
+            e.Property(x => x.ReviewNotes).HasMaxLength(1000);
+            e.Property(x => x.ContentHash).HasMaxLength(64);
+
+            e.HasIndex(x => new { x.ClientId, x.ReviewStatus });
+
+            e.HasOne(x => x.Client).WithMany(c => c.Documents)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<CreditPackage>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(500);
+
+            // Rates need more than 2 decimal places - 0.0045 is a real credit life rate.
+            e.Property(x => x.MonthlyInterestRate).HasPrecision(9, 6);
+            e.Property(x => x.InitiationFeeRate).HasPrecision(9, 6);
+            e.Property(x => x.CreditLifeRate).HasPrecision(9, 6);
+
+            // A customer may run several packages at the same tier - two Gold price lists
+            // for two kinds of borrower - so the tier is only a grouping for reporting.
+            // What must be unique is the name: that is what the operator picks from when
+            // quoting, and two identical names is an ambiguity nobody wants at quote time.
+            // (Case-insensitive, courtesy of the database collation.)
+            e.HasIndex(x => new { x.TenantId, x.Tier });
+            e.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Loan>(e =>
+        {
+            e.Property(x => x.LoanNumber).HasMaxLength(32).IsRequired();
+            e.Property(x => x.CollectionDay).HasMaxLength(4);
+            e.Property(x => x.CollectionDayCode).HasMaxLength(7);
+            e.Property(x => x.DecisionNotes).HasMaxLength(2000);
+
+            e.Property(x => x.MonthlyInterestRate).HasPrecision(9, 6);
+            e.Property(x => x.CreditLifeRate).HasPrecision(9, 6);
+
+            e.HasIndex(x => new { x.TenantId, x.LoanNumber }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasIndex(x => x.ClientId);
+
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // A client with a loan cannot be deleted out from under it.
+            e.HasOne(x => x.Client).WithMany(c => c.Loans).HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.CreditPackage).WithMany(p => p.Loans)
+                .HasForeignKey(x => x.CreditPackageId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Mandate).WithMany().HasForeignKey(x => x.MandateId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<LoanScheduleEntry>(e =>
+        {
+            e.HasIndex(x => new { x.LoanId, x.InstalmentNumber }).IsUnique();
+            e.HasOne(x => x.Loan).WithMany(l => l.Schedule)
+                .HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<AffordabilityAssessment>(e =>
+        {
+            e.Property(x => x.Reasoning).HasMaxLength(2000);
+            e.Property(x => x.OverrideReason).HasMaxLength(1000);
+            e.Property(x => x.UtilisationRatio).HasPrecision(9, 4);
+
+            e.HasIndex(x => new { x.LoanId, x.AssessedUtc });
+            e.HasOne(x => x.Loan).WithMany(l => l.Assessments)
+                .HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         b.Entity<DebiCheckMandate>(e =>
         {
@@ -178,9 +264,14 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         });
 
         // Money is money. Never let SQL Server pick a default precision for it.
+        //
+        // Properties that already declared a precision above are left alone: rates are not
+        // money. A credit life rate of 0.0045 forced to scale 2 becomes 0.00, and the
+        // premium silently disappears from every schedule.
         foreach (var p in b.Model.GetEntityTypes()
                      .SelectMany(t => t.GetProperties())
-                     .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))
+                     .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?))
+                     .Where(p => p.GetPrecision() is null))
         {
             p.SetPrecision(18);
             p.SetScale(2);

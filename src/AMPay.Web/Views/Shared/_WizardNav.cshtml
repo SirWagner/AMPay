@@ -13,10 +13,19 @@
         var built = step <= OnboardingStep.OtherDetails;
         var cls = (isCurrent ? "active " : "") + (done ? "done" : "");
 
-        @if (built)
+        @if (step == OnboardingStep.Documents)
+        {
+            // Documents live on their own controller: they outlive the capture wizard and
+            // are worked by reviewers who have no business in the rest of it.
+            <a class="@cls" asp-controller="Documents" asp-action="Client" asp-route-id="@Model.ClientId">
+                <span class="num">@(done ? "✓" : OnboardingSteps.Position(step).ToString())</span>
+                <span>@label</span>
+            </a>
+        }
+        else if (built)
         {
             <a class="@cls" asp-controller="Clients" asp-action="@action" asp-route-id="@Model.ClientId">
-                <span class="num">@(done && !isCurrent ? "✓" : ((int)step).ToString())</span>
+                <span class="num">@(done && !isCurrent ? "✓" : OnboardingSteps.Position(step).ToString())</span>
                 <span>@label</span>
             </a>
         }
@@ -24,7 +33,7 @@
         {
             <a class="@cls" asp-controller="Clients" asp-action="Step"
                asp-route-id="@Model.ClientId" asp-route-step="@step" title="Not built yet">
-                <span class="num">@((int)step)</span>
+                <span class="num">@OnboardingSteps.Position(step)</span>
                 <span class="muted">@label</span>
             </a>
         }

@@ -475,75 +475,26 @@ public class ClientsController : Controller
         return RedirectToAction(nameof(Banking), new { id });
     }
 
-    // ------------------------------------------------------------- step 5
+    // ------------------------------------------------------------- repayment terms
 
+    /// <summary>
+    /// Repayment terms used to be captured here, as step 5. They now belong to a loan,
+    /// raised once the client is onboarded - see LoansController. Kept as a redirect so an
+    /// old link or bookmark lands somewhere useful instead of a 404.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> Payback(Guid id)
     {
-        ViewData["Title"] = "Payback";
-        var client = await LoadClientAsync(id, c => c.Payback, c => c.Employment);
+        var client = await LoadClientAsync(id);
         if (client is null) return NotFound();
 
-        await PopulateWizardAsync(id);
+        if (ClientStatusInfo.CanBorrow(client.Status))
+            return RedirectToAction("Create", "Loans", new { clientId = id });
 
-        var p = client.Payback;
-        return View(new PaybackStepModel
-        {
-            ClientId = id,
-            LoanAmount = p?.LoanAmount,
-            InstalmentAmount = p?.InstalmentAmount,
-            NumberOfInstalments = p?.NumberOfInstalments,
-            Frequency = p?.Frequency ?? DebitFrequency.Monthly,
-            // Collections land best just after payday, so default to the salary day we captured.
-            CollectionDay = p?.CollectionDay ?? client.Employment?.SalaryDay?.ToString("D2"),
-            CollectionDayCode = p?.CollectionDayCode,
-            FirstCollectionDate = p?.FirstCollectionDate,
-            FirstCollectionDiffers = p?.FirstCollectionDiffers ?? false,
-            FirstCollectionAmount = p?.FirstCollectionAmount,
-            TrackingDays = p?.TrackingDays ?? 5,
-            AgreementDate = p?.AgreementDate ?? DateTime.UtcNow.Date
-        });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Payback(PaybackStepModel model)
-    {
-        ViewData["Title"] = "Payback";
-        var client = await LoadClientAsync(model.ClientId, c => c.Payback);
-        if (client is null) return NotFound();
-
-        if (model.FirstCollectionDiffers && model.FirstCollectionAmount is null)
-            ModelState.AddModelError(nameof(model.FirstCollectionAmount),
-                "Enter the first collection amount, or clear the box above.");
-
-        if (!ModelState.IsValid)
-        {
-            await PopulateWizardAsync(model.ClientId);
-            return View(model);
-        }
-
-        var p = GetOrCreate(client.Payback, _db.ClientPaybacks,
-            () => new ClientPayback { ClientId = client.Id });
-        client.Payback = p;
-
-        p.LoanAmount = model.LoanAmount;
-        p.InstalmentAmount = model.InstalmentAmount;
-        p.NumberOfInstalments = model.NumberOfInstalments;
-        p.Frequency = model.Frequency;
-        p.CollectionDay = model.CollectionDay;
-        p.CollectionDayCode = model.CollectionDayCode;
-        p.FirstCollectionDate = model.FirstCollectionDate;
-        p.FirstCollectionDiffers = model.FirstCollectionDiffers;
-        p.FirstCollectionAmount = model.FirstCollectionDiffers ? model.FirstCollectionAmount : null;
-        p.TrackingDays = model.TrackingDays;
-        p.AgreementDate = model.AgreementDate;
-
-        client.UpdatedUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-
-        TempData["Success"] = "Payback details saved.";
-        return RedirectToAction(nameof(Address), new { id = client.Id });
+        TempData["Info"] =
+            "Repayment terms are now set when a loan is raised, after onboarding is complete " +
+            "and the client's identity document and payslip have been accepted.";
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     // ------------------------------------------------------------- step 6
@@ -725,7 +676,8 @@ public class ClientsController : Controller
         var client = await _db.Clients
             .Include(c => c.Employment)
             .Include(c => c.Financial)
-            .Include(c => c.Payback)
+            .Include(c => c.Documents)
+            .Include(c => c.Loans).ThenInclude(l => l.CreditPackage)
             .Include(c => c.OtherDetails)
             .Include(c => c.BankAccounts)
             .Include(c => c.Addresses)
@@ -747,7 +699,7 @@ public class ClientsController : Controller
     public async Task<IActionResult> Activate(Guid id)
     {
         var client = await LoadClientAsync(id,
-            c => c.BankAccounts, c => c.Addresses, c => c.OtherDetails);
+            c => c.BankAccounts, c => c.Addresses, c => c.OtherDetails, c => c.Documents);
 
         if (client is null) return NotFound();
 
@@ -758,19 +710,35 @@ public class ClientsController : Controller
             missing.Add("a mobile number");
         if (client.OtherDetails?.DataProcessingConsent != true) missing.Add("POPIA consent");
 
+        // Verified documents, not merely uploaded ones. This is the control that lets a
+        // client captured through a public self-service link be trusted at all.
+        foreach (var required in DocumentsController.Required)
+        {
+            var accepted = client.Documents.Any(d =>
+                d.DocumentType == required && d.ReviewStatus == DocumentReviewStatus.Approved);
+
+            if (!accepted)
+                missing.Add($"an accepted {DocumentsController.Describe(required).ToLowerInvariant()}");
+        }
+
         if (missing.Count > 0)
         {
-            TempData["Error"] = $"Cannot activate this client without {string.Join(", ", missing)}.";
+            TempData["Error"] =
+                $"This client cannot be onboarded without {string.Join(", ", missing)}.";
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        client.Status = ClientStatus.Active;
+        // Onboarded, not Active. Active means the client is holding a disbursed loan, and
+        // that is set by the loan, not here. Conflating the two makes it impossible to say
+        // how much of the book is actually lending.
+        client.Status = ClientStatus.Onboarded;
         client.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _log.LogInformation("Client {ClientNumber} activated.", client.ClientNumber);
+        _log.LogInformation("Client {ClientNumber} onboarded.", client.ClientNumber);
 
-        TempData["Success"] = "Client activated. A DebiCheck mandate can now be created.";
+        TempData["Success"] =
+            "Client onboarded. A DebiCheck mandate can now be originated and credit advanced.";
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -830,10 +798,10 @@ public class ClientsController : Controller
             .AsNoTracking()
             .Include(c => c.Employment)
             .Include(c => c.Financial)
-            .Include(c => c.Payback)
             .Include(c => c.OtherDetails)
             .Include(c => c.BankAccounts)
             .Include(c => c.Addresses)
+            .Include(c => c.Documents)
             .FirstOrDefaultAsync(c => c.Id == clientId);
 
         if (client is null) return;
@@ -842,9 +810,14 @@ public class ClientsController : Controller
         if (client.Employment is not null) done.Add(OnboardingStep.Employment);
         if (client.Financial is not null) done.Add(OnboardingStep.Financial);
         if (client.BankAccounts.Count > 0) done.Add(OnboardingStep.Banking);
-        if (client.Payback is not null) done.Add(OnboardingStep.Payback);
         if (client.Addresses.Count > 0) done.Add(OnboardingStep.Address);
         if (client.OtherDetails is not null) done.Add(OnboardingStep.OtherDetails);
+
+        // Documents count as done only once the required ones are actually accepted -
+        // uploading a file is not the same as having it pass.
+        if (DocumentsController.Required.All(t => client.Documents.Any(d =>
+                d.DocumentType == t && d.ReviewStatus == DocumentReviewStatus.Approved)))
+            done.Add(OnboardingStep.Documents);
 
         ViewBag.Wizard = new WizardContext
         {
