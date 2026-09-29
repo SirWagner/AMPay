@@ -57,6 +57,7 @@
         }
         @if (!isReviewerOnly)
         {
+            <a class="nav-link @Active("Loans")" asp-controller="Loans" asp-action="Index">Loans</a>
             <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
             <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
         }
@@ -68,6 +69,7 @@
             {
                 <a class="nav-link @Active("Tenants")" asp-controller="Tenants" asp-action="Index">Customers</a>
             }
+            <a class="nav-link @Active("CreditPackages")" asp-controller="CreditPackages" asp-action="Index">Credit packages</a>
             <a class="nav-link @Active("ServiceKeys")" asp-controller="ServiceKeys" asp-action="Index">Netcash service keys</a>
             <a class="nav-link @Active("Users")" asp-controller="Users" asp-action="Index">Users</a>
         }

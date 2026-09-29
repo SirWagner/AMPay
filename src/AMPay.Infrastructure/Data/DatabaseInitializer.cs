@@ -52,7 +52,22 @@ public static class DatabaseInitializer
     public static async Task InitialiseAsync(
         AppDbContext db, ILogger log, CancellationToken ct = default)
     {
-        await AttachOrphanedLocalDbFilesAsync(db, log, ct);
+        try
+        {
+            await AttachOrphanedLocalDbFilesAsync(db, log, ct);
+        }
+        catch (Exception ex) when (ex is DbException or InvalidOperationException or TimeoutException)
+        {
+            // The attach step is a recovery aid for one specific LocalDB failure. It must
+            // never be the thing that stops the application starting: if master cannot be
+            // reached - LocalDB still spinning up, an instance restart in progress - carry
+            // on. The steps below connect to the database itself, and if it is genuinely
+            // unreachable EF reports that with its own, clearer error.
+            log.LogWarning(ex,
+                "Could not check LocalDB for an orphaned database file: {Message} " +
+                "Continuing with the normal startup.", ex.Message);
+        }
+
         await BaselineExistingSchemaAsync(db, log, ct);
 
         var pending = (await db.Database.GetPendingMigrationsAsync(ct)).ToList();
@@ -96,6 +111,10 @@ public static class DatabaseInitializer
 
         // The database is not attached, so connect to master to ask about it.
         builder.InitialCatalog = "master";
+
+        // LocalDB shuts itself down when idle and starts again on the next connection. A cold
+        // start can outlast SqlClient's default 15 seconds, so allow it longer here.
+        builder.ConnectTimeout = Math.Max(builder.ConnectTimeout, 60);
 
         await using var master = new SqlConnection(builder.ConnectionString);
         await master.OpenAsync(ct);

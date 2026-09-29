@@ -1,3 +1,4 @@
+using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Infrastructure.Data;
@@ -117,6 +118,10 @@ public class TenantsController : Controller
                 Status = ServiceKeyStatus.Unverified
             });
         }
+
+        // A customer with no credit package cannot raise a single loan, so it starts with
+        // the standard three. Its administrator reprices them from Credit packages.
+        _db.CreditPackages.AddRange(CreditPackageDefaults.For(tenant.Id));
 
         await _db.SaveChangesAsync();
 

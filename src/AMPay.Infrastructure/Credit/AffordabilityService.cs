@@ -17,7 +17,6 @@ namespace AMPay.Infrastructure.Credit;
 /// </summary>
 public class AffordabilityService : IAffordabilityService
 {
-    private static readonly CultureInfo Rand = CultureInfo.GetCultureInfo("en-ZA");
 
     private readonly AffordabilityNorms _norms;
 
@@ -118,7 +117,12 @@ public class AffordabilityService : IAffordabilityService
         };
     }
 
-    private static string Money(decimal value) => value.ToString("C2", Rand);
+    /// <summary>
+    /// R 14,500.00 - the same shape as every other amount in the app. Not the en-ZA culture
+    /// format (R14 500,00): this text sits on screen next to figures formatted the other way.
+    /// </summary>
+    private static string Money(decimal value) =>
+        "R " + value.ToString("N2", CultureInfo.InvariantCulture);
 
     private static decimal Round(decimal value) =>
         Math.Round(value, 2, MidpointRounding.AwayFromZero);

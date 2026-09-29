@@ -146,9 +146,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.InitiationFeeRate).HasPrecision(9, 6);
             e.Property(x => x.CreditLifeRate).HasPrecision(9, 6);
 
-            // One package per tier per tenant. Two active "Gold" price lists is an
-            // ambiguity nobody wants to discover at quote time.
-            e.HasIndex(x => new { x.TenantId, x.Tier }).IsUnique();
+            // A customer may run several packages at the same tier - two Gold price lists
+            // for two kinds of borrower - so the tier is only a grouping for reporting.
+            // What must be unique is the name: that is what the operator picks from when
+            // quoting, and two identical names is an ambiguity nobody wants at quote time.
+            // (Case-insensitive, courtesy of the database collation.)
+            e.HasIndex(x => new { x.TenantId, x.Tier });
+            e.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
 
             e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);

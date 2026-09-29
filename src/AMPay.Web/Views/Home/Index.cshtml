@@ -1,8 +1,86 @@
 @model AMPay.Web.Models.DashboardViewModel
+@using System.Globalization
 @{
     ViewData["Title"] = "Dashboard";
     var platformView = Model.IsPlatformUser && Model.TenantName is null;
+    var canReview = User.IsInRole(AppRoles.Reviewer) || User.IsInRole(AppRoles.TenantAdmin) ||
+                    User.IsInRole(AppRoles.SuperAdmin);
+    var inv = CultureInfo.InvariantCulture;
+
+    // CSS custom properties need an invariant number, whatever the page culture.
+    string Css(decimal d) => d.ToString("0.####", inv);
+
+    // A bar's share of the longest bar. A non-zero value never renders narrower than a
+    // sliver, or a real "1" beside a "400" would vanish.
+    string Frac(decimal value, decimal max) =>
+        value <= 0 || max <= 0 ? "0" : Css(Math.Max(value / max, 0.02m));
+
+    string Rand(decimal v) => "R " + v.ToString("N2", inv);
+
+    // Compact for labels at a bar's tip; the full figure is in the tooltip and the table.
+    string Compact(decimal v) => v switch
+    {
+        >= 1_000_000m => "R " + (v / 1_000_000m).ToString("0.#", inv) + "M",
+        >= 100_000m => "R " + (v / 1_000m).ToString("0", inv) + "K",
+        _ => "R " + v.ToString("N0", inv)
+    };
+
+    // The smallest 1, 2, 4 or 5 x 10^k at or above the data maximum: clean axis ticks.
+    // Four is there for small counts - a peak of 3 reads better on 0/2/4 than on 0/5.
+    int NiceMax(int max)
+    {
+        if (max <= 1) return 1;
+        var magnitude = (int)Math.Pow(10, Math.Floor(Math.Log10(max)));
+        foreach (var step in new[] { 1, 2, 4, 5, 10 })
+            if (step * magnitude >= max) return step * magnitude;
+        return 10 * magnitude;
+    }
+
+    string Plural(int n, string one, string many) => $"{n} {(n == 1 ? one : many)}";
+
+    // Data for each chart, worked out once.
+    var pipelineMax = Model.Pipeline.Count == 0 ? 0m : Model.Pipeline.Max(s => s.Value);
+
+    var months = Model.ClientsByMonth;
+    var monthMax = months.Count == 0 ? 0 : (int)months.Max(s => s.Value);
+    var monthScale = NiceMax(monthMax);
+    var monthTicks = monthScale % 2 == 0 ? new[] { 0, monthScale / 2, monthScale } : new[] { 0, monthScale };
+    var latestIndex = months.Count - 1;
+    var peakIndex = months.Count == 0 ? -1 : months.FindIndex(s => s.Value == monthMax);
+
+    var bookMax = Model.LoanBookByPackage.Count == 0 ? 0m : Model.LoanBookByPackage.Max(s => s.Value);
+    var bookTotal = Model.LoanBookByPackage.Sum(s => s.Value);
+
+    var inProgressMandates = Model.MandateHealth
+        .Where(s => s.Tone == MandateHealthTone.Warning).Sum(s => s.Count);
 }
+
+@functions {
+    // Status always travels with an icon, never colour alone.
+    static Microsoft.AspNetCore.Html.IHtmlContent StatusIcon(string tone)
+    {
+        var path = tone switch
+        {
+            "good" => "<circle cx='8' cy='8' r='7' fill='currentColor'/><path d='M4.8 8.2l2.1 2.1 4.3-4.6' stroke='#fff' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/>",
+            "warning" => "<circle cx='8' cy='8' r='7' fill='currentColor'/><path d='M8 4.4v4.3' stroke='#fff' stroke-width='1.8' stroke-linecap='round'/><circle cx='8' cy='11.3' r='1' fill='#fff'/>",
+            "critical" => "<circle cx='8' cy='8' r='7' fill='currentColor'/><path d='M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8' stroke='#fff' stroke-width='1.7' stroke-linecap='round'/>",
+            _ => "<circle cx='8' cy='8' r='7' fill='currentColor'/><path d='M5 8h6' stroke='#fff' stroke-width='1.8' stroke-linecap='round'/>"
+        };
+
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<svg class='status-icon {tone}' viewBox='0 0 16 16' aria-hidden='true' focusable='false'>{path}</svg>");
+    }
+
+    static string ToneClass(MandateHealthTone tone) => tone switch
+    {
+        MandateHealthTone.Good => "good",
+        MandateHealthTone.Warning => "warning",
+        MandateHealthTone.Critical => "critical",
+        _ => "neutral"
+    };
+}
+
+<div class="dash">
 
 <div class="page-head">
     <h1>@(Model.TenantName ?? "AM-Pay platform")</h1>
@@ -13,129 +91,310 @@
         }
         else
         {
-            <text>Client onboarding, DebiCheck mandate origination and Pay Now collections.</text>
+            <text>Client onboarding, credit, DebiCheck collections and Pay Now.</text>
         }
     </p>
 </div>
 
-<div class="stat-grid">
-    @if (platformView)
-    {
-        <div class="stat">
-            <div class="label">Customers</div>
-            <div class="value">@Model.CustomerCount</div>
-            <div class="note">Trading under the AM-Pay ISV</div>
+@* ---------------------------------------------------------------- hero *@
+
+<section class="hero" aria-labelledby="heroLabel">
+    <div>
+        <div class="hero-label" id="heroLabel">Collectable each month</div>
+        <div class="hero-value">@Rand(Model.MonthlyCollectionValue)</div>
+        <p class="hero-note">
+            @if (Model.AuthenticatedMandates == 0)
+            {
+                <text>No DebiCheck mandate has been authenticated yet, so nothing is collectable.</text>
+            }
+            else
+            {
+                <text>Across @Plural(Model.AuthenticatedMandates, "authenticated DebiCheck mandate", "authenticated DebiCheck mandates")
+                &mdash; what the bank will debit each cycle.</text>
+            }
+        </p>
+    </div>
+
+    <dl class="hero-facts">
+        @if (platformView)
+        {
+            <div>
+                <dt>Customers</dt>
+                <dd>@Model.CustomerCount</dd>
+            </div>
+        }
+        <div>
+            <dt>Advanced to clients</dt>
+            <dd>@Compact(Model.LoanBookPrincipal)</dd>
         </div>
-    }
-
-    <div class="stat">
-        <div class="label">Onboarded</div>
-        <div class="value accent">@Model.OnboardedClients</div>
-        <div class="note">Verified and eligible for credit</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Active</div>
-        <div class="value">@Model.ActiveClients</div>
-        <div class="note">Holding a disbursed loan</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Awaiting verification</div>
-        <div class="value">@Model.AwaitingVerification</div>
-        <div class="note">Documents with a reviewer</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Authenticated mandates</div>
-        <div class="value">@Model.AuthenticatedMandates</div>
-        <div class="note">Collectable today</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Mandated per cycle</div>
-        <div class="value">R @Model.MonthlyCollectionValue.ToString("N2")</div>
-        <div class="note">Sum of authenticated mandates</div>
-    </div>
-
-    <div class="stat">
-        <div class="label">Loan book advanced</div>
-        <div class="value">R @Model.LoanBookPrincipal.ToString("N2")</div>
-        <div class="note">@Model.DisbursedLoans disbursed</div>
-    </div>
-</div>
+        <div>
+            <dt>Loans disbursed</dt>
+            <dd>@Model.DisbursedLoans</dd>
+        </div>
+        <div>
+            <dt>Clients</dt>
+            <dd>@Model.ClientCount <span class="muted small" style="font-weight:400">&middot; @Model.ActiveClients active</span></dd>
+        </div>
+        @if (!platformView)
+        {
+            <div>
+                <dt>Pay Now collected</dt>
+                <dd>@Compact(Model.PayNowCollected)</dd>
+            </div>
+        }
+    </dl>
+</section>
 
 @if (platformView)
 {
-    <div class="card">
-        <div class="card-body">
-            <h3>Select a customer to begin</h3>
-            <p class="muted small mb-0">
-                You are signed in as a platform administrator and are not currently scoped to a
-                customer account. Choose one to onboard clients or originate mandates on its behalf.
-            </p>
-        </div>
-        <div class="card-foot">
-            <a asp-controller="Tenants" asp-action="Index" class="btn btn-primary">Choose a customer</a>
-            <a asp-controller="Tenants" asp-action="Create" class="btn btn-outline">Onboard a new customer</a>
-        </div>
+    <div class="alert alert-info">
+        You are viewing every customer at once. To onboard clients or raise loans,
+        <a asp-controller="Tenants" asp-action="Index">choose a customer</a> to work in.
     </div>
 }
 
+@* ---------------------------------------------------------------- needs attention *@
+
+<section class="attention" aria-label="Work waiting on someone">
+    @{
+        var queues = new[]
+        {
+            (Label: "Documents to review", Count: Model.DocumentsAwaitingReview,
+             Controller: canReview ? "Documents" : null, Action: "Index", Status: (LoanStatus?)null),
+            (Label: "Loans awaiting approval", Count: Model.LoansInApproval,
+             Controller: "Loans", Action: "Index", Status: (LoanStatus?)LoanStatus.PendingApproval),
+            (Label: "Mandates in progress", Count: inProgressMandates,
+             Controller: "Mandates", Action: "Index", Status: (LoanStatus?)null)
+        };
+    }
+
+    @foreach (var q in queues)
+    {
+        var tone = q.Count > 0 ? "warning" : "good";
+        var state = q.Count > 0 ? "Needs attention" : "All clear";
+
+        if (q.Controller is null)
+        {
+            <div class="attention-tile">
+                <span class="label">@q.Label</span>
+                <span class="value">@q.Count</span>
+                <span class="state">@StatusIcon(tone) @state</span>
+            </div>
+        }
+        else
+        {
+            <a class="attention-tile" asp-controller="@q.Controller" asp-action="@q.Action"
+               asp-route-status="@q.Status">
+                <span class="label">@q.Label</span>
+                <span class="value">@q.Count</span>
+                <span class="state">@StatusIcon(tone) @state <span class="go" aria-hidden="true">Open &rarr;</span></span>
+            </a>
+        }
+    }
+</section>
+
+@* ---------------------------------------------------------------- charts *@
+
 <div class="chart-grid">
-    <div class="card">
-        <div class="card-head"><h3>Onboarding pipeline</h3></div>
-        <div class="card-body">
-            <p class="muted small">
-                Where clients sit between first capture and a live loan. A drop between two
-                stages is where the process is losing people.
-            </p>
-            <div class="chart-box"><canvas id="pipelineChart"></canvas></div>
-        </div>
-    </div>
 
-    <div class="card">
-        <div class="card-head"><h3>Mandate status</h3></div>
+    @* Onboarding pipeline: ordered stages, so an ordinal ramp - the colour deepens as
+       the client moves along. One series, so no legend: the title names it. *@
+    <section class="card" aria-labelledby="pipeTitle">
+        <div class="card-head"><h3 id="pipeTitle">Onboarding pipeline</h3></div>
         <div class="card-body">
-            @if (Model.MandateBreakdown.Count == 0)
+            <p class="viz-sub">Clients at each stage, from first capture to holding a loan.</p>
+
+            <ol class="hbar">
+                @for (var i = 0; i < Model.Pipeline.Count; i++)
+                {
+                    var s = Model.Pipeline[i];
+                    var n = (int)s.Value;
+                    <li class="hbar-row" tabindex="0"
+                        aria-label="@s.Label: @Plural(n, "client", "clients")"
+                        data-tip-value="@Plural(n, "client", "clients")" data-tip-label="@s.Label">
+                        <span class="hbar-label">@s.Label</span>
+                        <span class="hbar-track">
+                            <span class="hbar-fill" style="--f:@Frac(s.Value, pipelineMax); --c:var(--ord5-@(i + 1))"></span>
+                            <span class="hbar-value">@n</span>
+                        </span>
+                    </li>
+                }
+            </ol>
+
+            <details class="viz-table">
+                <summary>Show as table</summary>
+                <table class="data">
+                    <thead><tr><th>Stage</th><th class="num">Clients</th></tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.Pipeline)
+                    {
+                        <tr><td>@s.Label</td><td class="num">@((int)s.Value)</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </details>
+        </div>
+    </section>
+
+    @* Mandate health: part-to-whole of states that mean good or bad, so a stacked bar
+       in the reserved status colours, with the icon + label legend that carries them. *@
+    <section class="card" aria-labelledby="mandateTitle">
+        <div class="card-head">
+            <h3 id="mandateTitle">DebiCheck mandates</h3>
+            <span class="muted small">@Plural(Model.MandateTotal, "mandate", "mandates")</span>
+        </div>
+        <div class="card-body">
+            @if (Model.MandateTotal == 0)
             {
-                <div class="empty">No mandates have been originated yet.</div>
+                <p class="viz-empty">No mandates have been originated yet.</p>
             }
             else
             {
-                <div class="chart-box"><canvas id="mandateChart"></canvas></div>
-            }
-        </div>
-    </div>
+                <p class="viz-sub">Where every mandate stands with the bank.</p>
 
-    <div class="card">
-        <div class="card-head"><h3>Clients captured per month</h3></div>
-        <div class="card-body">
-            <div class="chart-box"><canvas id="intakeChart"></canvas></div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-head"><h3>Loan book by package</h3></div>
-        <div class="card-body">
-            @if (!Model.HasLoanBook)
-            {
-                <div class="empty">
-                    No loans advanced yet. This fills in once the first agreement is disbursed.
+                <div class="stack" role="group" aria-label="Mandates by state">
+                    @foreach (var s in Model.MandateHealth.Where(s => s.Count > 0))
+                    {
+                        var pct = Math.Round(100m * s.Count / Model.MandateTotal);
+                        <span class="stack-seg @ToneClass(s.Tone)" style="flex-grow:@s.Count" tabindex="0"
+                              aria-label="@s.Label: @s.Count of @Model.MandateTotal"
+                              data-tip-value="@Plural(s.Count, "mandate", "mandates") (@pct%)"
+                              data-tip-label="@s.Label"></span>
+                    }
                 </div>
+
+                <ul class="status-list">
+                    @foreach (var s in Model.MandateHealth)
+                    {
+                        <li>
+                            @StatusIcon(ToneClass(s.Tone))
+                            <span class="what">@s.Label <span class="why">@s.Explanation</span></span>
+                            <span class="count">@s.Count</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </section>
+
+    @* Intake per month: a count per period, so columns in the single series colour.
+       Only the latest month and the peak carry a label; the axis, the tooltip and the
+       table carry the rest. *@
+    <section class="card" aria-labelledby="intakeTitle">
+        <div class="card-head"><h3 id="intakeTitle">Clients captured per month</h3></div>
+        <div class="card-body">
+            <p class="viz-sub">New client files opened over the last twelve months.</p>
+
+            <div class="cols">
+                <div class="cols-plot">
+                    @foreach (var t in monthTicks)
+                    {
+                        <div class="cols-grid" style="bottom:@Css(100m * t / monthScale)%" aria-hidden="true"><span>@t</span></div>
+                    }
+                    <div class="cols-bars" style="--n:@months.Count" role="group" aria-label="Clients captured per month">
+                        @for (var i = 0; i < months.Count; i++)
+                        {
+                            var m = months[i];
+                            var n = (int)m.Value;
+                            var labelled = n > 0 && (i == latestIndex || i == peakIndex);
+                            <div class="col" tabindex="0" style="--h:@Css(100m * n / monthScale)%"
+                                 aria-label="@m.Label: @Plural(n, "client", "clients")"
+                                 data-tip-value="@Plural(n, "client", "clients")" data-tip-label="@m.Label">
+                                @if (labelled)
+                                {
+                                    <span class="col-value">@n</span>
+                                }
+                                <span class="col-bar"></span>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="cols-axis" style="--n:@months.Count" aria-hidden="true">
+                    @foreach (var m in months)
+                    {
+                        <span>@(m.Label.Length > 3 ? m.Label[..3] : m.Label)</span>
+                    }
+                </div>
+            </div>
+
+            <details class="viz-table">
+                <summary>Show as table</summary>
+                <table class="data">
+                    <thead><tr><th>Month</th><th class="num">Clients captured</th></tr></thead>
+                    <tbody>
+                    @foreach (var m in months)
+                    {
+                        <tr><td>@m.Label</td><td class="num">@((int)m.Value)</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </details>
+        </div>
+    </section>
+
+    @* Loan book: ordered tiers, so the three-step ordinal ramp. *@
+    <section class="card" aria-labelledby="bookTitle">
+        <div class="card-head">
+            <h3 id="bookTitle">Loan book by package</h3>
+            @if (bookTotal > 0)
+            {
+                <span class="muted small">@Compact(bookTotal) advanced</span>
+            }
+        </div>
+        <div class="card-body">
+            @if (bookTotal == 0)
+            {
+                <p class="viz-empty">
+                    No loans approved or disbursed yet. This fills in as agreements are approved.
+                </p>
             }
             else
             {
-                <div class="chart-box"><canvas id="bookChart"></canvas></div>
+                <p class="viz-sub">Amount advanced on approved and disbursed loans.</p>
+
+                <ol class="hbar">
+                    @for (var i = 0; i < Model.LoanBookByPackage.Count; i++)
+                    {
+                        var s = Model.LoanBookByPackage[i];
+                        <li class="hbar-row" tabindex="0"
+                            aria-label="@s.Label: @Rand(s.Value)"
+                            data-tip-value="@Rand(s.Value)" data-tip-label="@s.Label package">
+                            <span class="hbar-label">@s.Label</span>
+                            <span class="hbar-track">
+                                <span class="hbar-fill" style="--f:@Frac(s.Value, bookMax); --c:var(--ord3-@(Math.Min(i + 1, 3)))"></span>
+                                <span class="hbar-value">@Compact(s.Value)</span>
+                            </span>
+                        </li>
+                    }
+                </ol>
+
+                <details class="viz-table">
+                    <summary>Show as table</summary>
+                    <table class="data">
+                        <thead><tr><th>Package</th><th class="num">Advanced</th><th class="num">Share</th></tr></thead>
+                        <tbody>
+                        @foreach (var s in Model.LoanBookByPackage)
+                        {
+                            <tr>
+                                <td>@s.Label</td>
+                                <td class="num">@Rand(s.Value)</td>
+                                <td class="num">@((100m * s.Value / bookTotal).ToString("0", inv))%</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </details>
             }
         </div>
-    </div>
+    </section>
 </div>
+
+@* ---------------------------------------------------------------- recent activity *@
 
 @if (!platformView)
 {
     <div class="chart-grid">
-        <div class="card">
+        <section class="card">
             <div class="card-head">
                 <h3>Recent clients</h3>
                 <a asp-controller="Clients" asp-action="Create" class="btn btn-primary btn-sm">Onboard a client</a>
@@ -165,9 +424,9 @@
                     </table>
                 </div>
             }
-        </div>
+        </section>
 
-        <div class="card">
+        <section class="card">
             <div class="card-head">
                 <h3>Recent mandates</h3>
                 <a asp-controller="Mandates" asp-action="Index" class="btn btn-outline btn-sm">View all</a>
@@ -191,7 +450,7 @@
                                     <a asp-controller="Mandates" asp-action="Details" asp-route-id="@m.Id">@m.AccountReference</a>
                                 </td>
                                 <td>@m.ClientName</td>
-                                <td class="num">R @m.Amount.ToString("N2")</td>
+                                <td class="num" style="font-variant-numeric:tabular-nums">@Rand(m.Amount)</td>
                                 <td><partial name="_MandateStatus" model="m.Status" /></td>
                             </tr>
                         }
@@ -199,144 +458,63 @@
                     </table>
                 </div>
             }
-        </div>
+        </section>
     </div>
 }
 
+</div>
+
 @section Scripts {
-    <script src="~/lib/chartjs/chart.umd.min.js" asp-append-version="true"></script>
-    <script>
-        (function () {
-            if (typeof Chart === 'undefined') return;
+<script>
+// One tooltip for every mark on the page. It enhances and never gates: each value is
+// also in a label, the aria-label, or the table view. Same readout on keyboard focus as
+// on hover. Text goes in with textContent - labels are data, not markup.
+(function () {
+    var tip = document.createElement('div');
+    tip.className = 'viz-tip';
+    tip.setAttribute('role', 'tooltip');
+    tip.hidden = true;
+    var value = document.createElement('strong');
+    var label = document.createElement('span');
+    tip.appendChild(value);
+    tip.appendChild(label);
+    document.body.appendChild(tip);
 
-            // Pulled from ampay.css so the charts stay in step with the rest of the theme.
-            var css = getComputedStyle(document.documentElement);
-            var v = function (name, fallback) {
-                return (css.getPropertyValue(name) || '').trim() || fallback;
-            };
+    function show(el) {
+        value.textContent = el.dataset.tipValue || '';
+        label.textContent = el.dataset.tipLabel || '';
+        tip.hidden = false;
 
-            var navy  = v('--navy', '#1e3674');
-            var green = v('--green-accent', '#4aaa3c');
-            var amber = v('--amber', '#b8860b');
-            var red   = v('--red', '#c0392b');
-            var muted = v('--text-muted', '#777');
-            var border = v('--border', '#e5e5e5');
+        var r = el.getBoundingClientRect();
+        var t = tip.getBoundingClientRect();
+        var x = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), window.innerWidth - t.width - 8);
+        var y = r.top - t.height - 8;
+        if (y < 8) y = r.bottom + 8;
 
-            var palette = [navy, green, amber, '#5b7bc4', red, '#7f8fa6', '#2d7a4e'];
+        tip.style.left = x + 'px';
+        tip.style.top = y + 'px';
+    }
 
-            Chart.defaults.font.family =
-                '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
-            Chart.defaults.font.size = 12;
-            Chart.defaults.color = muted;
-            Chart.defaults.maintainAspectRatio = false;
+    function hide() { tip.hidden = true; }
 
-            var rands = new Intl.NumberFormat('en-ZA', {
-                style: 'currency', currency: 'ZAR', minimumFractionDigits: 2
-            });
+    function markOf(target) {
+        return target && target.closest ? target.closest('[data-tip-value]') : null;
+    }
 
-            function mount(id, config) {
-                var el = document.getElementById(id);
-                if (el) new Chart(el, config);
-            }
-
-            // ---- Onboarding pipeline ----
-            var pipeline = @Html.Raw(Json.Serialize(Model.Pipeline));
-            mount('pipelineChart', {
-                type: 'bar',
-                data: {
-                    labels: pipeline.map(function (s) { return s.label; }),
-                    datasets: [{
-                        data: pipeline.map(function (s) { return s.value; }),
-                        backgroundColor: navy,
-                        borderRadius: 4,
-                        barThickness: 22
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            ticks: { precision: 0 },
-                            grid: { color: border }
-                        },
-                        y: { grid: { display: false } }
-                    }
-                }
-            });
-
-            // ---- Mandate status ----
-            var mandates = @Html.Raw(Json.Serialize(Model.MandateBreakdown));
-            mount('mandateChart', {
-                type: 'doughnut',
-                data: {
-                    labels: mandates.map(function (s) { return s.label; }),
-                    datasets: [{
-                        data: mandates.map(function (s) { return s.value; }),
-                        backgroundColor: palette,
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    cutout: '62%',
-                    plugins: { legend: { position: 'right', labels: { boxWidth: 12 } } }
-                }
-            });
-
-            // ---- Intake per month ----
-            var intake = @Html.Raw(Json.Serialize(Model.ClientsByMonth));
-            mount('intakeChart', {
-                type: 'line',
-                data: {
-                    labels: intake.map(function (s) { return s.label; }),
-                    datasets: [{
-                        data: intake.map(function (s) { return s.value; }),
-                        borderColor: green,
-                        backgroundColor: 'rgba(74,170,60,.12)',
-                        fill: true,
-                        tension: .3,
-                        pointRadius: 3,
-                        pointBackgroundColor: green
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: border } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-
-            // ---- Loan book by package ----
-            var book = @Html.Raw(Json.Serialize(Model.LoanBookByPackage));
-            mount('bookChart', {
-                type: 'doughnut',
-                data: {
-                    labels: book.map(function (s) { return s.label; }),
-                    datasets: [{
-                        data: book.map(function (s) { return s.value; }),
-                        backgroundColor: palette,
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    cutout: '62%',
-                    plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 12 } },
-                        tooltip: {
-                            callbacks: {
-                                label: function (ctx) {
-                                    return ctx.label + ': ' + rands.format(ctx.parsed);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        })();
-    </script>
+    document.addEventListener('pointerover', function (e) {
+        var el = markOf(e.target);
+        if (el) show(el);
+    });
+    document.addEventListener('pointerout', function (e) {
+        var el = markOf(e.target);
+        if (el && !el.contains(e.relatedTarget)) hide();
+    });
+    document.addEventListener('focusin', function (e) {
+        var el = markOf(e.target);
+        if (el) show(el); else hide();
+    });
+    document.addEventListener('focusout', hide);
+    window.addEventListener('scroll', hide, { passive: true });
+})();
+</script>
 }

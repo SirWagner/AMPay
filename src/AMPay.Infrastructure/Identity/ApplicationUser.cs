@@ -98,4 +98,11 @@ public static class AppPolicies
     /// Seeing a client file and its documents. Everyone who works a client can read one.
     /// </summary>
     public const string CanViewClients = "CanViewClients";
+
+    /// <summary>
+    /// Taking the credit decision: approving, declining, overriding an affordability flag,
+    /// marking a loan disbursed, and repricing the credit packages. A capturer quotes and
+    /// submits; an administrator decides.
+    /// </summary>
+    public const string CanApproveCredit = "CanApproveCredit";
 }

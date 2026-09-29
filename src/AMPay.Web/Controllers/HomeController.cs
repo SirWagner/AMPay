@@ -86,11 +86,30 @@ public class HomeController : Controller
                                 MandatesOf(MandateStatus.AwaitingDebtorAuthentication);
         model.RejectedMandates = MandatesOf(MandateStatus.Rejected);
 
-        model.MandateBreakdown = mandatesByStatus
-            .Where(x => x.Count > 0)
-            .OrderByDescending(x => x.Count)
-            .Select(x => new ChartSlice(Humanise(x.Status.ToString()), x.Count))
-            .ToList();
+        // Grouped by what the status means, not listed one Netcash state at a time. The
+        // operator's question is how much will collect, how much is stuck, and how much has
+        // failed - not which of ten lifecycle states each mandate happens to be in.
+        int Total(params MandateStatus[] statuses) => statuses.Sum(MandatesOf);
+
+        model.MandateHealth = new List<MandateHealthSlice>
+        {
+            new("Authenticated", "Collectable",
+                Total(MandateStatus.Authenticated), MandateHealthTone.Good),
+            new("In progress", "With the bank or the debtor",
+                Total(MandateStatus.Draft, MandateStatus.PendingMasterfile, MandateStatus.SubmittedToBank,
+                      MandateStatus.AwaitingDebtorAuthentication, MandateStatus.Amended),
+                MandateHealthTone.Warning),
+            new("Failed or rejected", "Will not collect",
+                Total(MandateStatus.Rejected, MandateStatus.Failed, MandateStatus.Expired),
+                MandateHealthTone.Critical),
+            new("Cancelled", "Closed",
+                Total(MandateStatus.Cancelled), MandateHealthTone.Neutral)
+        };
+
+        model.DocumentsAwaitingReview = await _db.ClientDocuments.AsNoTracking()
+            .Where(d => d.ReviewStatus == DocumentReviewStatus.Pending)
+            .Where(d => crossTenant || d.Client!.TenantId == tenantId)
+            .CountAsync();
 
         model.MonthlyCollectionValue = await mandates
             .Where(m => m.Status == MandateStatus.Authenticated)
@@ -111,16 +130,21 @@ public class HomeController : Controller
             .Where(l => l.Status == LoanStatus.Disbursed)
             .SumAsync(l => (decimal?)l.CapitalisedAmount) ?? 0m;
 
-        // Projected to an anonymous type first: ChartSlice has an optional constructor
+        // By tier rather than package name: names are editable per customer, the tier is
+        // not, so the chart means the same thing across every customer on the platform.
+        // Projected to an anonymous type first - ChartSlice has an optional constructor
         // parameter, which EF cannot put in an expression tree.
-        var byPackage = await loans
+        var byTier = await loans
             .Where(l => l.Status == LoanStatus.Disbursed || l.Status == LoanStatus.Approved)
-            .GroupBy(l => l.CreditPackage!.Name)
-            .Select(g => new { Package = g.Key, Advanced = g.Sum(l => l.Principal) })
+            .GroupBy(l => l.CreditPackage!.Tier)
+            .Select(g => new { Tier = g.Key, Advanced = g.Sum(l => l.Principal) })
             .ToListAsync();
 
-        model.LoanBookByPackage = byPackage
-            .Select(x => new ChartSlice(x.Package, x.Advanced))
+        // Every tier present, in tier order: a Premium bar of zero is information, and a
+        // missing one reads as a fault.
+        model.LoanBookByPackage = Enum.GetValues<CreditTier>()
+            .OrderBy(t => t)
+            .Select(t => new ChartSlice(t.ToString(), byTier.FirstOrDefault(x => x.Tier == t)?.Advanced ?? 0m))
             .ToList();
 
         // ---- Captured per month, last twelve ----
@@ -177,10 +201,6 @@ public class HomeController : Controller
 
         return View(model);
     }
-
-    /// <summary>Turns a PascalCase enum name into something a person would read.</summary>
-    private static string Humanise(string pascal) =>
-        System.Text.RegularExpressions.Regex.Replace(pascal, "(?<!^)([A-Z])", " $1");
 
     [AllowAnonymous]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

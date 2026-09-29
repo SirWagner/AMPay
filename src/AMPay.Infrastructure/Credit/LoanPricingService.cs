@@ -42,7 +42,7 @@ public class LoanPricingService : ILoanPricingService
 
         if (request.Principal < package.MinLoanAmount || request.Principal > package.MaxLoanAmount)
             throw new ArgumentOutOfRangeException(nameof(request),
-                $"{package.Name} lends between {package.MinLoanAmount:N2} and {package.MaxLoanAmount:N2}.");
+                $"{package.Name} lends between {Money(package.MinLoanAmount)} and {Money(package.MaxLoanAmount)}.");
 
         if (request.NumberOfInstalments < package.MinTermMonths ||
             request.NumberOfInstalments > package.MaxTermMonths)
@@ -75,8 +75,8 @@ public class LoanPricingService : ILoanPricingService
         if (serviceFee > _limits.MonthlyServiceFeeCeiling)
         {
             notices.Add(
-                $"Service fee reduced from {serviceFee:N2} to the statutory maximum of " +
-                $"{_limits.MonthlyServiceFeeCeiling:N2} per month.");
+                $"Service fee reduced from {Money(serviceFee)} to the statutory maximum of " +
+                $"{Money(_limits.MonthlyServiceFeeCeiling)} per month.");
             serviceFee = _limits.MonthlyServiceFeeCeiling;
         }
         serviceFee = Round(serviceFee);
@@ -90,8 +90,8 @@ public class LoanPricingService : ILoanPricingService
         if (initiationFee > statutoryMax)
         {
             notices.Add(
-                $"Initiation fee reduced from {requestedFee:N2} to the statutory maximum of " +
-                $"{statutoryMax:N2} for a principal of {request.Principal:N2}.");
+                $"Initiation fee reduced from {Money(requestedFee)} to the statutory maximum of " +
+                $"{Money(statutoryMax)} for a principal of {Money(request.Principal)}.");
             initiationFee = statutoryMax;
         }
 
@@ -196,6 +196,9 @@ public class LoanPricingService : ILoanPricingService
         for (var i = 0; i < exponent; i++) result *= value;
         return result;
     }
+
+    private static string Money(decimal value) =>
+        "R " + value.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
 
     private static decimal Round(decimal value) =>
         Math.Round(value, 2, MidpointRounding.AwayFromZero);

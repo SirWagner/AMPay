@@ -4,6 +4,17 @@ using AMPay.Infrastructure.Identity;
 using AMPay.Web.Services;
 using Microsoft.AspNetCore.Identity;
 
+// One number format for the whole application, whatever the host's regional settings.
+// Two reasons, and the second is the one that matters:
+//  - every amount renders the same way (R 14,500.00) on every screen and in every message;
+//  - a decimal posted from an <input type="number"> always arrives with a "." separator,
+//    and model binding parses form values in the current culture. On a server set to
+//    en-ZA (decimal comma) "5000.50" is rejected as invalid; under a culture that uses "."
+//    to group thousands it would quietly bind as 500050.
+var appCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = appCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = appCulture;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------------------
@@ -65,6 +76,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(AppPolicies.CanViewClients, p =>
         p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Capturer,
                       AppRoles.Reviewer, AppRoles.Viewer));
+
+    options.AddPolicy(AppPolicies.CanApproveCredit, p =>
+        p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin));
 });
 
 builder.Services.AddHttpContextAccessor();

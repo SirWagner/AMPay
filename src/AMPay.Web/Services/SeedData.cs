@@ -1,3 +1,4 @@
+using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Infrastructure.Data;
@@ -90,7 +91,7 @@ public static class SeedData
             log.LogInformation("Seeded customer tenant {Name}.", albatross.Name);
         }
 
-        await SeedCreditPackagesAsync(db, albatross, log);
+        await SeedCreditPackagesAsync(db, log);
 
         // The sudo account.
         var sudoEmail = config["Seed:SuperAdmin:Email"] ?? "admin@ampay.local";
@@ -132,68 +133,36 @@ public static class SeedData
     }
 
     /// <summary>
-    /// The three credit packages, seeded once per tenant.
+    /// Gives every customer the standard credit packages it is missing.
     /// <para>
-    /// Only the tier is fixed. Every rate is a starting point for the lender to adjust in
-    /// the UI - which is why these are seeded rows rather than constants. Interest is at
-    /// the statutory 5% per month ceiling on Regular and steps down for better tiers;
-    /// service fee and lending limits move with it. The initiation rate is the same across
-    /// all three and is clamped to the statutory maximum at quote time regardless.
+    /// Every customer, not only the first: a customer created before this ran - or created
+    /// any other way - would otherwise have no package, and a customer without one cannot
+    /// raise a single loan. Only missing tiers are added, so a repriced package is never
+    /// touched and this is safe on every startup.
     /// </para>
     /// </summary>
-    private static async Task SeedCreditPackagesAsync(
-        AppDbContext db, Tenant tenant, ILogger log)
+    private static async Task SeedCreditPackagesAsync(AppDbContext db, ILogger log)
     {
-        if (await db.CreditPackages.AnyAsync(p => p.TenantId == tenant.Id)) return;
+        var tenants = await db.Tenants
+            .Where(t => !t.IsPlatformOwner)
+            .Select(t => new { t.Id, t.Name })
+            .ToListAsync();
 
-        db.CreditPackages.AddRange(
-            new CreditPackage
-            {
-                TenantId = tenant.Id,
-                Tier = CreditTier.Regular,
-                Name = "Regular",
-                Description = "Entry tier. Priced at the statutory maximum rate.",
-                MonthlyInterestRate = 0.05m,
-                MonthlyServiceFee = 16m,
-                InitiationFeeRate = 0.15m,
-                CreditLifeRate = 0.0045m,
-                MinLoanAmount = 500m,
-                MaxLoanAmount = 8_000m,
-                MinTermMonths = 1,
-                MaxTermMonths = 6
-            },
-            new CreditPackage
-            {
-                TenantId = tenant.Id,
-                Tier = CreditTier.Gold,
-                Name = "Gold",
-                Description = "Repeat clients in good standing. Lower rate, longer terms.",
-                MonthlyInterestRate = 0.035m,
-                MonthlyServiceFee = 16m,
-                InitiationFeeRate = 0.15m,
-                CreditLifeRate = 0.0045m,
-                MinLoanAmount = 1_000m,
-                MaxLoanAmount = 25_000m,
-                MinTermMonths = 3,
-                MaxTermMonths = 12
-            },
-            new CreditPackage
-            {
-                TenantId = tenant.Id,
-                Tier = CreditTier.Premium,
-                Name = "Premium",
-                Description = "Best rate and highest limits. Reserved for the strongest books.",
-                MonthlyInterestRate = 0.025m,
-                MonthlyServiceFee = 10m,
-                InitiationFeeRate = 0.15m,
-                CreditLifeRate = 0.0045m,
-                MinLoanAmount = 5_000m,
-                MaxLoanAmount = 100_000m,
-                MinTermMonths = 6,
-                MaxTermMonths = 36
-            });
+        foreach (var tenant in tenants)
+        {
+            var existing = await db.CreditPackages
+                .Where(p => p.TenantId == tenant.Id)
+                .Select(p => new { p.Tier, p.Name })
+                .ToListAsync();
 
-        await db.SaveChangesAsync();
-        log.LogInformation("Seeded three credit packages for {Tenant}.", tenant.Name);
+            var missing = CreditPackageDefaults.MissingFor(
+                tenant.Id, existing.Select(e => (e.Tier, e.Name)));
+            if (missing.Count == 0) continue;
+
+            db.CreditPackages.AddRange(missing);
+            await db.SaveChangesAsync();
+
+            log.LogInformation("Added {Count} standard credit package(s) for {Tenant}.", missing.Count, tenant.Name);
+        }
     }
 }

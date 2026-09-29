@@ -1,0 +1,16 @@
+@model AMPay.Domain.Enums.LoanStatus
+@{
+    var (tone, label) = Model switch
+    {
+        LoanStatus.Draft => ("badge-grey", "Draft"),
+        LoanStatus.PendingApproval => ("badge-amber", "Awaiting approval"),
+        LoanStatus.Approved => ("badge-navy", "Approved"),
+        LoanStatus.Declined => ("badge-red", "Declined"),
+        LoanStatus.Disbursed => ("badge-green", "Disbursed"),
+        LoanStatus.Settled => ("badge-grey", "Settled"),
+        LoanStatus.Cancelled => ("badge-grey", "Cancelled"),
+        LoanStatus.WrittenOff => ("badge-red", "Written off"),
+        _ => ("badge-grey", Model.ToString())
+    };
+}
+<span class="badge @tone">@label</span>

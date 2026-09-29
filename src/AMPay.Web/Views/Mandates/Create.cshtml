@@ -9,6 +9,10 @@
     <h1>New DebiCheck mandate</h1>
     <p class="lede">
         @Model.ClientName &middot; client <span class="mono">@Model.ClientNumber</span>
+        @if (Model.LoanNumber is not null)
+        {
+            <text>&middot; collecting loan <span class="mono">@Model.LoanNumber</span>. The amount and dates below come from the loan.</text>
+        }
     </p>
 </div>
 
@@ -19,6 +23,8 @@
 
 <form asp-action="Create" method="post">
     <input type="hidden" asp-for="ClientId" />
+    <input type="hidden" asp-for="LoanId" />
+    <input type="hidden" asp-for="LoanNumber" />
     <input type="hidden" asp-for="ClientName" />
     <input type="hidden" asp-for="ClientNumber" />
 

@@ -58,6 +58,9 @@ public class AffordabilityTests
         Assert.Equal(1_505.38m, result.AppliedExpenses);
         Assert.Equal(6_994.62m, result.DiscretionaryIncome);
         Assert.Contains("Regulation 23A minimum", result.Reasoning);
+
+        // Same shape as every other amount in the app, not the en-ZA "R6 994,62".
+        Assert.Contains("R 6,994.62", result.Reasoning);
     }
 
     [Fact]

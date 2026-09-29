@@ -6,6 +6,16 @@ namespace AMPay.Web.Models;
 /// <summary>One labelled value in a chart.</summary>
 public record ChartSlice(string Label, decimal Value, string? Colour = null);
 
+/// <summary>
+/// The four states a mandate rolls up to on the dashboard. These carry meaning - good,
+/// in progress, failed - so they render in the reserved status colours, always with an
+/// icon and a label beside them, never colour alone.
+/// </summary>
+public enum MandateHealthTone { Good, Warning, Critical, Neutral }
+
+/// <summary>One segment of the mandate health bar.</summary>
+public record MandateHealthSlice(string Label, string Explanation, int Count, MandateHealthTone Tone);
+
 public class DashboardViewModel
 {
     public bool IsPlatformUser { get; set; }
@@ -34,13 +44,20 @@ public class DashboardViewModel
     public decimal LoanBookPrincipal { get; set; }
     public decimal LoanBookOutstanding { get; set; }
 
+    // ---- Work waiting on someone ----
+
+    /// <summary>Supporting documents nobody has accepted or rejected yet.</summary>
+    public int DocumentsAwaitingReview { get; set; }
+
+    /// <summary>Mandates grouped by what their status means, in reading order.</summary>
+    public List<MandateHealthSlice> MandateHealth { get; set; } = new();
+
+    public int MandateTotal => MandateHealth.Sum(s => s.Count);
+
     // ---- Charts ----
 
     /// <summary>Onboarding funnel, in lifecycle order.</summary>
     public List<ChartSlice> Pipeline { get; set; } = new();
-
-    /// <summary>Mandates by status.</summary>
-    public List<ChartSlice> MandateBreakdown { get; set; } = new();
 
     /// <summary>Clients captured per month over the last twelve months.</summary>
     public List<ChartSlice> ClientsByMonth { get; set; } = new();
@@ -96,13 +113,20 @@ public enum OnboardingStep
 
 public static class OnboardingSteps
 {
+    /// <summary>
+    /// The steps in capture order.
+    /// <para>
+    /// Payback is deliberately absent. Repayment terms belong to a loan, and a loan is raised
+    /// only after onboarding is complete and the documents are accepted - so it is not a
+    /// capture step. The enum value is kept so historical references still resolve.
+    /// </para>
+    /// </summary>
     public static readonly IReadOnlyList<(OnboardingStep Step, string Label, string Action)> All = new[]
     {
         (OnboardingStep.General,      "General",       "General"),
         (OnboardingStep.Employment,   "Employment",    "Employment"),
         (OnboardingStep.Financial,    "Financial",     "Financial"),
         (OnboardingStep.Banking,      "Banking",       "Banking"),
-        (OnboardingStep.Payback,      "Payback",       "Payback"),
         (OnboardingStep.Address,      "Address",       "Address"),
         (OnboardingStep.OtherDetails, "Other details", "OtherDetails"),
         (OnboardingStep.References,   "References",    "References"),
@@ -112,6 +136,21 @@ public static class OnboardingSteps
         (OnboardingStep.Documents,    "Documents",     "Documents"),
         (OnboardingStep.Photo,        "Photograph",    "Photo")
     };
+
+    /// <summary>
+    /// The 1-based position of a step as the operator sees it. Not the enum value: the
+    /// numbers are historical, and showing them would leave a gap where Payback used to be.
+    /// </summary>
+    public static int Position(OnboardingStep step)
+    {
+        for (var i = 0; i < All.Count; i++)
+            if (All[i].Step == step) return i + 1;
+
+        return 0;
+    }
+
+    /// <summary>"Step 5 of 12", kept in one place so it cannot drift from the list.</summary>
+    public static string Caption(OnboardingStep step) => $"Step {Position(step)} of {All.Count}";
 }
 
 /// <summary>Shared chrome for every wizard step.</summary>
@@ -258,44 +297,6 @@ public class BankAccountModel
     public bool IsPrimary { get; set; } = true;
 }
 
-public class PaybackStepModel
-{
-    public Guid ClientId { get; set; }
-
-    [Display(Name = "Loan amount"), Range(0, 10_000_000)]
-    public decimal? LoanAmount { get; set; }
-
-    [Display(Name = "Instalment amount"), Range(0, 10_000_000)]
-    public decimal? InstalmentAmount { get; set; }
-
-    [Display(Name = "Number of instalments"), Range(1, 600)]
-    public int? NumberOfInstalments { get; set; }
-
-    [Display(Name = "Collection frequency")]
-    public DebitFrequency Frequency { get; set; } = DebitFrequency.Monthly;
-
-    [Display(Name = "Collection day")]
-    public string? CollectionDay { get; set; }
-
-    [Display(Name = "Netcash collection day code"), StringLength(7)]
-    public string? CollectionDayCode { get; set; }
-
-    [Display(Name = "First collection date"), DataType(DataType.Date)]
-    public DateTime? FirstCollectionDate { get; set; }
-
-    [Display(Name = "First collection differs from the rest")]
-    public bool FirstCollectionDiffers { get; set; }
-
-    [Display(Name = "First collection amount"), Range(0, 10_000_000)]
-    public decimal? FirstCollectionAmount { get; set; }
-
-    [Display(Name = "DebiCheck tracking days"), Range(1, 10)]
-    public int TrackingDays { get; set; } = 5;
-
-    [Display(Name = "Agreement date"), DataType(DataType.Date)]
-    public DateTime? AgreementDate { get; set; } = DateTime.UtcNow.Date;
-}
-
 public class AddressStepModel
 {
     public Guid ClientId { get; set; }
@@ -363,6 +364,13 @@ public class CreateMandateModel
     public Guid ClientId { get; set; }
     public string ClientName { get; set; } = "";
     public string ClientNumber { get; set; } = "";
+
+    /// <summary>
+    /// The loan this mandate collects, when it was originated from one. The mandate is
+    /// linked back to the loan on save.
+    /// </summary>
+    public Guid? LoanId { get; set; }
+    public string? LoanNumber { get; set; }
 
     [Display(Name = "Authentication route")]
     public MandateType MandateType { get; set; } = MandateType.DebiCheckTt1RealTime;
@@ -578,4 +586,161 @@ public class ClientDocumentsModel
             ? $"{SizeBytes / 1024d:N0} KB"
             : $"{SizeBytes / 1024d / 1024d:N1} MB";
     }
+}
+
+// -------------------------------------------------------------------------------------
+// Loans
+// -------------------------------------------------------------------------------------
+
+/// <summary>
+/// What the operator fills in to raise a loan. Only four things: everything else - the
+/// instalment, the fees, the schedule - is calculated.
+/// </summary>
+public class LoanCreateModel
+{
+    public Guid ClientId { get; set; }
+    public string ClientName { get; set; } = "";
+    public string ClientNumber { get; set; } = "";
+
+    [Required(ErrorMessage = "Choose a credit package.")]
+    [Display(Name = "Credit package")]
+    public Guid? CreditPackageId { get; set; }
+
+    [Required(ErrorMessage = "Enter the amount the client will receive.")]
+    [Range(1, 10_000_000), Display(Name = "Loan amount")]
+    public decimal? Principal { get; set; }
+
+    [Required(ErrorMessage = "Enter the number of monthly instalments.")]
+    [Range(1, 600), Display(Name = "Number of instalments")]
+    public int? NumberOfInstalments { get; set; }
+
+    [Required(ErrorMessage = "Choose the first collection date.")]
+    [DataType(DataType.Date), Display(Name = "First collection date")]
+    public DateTime? FirstCollectionDate { get; set; }
+
+    [Range(1, 10), Display(Name = "DebiCheck tracking days")]
+    public int TrackingDays { get; set; } = 5;
+
+    public List<PackageOption> Packages { get; set; } = new();
+
+    /// <summary>False when there is no income on file, so affordability cannot run.</summary>
+    public bool HasFinancials { get; set; }
+
+    public class PackageOption
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public decimal MonthlyInterestRate { get; set; }
+        public decimal MonthlyServiceFee { get; set; }
+        public decimal InitiationFeeRate { get; set; }
+        public decimal CreditLifeRate { get; set; }
+        public decimal MinLoanAmount { get; set; }
+        public decimal MaxLoanAmount { get; set; }
+        public int MinTermMonths { get; set; }
+        public int MaxTermMonths { get; set; }
+    }
+}
+
+/// <summary>A live quote, returned as JSON while the operator types.</summary>
+public class LoanQuoteView
+{
+    public bool Ok { get; set; }
+    public string? Error { get; set; }
+
+    public decimal Principal { get; set; }
+    public int NumberOfInstalments { get; set; }
+    public decimal MonthlyInterestRate { get; set; }
+    public decimal MonthlyServiceFee { get; set; }
+    public decimal CreditLifeRate { get; set; }
+
+    public decimal InitiationFee { get; set; }
+    public decimal CapitalisedAmount { get; set; }
+    public decimal FirstInstalment { get; set; }
+    public decimal FinalInstalment { get; set; }
+
+    public decimal TotalInterest { get; set; }
+    public decimal TotalServiceFees { get; set; }
+    public decimal TotalCreditLife { get; set; }
+    public decimal TotalRepayable { get; set; }
+    public decimal TotalCostOfCredit { get; set; }
+
+    public List<string> Notices { get; set; } = new();
+    public List<AMPay.Domain.Credit.ScheduleRow> Schedule { get; set; } = new();
+
+    public AffordabilityView? Affordability { get; set; }
+
+    public class AffordabilityView
+    {
+        public string Outcome { get; set; } = "";
+        public string Reasoning { get; set; } = "";
+        public decimal DiscretionaryIncome { get; set; }
+        public decimal SurplusAfterInstalment { get; set; }
+        public decimal UtilisationRatio { get; set; }
+        public decimal MaximumAffordableInstalment { get; set; }
+    }
+}
+
+/// <summary>One row of the loan book.</summary>
+public class LoanRow
+{
+    public Guid Id { get; set; }
+    public string LoanNumber { get; set; } = "";
+    public Guid ClientId { get; set; }
+    public string ClientName { get; set; } = "";
+    public string ClientNumber { get; set; } = "";
+    public string PackageName { get; set; } = "";
+    public decimal Principal { get; set; }
+    public decimal FirstInstalment { get; set; }
+    public int NumberOfInstalments { get; set; }
+    public LoanStatus Status { get; set; }
+    public AffordabilityOutcome? Affordability { get; set; }
+    public DateTime CreatedUtc { get; set; }
+}
+
+/// <summary>
+/// Editing a credit package. Rates are entered as percentages because that is how people
+/// think about them; they are stored as fractions (5% is 0.05).
+/// </summary>
+public class CreditPackageEditModel
+{
+    public Guid Id { get; set; }
+    public CreditTier Tier { get; set; }
+
+    [Required, StringLength(100)]
+    public string Name { get; set; } = "";
+
+    [StringLength(500)]
+    public string? Description { get; set; }
+
+    [Range(0, 5, ErrorMessage = "Interest cannot exceed the 5% per month statutory maximum.")]
+    [Display(Name = "Interest per month (%)")]
+    public decimal MonthlyInterestPercent { get; set; }
+
+    [Range(0, 69, ErrorMessage = "The service fee cannot exceed the R69 statutory maximum.")]
+    [Display(Name = "Service fee per month (R)")]
+    public decimal MonthlyServiceFee { get; set; }
+
+    [Range(0, 100)]
+    [Display(Name = "Initiation fee (% of loan)")]
+    public decimal InitiationFeePercent { get; set; }
+
+    [Range(0, 0.45, ErrorMessage = "Credit life cannot exceed 0.45% of the balance per month.")]
+    [Display(Name = "Credit life per month (%)")]
+    public decimal CreditLifePercent { get; set; }
+
+    [Range(1, 10_000_000), Display(Name = "Minimum loan (R)")]
+    public decimal MinLoanAmount { get; set; }
+
+    [Range(1, 10_000_000), Display(Name = "Maximum loan (R)")]
+    public decimal MaxLoanAmount { get; set; }
+
+    [Range(1, 600), Display(Name = "Minimum term (months)")]
+    public int MinTermMonths { get; set; }
+
+    [Range(1, 600), Display(Name = "Maximum term (months)")]
+    public int MaxTermMonths { get; set; }
+
+    [Display(Name = "Available for new loans")]
+    public bool IsActive { get; set; } = true;
 }

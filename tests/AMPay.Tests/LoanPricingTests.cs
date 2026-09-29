@@ -58,6 +58,19 @@ public class LoanPricingTests
     }
 
     [Fact]
+    public void Notices_StateAmountsInRands_InTheAppWideFormat()
+    {
+        // Shown on screen beside figures formatted "R 1,089.75", so they must match -
+        // not a bare "1089.75" and not the en-ZA "R1 089,75".
+        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+
+        var notice = Assert.Single(quote.Notices);
+        Assert.Contains("from R 1,500.00", notice);
+        Assert.Contains("maximum of R 1,089.75", notice);
+        Assert.Contains("principal of R 10,000.00", notice);
+    }
+
+    [Fact]
     public void InitiationFee_NeverExceedsTheAbsoluteCeiling()
     {
         // The marginal formula would give R2 089.75 on R20 000; the ceiling is R1 207.50.

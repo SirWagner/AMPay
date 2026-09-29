@@ -1,0 +1,308 @@
+@model Loan
+@{
+    var names = (Dictionary<string, string>)ViewBag.UserNames;
+    var canDecide = (bool)ViewBag.CanDecide;
+    var canCapture = (bool)ViewBag.CanCapture;
+    var assessment = Model.Assessments.OrderByDescending(a => a.AssessedUtc).FirstOrDefault();
+
+    // A mandate that failed or was rejected collects nothing, so it counts as no mandate.
+    var hasLiveMandate = Model.Mandate is not null &&
+                         !AMPay.Web.Controllers.MandatesController.IsDeadMandate(Model.Mandate.Status);
+
+    string Who(string? id) => id is not null && names.TryGetValue(id, out var n) ? n : "unknown";
+    string Pct(decimal f, int dp = 2) => (f * 100m).ToString("N" + dp) + "%";
+    string R(decimal v) => "R " + v.ToString("N2");
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@Model.LoanNumber</h1>
+        <p class="lede">
+            <a asp-controller="Clients" asp-action="Details" asp-route-id="@Model.ClientId">@Model.Client!.FullName</a>
+            <span class="mono">(@Model.Client!.ClientNumber)</span> &middot;
+            @Model.CreditPackage!.Name package &middot;
+            <partial name="_LoanStatus" model="Model.Status" />
+        </p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline">All loans</a>
+</div>
+
+<div class="stat-grid">
+    <div class="stat">
+        <div class="label">Loan amount</div>
+        <div class="value">@R(Model.Principal)</div>
+        <div class="note">Paid to the client</div>
+    </div>
+    <div class="stat">
+        <div class="label">Monthly instalment</div>
+        <div class="value accent">@R(Model.FirstInstalment)</div>
+        <div class="note">
+            @if (Model.FirstInstalment == Model.FinalInstalment)
+            {
+                <text>for @Model.NumberOfInstalments months</text>
+            }
+            else
+            {
+                <text>falling to @R(Model.FinalInstalment) by month @Model.NumberOfInstalments</text>
+            }
+        </div>
+    </div>
+    <div class="stat">
+        <div class="label">Total repayable</div>
+        <div class="value">@R(Model.TotalRepayable)</div>
+        <div class="note">Cost of credit @R(Model.TotalCostOfCredit)</div>
+    </div>
+    <div class="stat">
+        <div class="label">First collection</div>
+        <div class="value">@Model.FirstCollectionDate?.ToString("dd MMM yyyy")</div>
+        <div class="note">Collection day @Model.CollectionDay</div>
+    </div>
+</div>
+
+<div class="chart-grid">
+    <div class="card">
+        <div class="card-head"><h3>Cost breakdown</h3></div>
+        <div class="card-body">
+            <table class="data quote-table">
+                <tbody>
+                <tr><td>Loan amount</td><td class="num">@R(Model.Principal)</td></tr>
+                <tr><td>Initiation fee <span class="muted small">(added to the loan)</span></td><td class="num">@R(Model.InitiationFee)</td></tr>
+                <tr><td>Interest <span class="muted small">(@Pct(Model.MonthlyInterestRate) per month)</span></td><td class="num">@R(Model.TotalInterest)</td></tr>
+                <tr><td>Service fees <span class="muted small">(@R(Model.MonthlyServiceFee) per month)</span></td><td class="num">@R(Model.TotalServiceFees)</td></tr>
+                <tr><td>Credit life <span class="muted small">(@Pct(Model.CreditLifeRate) of the balance per month)</span></td><td class="num">@R(Model.TotalCreditLife)</td></tr>
+                <tr class="total"><td>Total repayable</td><td class="num">@R(Model.TotalRepayable)</td></tr>
+                </tbody>
+            </table>
+            <p class="muted small mb-0">
+                Priced at the rates in force on @Model.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy").
+                Later changes to the @Model.CreditPackage.Name package do not affect this agreement.
+            </p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Affordability</h3></div>
+        <div class="card-body">
+            @if (assessment is null)
+            {
+                <div class="alert alert-error">No affordability assessment is on file for this loan.</div>
+            }
+            else
+            {
+                var tone = assessment.Outcome switch
+                {
+                    AffordabilityOutcome.Pass => "alert-success",
+                    AffordabilityOutcome.Marginal => "alert-warn",
+                    _ => "alert-error"
+                };
+                var title = assessment.Outcome switch
+                {
+                    AffordabilityOutcome.Pass => "Affordable",
+                    AffordabilityOutcome.Marginal => "Marginal",
+                    AffordabilityOutcome.Fail => "Not affordable",
+                    _ => "Could not be assessed"
+                };
+
+                <div class="alert @tone small affordability">
+                    <strong>@title</strong>
+                    <div>@assessment.Reasoning</div>
+                </div>
+
+                <dl class="detail-list">
+                    <dt>Net income</dt><dd>@R(assessment.NetMonthlyIncome)</dd>
+                    <dt>Expenses used</dt>
+                    <dd>
+                        @R(Math.Max(assessment.DeclaredMonthlyExpenses, assessment.StatutoryMinimumExpenses))
+                        <span class="muted small">(declared @R(assessment.DeclaredMonthlyExpenses), statutory minimum @R(assessment.StatutoryMinimumExpenses))</span>
+                    </dd>
+                    <dt>Existing debt</dt><dd>@R(assessment.ExistingDebtRepayments)</dd>
+                    <dt>Discretionary</dt><dd><strong>@R(assessment.DiscretionaryIncome)</strong></dd>
+                    <dt>After this loan</dt><dd>@R(assessment.SurplusAfterInstalment)</dd>
+                </dl>
+
+                <p class="muted small mb-0">
+                    Assessed @assessment.AssessedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm") by @Who(assessment.AssessedByUserId).
+                </p>
+
+                @if (assessment.WasOverridden)
+                {
+                    <div class="alert alert-warn small" style="margin-top:.75rem;">
+                        <strong>Approved despite this result</strong> by @Who(assessment.OverriddenByUserId):
+                        <div><em>@assessment.OverrideReason</em></div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@* ---------------------------------------------------------------- next step *@
+
+@if (Model.Status == LoanStatus.PendingApproval)
+{
+    <div class="card">
+        <div class="card-head"><h3>Credit decision</h3></div>
+        <div class="card-body">
+            <p class="muted small">
+                Raised by @Who(Model.CreatedByUserId) on @Model.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm").
+            </p>
+
+            @if (canDecide)
+            {
+                <div class="decision-grid">
+                    <form asp-action="Approve" asp-route-id="@Model.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        @if (assessment is not null && assessment.Outcome != AffordabilityOutcome.Pass)
+                        {
+                            <div class="field">
+                                <label for="overrideReason">Reason for approving despite the affordability result</label>
+                                <textarea id="overrideReason" name="overrideReason" required
+                                          placeholder="What evidence justifies this advance?"></textarea>
+                                <span class="hint">Recorded against your name and kept with the assessment.</span>
+                            </div>
+                        }
+                        <button type="submit" class="btn btn-primary">Approve</button>
+                    </form>
+
+                    <form asp-action="Decline" asp-route-id="@Model.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="field">
+                            <label for="reason">Reason for declining</label>
+                            <textarea id="reason" name="reason" required
+                                      placeholder="The client is entitled to know why."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger">Decline</button>
+                    </form>
+                </div>
+            }
+            else
+            {
+                <p class="mb-0">Waiting for a customer administrator to approve or decline.</p>
+            }
+        </div>
+    </div>
+}
+else if (Model.Status == LoanStatus.Approved)
+{
+    <div class="card">
+        <div class="card-head"><h3>Next steps</h3></div>
+        <div class="card-body">
+            <p class="muted small">
+                Approved by @Who(Model.DecidedByUserId) on @Model.DecidedUtc?.ToLocalTime().ToString("dd MMM yyyy HH:mm").
+            </p>
+            <ol class="steps">
+                <li>
+                    @if (!hasLiveMandate)
+                    {
+                        <text>Originate the DebiCheck mandate for @R(Model.FirstInstalment) so the client can authenticate it.</text>
+                    }
+                    else
+                    {
+                        <text>DebiCheck mandate originated &mdash;
+                            <a asp-controller="Mandates" asp-action="Details" asp-route-id="@Model.MandateId">view it</a>.</text>
+                    }
+                </li>
+                <li>Pay the loan amount of @R(Model.Principal) to the client.</li>
+                <li>Mark the loan as disbursed.</li>
+            </ol>
+        </div>
+        <div class="card-foot">
+            @if (!hasLiveMandate && canCapture)
+            {
+                <a asp-controller="Mandates" asp-action="Create"
+                   asp-route-clientId="@Model.ClientId" asp-route-loanId="@Model.Id"
+                   class="btn btn-primary">Originate DebiCheck mandate</a>
+            }
+            @if (canDecide)
+            {
+                <form asp-action="Disburse" asp-route-id="@Model.Id" method="post" style="display:inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-navy">Mark as disbursed</button>
+                </form>
+            }
+        </div>
+    </div>
+}
+else if (Model.Status is LoanStatus.Declined)
+{
+    <div class="alert alert-error">
+        Declined by @Who(Model.DecidedByUserId) on @Model.DecidedUtc?.ToLocalTime().ToString("dd MMM yyyy"):
+        <em>@Model.DecisionNotes</em>
+    </div>
+}
+else if (Model.Status is LoanStatus.Disbursed)
+{
+    <div class="alert alert-success">
+        Disbursed on @Model.DisbursedUtc?.ToLocalTime().ToString("dd MMM yyyy").
+        @if (!hasLiveMandate)
+        {
+            <text>No DebiCheck mandate is linked yet &mdash; instalments cannot be collected until one is.</text>
+            @if (canCapture)
+            {
+                <a asp-controller="Mandates" asp-action="Create"
+                   asp-route-clientId="@Model.ClientId" asp-route-loanId="@Model.Id">Originate it now</a>
+            }
+        }
+        else
+        {
+            <text><a asp-controller="Mandates" asp-action="Details" asp-route-id="@Model.MandateId">View the DebiCheck mandate</a>.</text>
+        }
+    </div>
+}
+
+@if (canCapture && (Model.Status is LoanStatus.PendingApproval or LoanStatus.Approved))
+{
+    <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" style="margin-bottom:1.25rem;">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline btn-sm"
+                onclick="return confirm('Cancel @Model.LoanNumber? This cannot be undone.');">Cancel this loan</button>
+    </form>
+}
+
+<div class="card">
+    <div class="card-head"><h3>Repayment schedule</h3></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Due</th>
+                <th class="num">Opening balance</th>
+                <th class="num">Interest</th>
+                <th class="num">Capital</th>
+                <th class="num">Service fee</th>
+                <th class="num">Credit life</th>
+                <th class="num">Instalment</th>
+                <th class="num">Closing balance</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Schedule.OrderBy(s => s.InstalmentNumber))
+            {
+                <tr>
+                    <td>@r.InstalmentNumber</td>
+                    <td>@r.DueDate.ToString("dd MMM yyyy")</td>
+                    <td class="num">@R(r.OpeningBalance)</td>
+                    <td class="num">@R(r.InterestPortion)</td>
+                    <td class="num">@R(r.CapitalPortion)</td>
+                    <td class="num">@R(r.ServiceFee)</td>
+                    <td class="num">@R(r.CreditLifePremium)</td>
+                    <td class="num"><strong>@R(r.InstalmentTotal)</strong></td>
+                    <td class="num">@R(r.ClosingBalance)</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+            <tr class="total">
+                <td colspan="3">Totals</td>
+                <td class="num">@R(Model.TotalInterest)</td>
+                <td class="num">@R(Model.CapitalisedAmount)</td>
+                <td class="num">@R(Model.TotalServiceFees)</td>
+                <td class="num">@R(Model.TotalCreditLife)</td>
+                <td class="num"><strong>@R(Model.TotalRepayable)</strong></td>
+                <td></td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
