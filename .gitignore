@@ -4,3 +4,11 @@ obj/
 appsettings.Development.json
 .vs/
 App_Data/
+
+# Real client documents exported from Maxmoney / Amplifin / Kepler. They carry ID numbers,
+# bank accounts, addresses and income - personal information under POPIA - and this
+# repository is public. Keep them on disk for reference; never commit them.
+folder/MAXMONEY*.pdf
+folder/Amplifin*.pdf
+folder/*MANDATE*.pdf
+folder/*mandate*.pdf
