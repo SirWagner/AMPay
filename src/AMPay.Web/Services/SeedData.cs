@@ -23,7 +23,10 @@ public static class SeedData
         var roles = sp.GetRequiredService<RoleManager<ApplicationRole>>();
         var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Seed");
 
-        await db.Database.MigrateAsync();
+        // Not a bare MigrateAsync: that fails outright when the tables already exist, or when
+        // LocalDB has lost track of a database whose files are still on disk. The
+        // initializer handles both, then migrates whatever is genuinely outstanding.
+        await DatabaseInitializer.InitialiseAsync(db, log);
 
         foreach (var (name, description) in AppRoles.All)
         {
