@@ -747,7 +747,7 @@ public class ClientsController : Controller
     public async Task<IActionResult> Activate(Guid id)
     {
         var client = await LoadClientAsync(id,
-            c => c.BankAccounts, c => c.Addresses, c => c.OtherDetails);
+            c => c.BankAccounts, c => c.Addresses, c => c.OtherDetails, c => c.Documents);
 
         if (client is null) return NotFound();
 
@@ -758,19 +758,35 @@ public class ClientsController : Controller
             missing.Add("a mobile number");
         if (client.OtherDetails?.DataProcessingConsent != true) missing.Add("POPIA consent");
 
+        // Verified documents, not merely uploaded ones. This is the control that lets a
+        // client captured through a public self-service link be trusted at all.
+        foreach (var required in DocumentsController.Required)
+        {
+            var accepted = client.Documents.Any(d =>
+                d.DocumentType == required && d.ReviewStatus == DocumentReviewStatus.Approved);
+
+            if (!accepted)
+                missing.Add($"an accepted {DocumentsController.Describe(required).ToLowerInvariant()}");
+        }
+
         if (missing.Count > 0)
         {
-            TempData["Error"] = $"Cannot activate this client without {string.Join(", ", missing)}.";
+            TempData["Error"] =
+                $"This client cannot be onboarded without {string.Join(", ", missing)}.";
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        client.Status = ClientStatus.Active;
+        // Onboarded, not Active. Active means the client is holding a disbursed loan, and
+        // that is set by the loan, not here. Conflating the two makes it impossible to say
+        // how much of the book is actually lending.
+        client.Status = ClientStatus.Onboarded;
         client.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _log.LogInformation("Client {ClientNumber} activated.", client.ClientNumber);
+        _log.LogInformation("Client {ClientNumber} onboarded.", client.ClientNumber);
 
-        TempData["Success"] = "Client activated. A DebiCheck mandate can now be created.";
+        TempData["Success"] =
+            "Client onboarded. A DebiCheck mandate can now be originated and credit advanced.";
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -834,6 +850,7 @@ public class ClientsController : Controller
             .Include(c => c.OtherDetails)
             .Include(c => c.BankAccounts)
             .Include(c => c.Addresses)
+            .Include(c => c.Documents)
             .FirstOrDefaultAsync(c => c.Id == clientId);
 
         if (client is null) return;
@@ -845,6 +862,12 @@ public class ClientsController : Controller
         if (client.Payback is not null) done.Add(OnboardingStep.Payback);
         if (client.Addresses.Count > 0) done.Add(OnboardingStep.Address);
         if (client.OtherDetails is not null) done.Add(OnboardingStep.OtherDetails);
+
+        // Documents count as done only once the required ones are actually accepted -
+        // uploading a file is not the same as having it pass.
+        if (DocumentsController.Required.All(t => client.Documents.Any(d =>
+                d.DocumentType == t && d.ReviewStatus == DocumentReviewStatus.Approved)))
+            done.Add(OnboardingStep.Documents);
 
         ViewBag.Wizard = new WizardContext
         {

@@ -594,3 +594,47 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
     .wizard { grid-template-columns: 1fr; }
     .wizard-steps { position: static; }
 }
+
+/* ---------------------------------------------------------------- charts */
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+/* Chart.js needs a sized parent: the canvas has no intrinsic height of its own,
+   and without this it collapses or grows without bound on resize. */
+.chart-box {
+    position: relative;
+    height: 260px;
+    margin-top: .75rem;
+}
+
+.chart-grid .card-body > p.muted:first-child { margin-top: 0; }
+
+/* ------------------------------------------------------- document review */
+
+.row-between { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+
+.review-form { display: inline-flex; align-items: center; gap: .35rem; }
+
+.inline-reason {
+    width: 170px;
+    padding: .3rem .5rem;
+    font-size: .8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.detail-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .4rem 1rem;
+    margin: 0 0 1rem;
+    font-size: .85rem;
+}
+
+.detail-list dt { color: var(--text-muted); }
+.detail-list dd { margin: 0; color: var(--text-body); }

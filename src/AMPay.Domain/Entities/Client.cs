@@ -69,4 +69,10 @@ public class Client
     public ICollection<ClientNote> Notes { get; set; } = new List<ClientNote>();
     public ICollection<ClientDocument> Documents { get; set; } = new List<ClientDocument>();
     public ICollection<DebiCheckMandate> Mandates { get; set; } = new List<DebiCheckMandate>();
+
+    /// <summary>
+    /// Credit agreements raised against this client. Loans are originated after onboarding
+    /// completes, not during it - see <see cref="Loan"/>.
+    /// </summary>
+    public ICollection<Loan> Loans { get; set; } = new List<Loan>();
 }

@@ -34,11 +34,32 @@
             <span class="sub">A Netcash ISV</span>
         </div>
 
+    @{
+        // A reviewer's world is the queue and nothing else. Showing them links that lead
+        // straight to an access-denied page is not security, it is just rude.
+        var isReviewerOnly = User.IsInRole(AppRoles.Reviewer) &&
+                             !User.IsInRole(AppRoles.TenantAdmin) &&
+                             !User.IsInRole(AppRoles.SuperAdmin);
+
+        var canReview = User.IsInRole(AppRoles.Reviewer) || User.IsInRole(AppRoles.TenantAdmin) ||
+                        User.IsInRole(AppRoles.SuperAdmin);
+    }
+
         <div class="sidebar-section">Operations</div>
         <a class="nav-link @Active("Home")" asp-controller="Home" asp-action="Index">Dashboard</a>
-        <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
-        <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
-        <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
+        @if (!isReviewerOnly)
+        {
+            <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
+        }
+        @if (canReview)
+        {
+            <a class="nav-link @Active("Documents")" asp-controller="Documents" asp-action="Index">Document review</a>
+        }
+        @if (!isReviewerOnly)
+        {
+            <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
+            <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
+        }
 
         @if (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin))
         {
@@ -81,6 +102,7 @@
                     @if (User.IsInRole(AppRoles.SuperAdmin)) { <span>Super administrator</span> }
                     else if (User.IsInRole(AppRoles.TenantAdmin)) { <span>Customer administrator</span> }
                     else if (User.IsInRole(AppRoles.Capturer)) { <span>Capturer</span> }
+                    else if (User.IsInRole(AppRoles.Reviewer)) { <span>Document reviewer</span> }
                     else { <span>Viewer</span> }
                 </div>
                 <form asp-controller="Account" asp-action="Logout" method="post">

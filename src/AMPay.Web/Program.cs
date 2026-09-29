@@ -56,6 +56,15 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(AppPolicies.CanCapture, p =>
         p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Capturer));
+
+    // A capturer is absent by design: the person who uploaded the ID must not be the
+    // person who attests that it is genuine.
+    options.AddPolicy(AppPolicies.CanReviewDocuments, p =>
+        p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Reviewer));
+
+    options.AddPolicy(AppPolicies.CanViewClients, p =>
+        p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Capturer,
+                      AppRoles.Reviewer, AppRoles.Viewer));
 });
 
 builder.Services.AddHttpContextAccessor();

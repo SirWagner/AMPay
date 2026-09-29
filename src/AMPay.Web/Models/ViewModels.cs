@@ -3,6 +3,9 @@ using AMPay.Domain.Enums;
 
 namespace AMPay.Web.Models;
 
+/// <summary>One labelled value in a chart.</summary>
+public record ChartSlice(string Label, decimal Value, string? Colour = null);
+
 public class DashboardViewModel
 {
     public bool IsPlatformUser { get; set; }
@@ -15,6 +18,38 @@ public class DashboardViewModel
     public int RejectedMandates { get; set; }
     public decimal MonthlyCollectionValue { get; set; }
     public decimal PayNowCollected { get; set; }
+
+    // ---- Client lifecycle ----
+
+    /// <summary>Headline counts, split so that captured is never mistaken for lendable.</summary>
+    public int CapturedClients { get; set; }
+    public int AwaitingVerification { get; set; }
+    public int OnboardedClients { get; set; }
+    public int ActiveClients { get; set; }
+
+    // ---- Loan book ----
+
+    public int LoansInApproval { get; set; }
+    public int DisbursedLoans { get; set; }
+    public decimal LoanBookPrincipal { get; set; }
+    public decimal LoanBookOutstanding { get; set; }
+
+    // ---- Charts ----
+
+    /// <summary>Onboarding funnel, in lifecycle order.</summary>
+    public List<ChartSlice> Pipeline { get; set; } = new();
+
+    /// <summary>Mandates by status.</summary>
+    public List<ChartSlice> MandateBreakdown { get; set; } = new();
+
+    /// <summary>Clients captured per month over the last twelve months.</summary>
+    public List<ChartSlice> ClientsByMonth { get; set; } = new();
+
+    /// <summary>Value advanced per credit package.</summary>
+    public List<ChartSlice> LoanBookByPackage { get; set; } = new();
+
+    /// <summary>True when there is nothing yet to chart - drives the empty state.</summary>
+    public bool HasLoanBook => LoanBookByPackage.Any(s => s.Value > 0);
 
     public List<ClientRow> RecentClients { get; set; } = new();
     public List<MandateRow> RecentMandates { get; set; } = new();
@@ -440,4 +475,107 @@ public class CreateUserModel
     public Guid? TenantId { get; set; }
 
     public List<(Guid Id, string Name)> Tenants { get; set; } = new();
+}
+
+// -------------------------------------------------------------------------------------
+// Supporting documents
+// -------------------------------------------------------------------------------------
+
+/// <summary>One row of the reviewer's queue.</summary>
+public class DocumentQueueRow
+{
+    public Guid DocumentId { get; set; }
+    public Guid ClientId { get; set; }
+    public string ClientNumber { get; set; } = "";
+    public string ClientName { get; set; } = "";
+    public DocumentType DocumentType { get; set; }
+    public string FileName { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public DateTime UploadedUtc { get; set; }
+
+    public string SizeDisplay => SizeBytes < 1024 * 1024
+        ? $"{SizeBytes / 1024d:N0} KB"
+        : $"{SizeBytes / 1024d / 1024d:N1} MB";
+
+    /// <summary>How long this has been waiting. A queue without ageing is not a queue.</summary>
+    public string Waiting
+    {
+        get
+        {
+            var age = DateTime.UtcNow - UploadedUtc;
+            if (age.TotalHours < 1) return $"{Math.Max(1, (int)age.TotalMinutes)} min";
+            if (age.TotalDays < 1) return $"{(int)age.TotalHours} hr";
+            return $"{(int)age.TotalDays} d";
+        }
+    }
+}
+
+/// <summary>The documents tab for one client.</summary>
+public class ClientDocumentsModel
+{
+    public Guid ClientId { get; set; }
+    public string ClientNumber { get; set; } = "";
+    public string ClientName { get; set; } = "";
+    public ClientStatus ClientStatus { get; set; }
+
+    /// <summary>True when the signed-in user may accept or reject.</summary>
+    public bool CanReview { get; set; }
+
+    /// <summary>
+    /// True when the user can also reach the full client file. A reviewer cannot, so this
+    /// page has to carry everything they need on its own.
+    /// </summary>
+    public bool CanOpenClientFile { get; set; }
+
+    // ---- What the reviewer checks the documents against ----
+    // Verification is a comparison: the name and number on the identity document against
+    // what was captured, the employer and income on the payslip against the Financial tab.
+    // Without these on the page the reviewer is just confirming that a file opens.
+
+    /// <summary>Unmasked deliberately - matching it against the document is the whole job.</summary>
+    public string IdNumber { get; set; } = "";
+    public bool IsSaIdNumber { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? MobileNumber { get; set; }
+
+    public string? EmployerName { get; set; }
+    public string? Occupation { get; set; }
+    public decimal? GrossMonthlyIncome { get; set; }
+    public decimal? NetMonthlyIncome { get; set; }
+
+    /// <summary>Account holder name matters; the number does not. It stays masked.</summary>
+    public string? BankAccountHolder { get; set; }
+    public string? BankName { get; set; }
+    public string? MaskedAccountNumber { get; set; }
+
+    public long MaxFileSizeBytes { get; set; }
+    public string AcceptedExtensions { get; set; } = "";
+
+    public List<Row> Documents { get; set; } = new();
+
+    /// <summary>Required document types with nothing usable on file yet.</summary>
+    public List<DocumentType> Outstanding { get; set; } = new();
+
+    public bool IsComplete => Outstanding.Count == 0;
+
+    public string MaxFileSizeDisplay => $"{MaxFileSizeBytes / 1024d / 1024d:N0} MB";
+
+    public class Row
+    {
+        public Guid Id { get; set; }
+        public DocumentType DocumentType { get; set; }
+        public string FileName { get; set; } = "";
+        public long SizeBytes { get; set; }
+        public DateTime UploadedUtc { get; set; }
+        public string? UploadedBy { get; set; }
+
+        public DocumentReviewStatus ReviewStatus { get; set; }
+        public DateTime? ReviewedUtc { get; set; }
+        public string? ReviewedBy { get; set; }
+        public string? ReviewNotes { get; set; }
+
+        public string SizeDisplay => SizeBytes < 1024 * 1024
+            ? $"{SizeBytes / 1024d:N0} KB"
+            : $"{SizeBytes / 1024d / 1024d:N1} MB";
+    }
 }

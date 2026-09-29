@@ -11,18 +11,18 @@
         <h1>@Model.FullName</h1>
         <p class="lede">
             Client <span class="mono">@Model.ClientNumber</span> &middot;
-            <span class="badge @(Model.Status == ClientStatus.Active ? "badge-green" : "badge-grey")">@Model.Status</span>
+            <partial name="_ClientStatus" model="Model.Status" />
         </p>
     </div>
     <div class="row-actions">
-        @if (Model.Status == ClientStatus.Draft)
+        @if (Model.Status is ClientStatus.Draft or ClientStatus.Captured)
         {
             <form asp-action="Activate" method="post">
                 <input type="hidden" name="id" value="@Model.Id" />
-                <button type="submit" class="btn btn-primary">Activate client</button>
+                <button type="submit" class="btn btn-primary">Complete onboarding</button>
             </form>
         }
-        else if (Model.Status == ClientStatus.Active)
+        else if (ClientStatusInfo.CanBorrow(Model.Status))
         {
             <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
                class="btn btn-primary">New DebiCheck mandate</a>
@@ -38,8 +38,8 @@
         @if (Model.Status == ClientStatus.Draft)
         {
             <div class="alert alert-info">
-                This client is still a draft. Activation needs a bank account, a mobile number
-                and POPIA consent &mdash; then DebiCheck mandates can be created.
+                Onboarding is not yet complete. A bank account, a mobile number and POPIA
+                consent are required before this client can be onboarded and credit advanced.
             </div>
         }
 
@@ -135,7 +135,7 @@
         <div class="card">
             <div class="card-head">
                 <h3>DebiCheck mandates</h3>
-                @if (Model.Status == ClientStatus.Active)
+                @if (ClientStatusInfo.CanBorrow(Model.Status))
                 {
                     <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
                        class="btn btn-primary btn-sm">New mandate</a>

@@ -1,5 +1,9 @@
+using AMPay.Domain.Credit;
+using AMPay.Domain.Documents;
 using AMPay.Domain.Netcash;
+using AMPay.Infrastructure.Credit;
 using AMPay.Infrastructure.Data;
+using AMPay.Infrastructure.Documents;
 using AMPay.Infrastructure.Netcash;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +23,21 @@ public static class DependencyInjection
                 sql => sql.EnableRetryOnFailure()));
 
         services.Configure<NetcashOptions>(configuration.GetSection(NetcashOptions.SectionName));
+
+        // Credit origination. The statutory ceilings and the Regulation 23A expense norms
+        // bind from configuration so that a gazetted rate change is a settings edit rather
+        // than a code change and a release.
+        services.Configure<NcaCreditLimits>(configuration.GetSection(NcaCreditLimits.SectionName));
+        services.Configure<AffordabilityNorms>(configuration.GetSection(AffordabilityNorms.SectionName));
+
+        services.AddScoped<ILoanPricingService, LoanPricingService>();
+        services.AddScoped<IAffordabilityService, AffordabilityService>();
+
+        // Supporting documents. Local disk today; swap in a blob implementation for
+        // anything running on more than one server.
+        services.Configure<DocumentStorageOptions>(
+            configuration.GetSection(DocumentStorageOptions.SectionName));
+        services.AddSingleton<IDocumentStore, LocalDocumentStore>();
 
         services.AddSingleton<INetcashSecretStore, ConfigurationSecretStore>();
 

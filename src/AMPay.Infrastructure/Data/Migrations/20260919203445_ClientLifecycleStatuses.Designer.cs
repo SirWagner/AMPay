@@ -4,6 +4,7 @@ using AMPay.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AMPay.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260919203445_ClientLifecycleStatuses")]
+    partial class ClientLifecycleStatuses
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -94,7 +97,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("LoanId", "AssessedUtc");
 
-                    b.ToTable("AffordabilityAssessments", (string)null);
+                    b.ToTable("AffordabilityAssessments");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.Client", b =>
@@ -169,7 +172,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId", "IdNumber");
 
-                    b.ToTable("Clients", (string)null);
+                    b.ToTable("Clients");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientAddress", b =>
@@ -218,7 +221,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientAddresses", (string)null);
+                    b.ToTable("ClientAddresses");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientBankAccount", b =>
@@ -272,7 +275,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientBankAccounts", (string)null);
+                    b.ToTable("ClientBankAccounts");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientBudget", b =>
@@ -305,7 +308,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientBudgets", (string)null);
+                    b.ToTable("ClientBudgets");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientCreditEnquiry", b =>
@@ -342,7 +345,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientCreditEnquiries", (string)null);
+                    b.ToTable("ClientCreditEnquiries");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientDocument", b =>
@@ -401,7 +404,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId", "ReviewStatus");
 
-                    b.ToTable("ClientDocuments", (string)null);
+                    b.ToTable("ClientDocuments");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientEmployment", b =>
@@ -448,7 +451,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId")
                         .IsUnique();
 
-                    b.ToTable("ClientEmployments", (string)null);
+                    b.ToTable("ClientEmployments");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientFinancial", b =>
@@ -494,7 +497,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId")
                         .IsUnique();
 
-                    b.ToTable("ClientFinancials", (string)null);
+                    b.ToTable("ClientFinancials");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientNote", b =>
@@ -523,7 +526,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientNotes", (string)null);
+                    b.ToTable("ClientNotes");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientOtherDetails", b =>
@@ -570,7 +573,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId")
                         .IsUnique();
 
-                    b.ToTable("ClientOtherDetails", (string)null);
+                    b.ToTable("ClientOtherDetails");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientPayback", b =>
@@ -623,7 +626,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId")
                         .IsUnique();
 
-                    b.ToTable("ClientPaybacks", (string)null);
+                    b.ToTable("ClientPaybacks");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientPhoto", b =>
@@ -653,7 +656,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId")
                         .IsUnique();
 
-                    b.ToTable("ClientPhotos", (string)null);
+                    b.ToTable("ClientPhotos");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientReference", b =>
@@ -700,7 +703,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientReferences", (string)null);
+                    b.ToTable("ClientReferences");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientWallet", b =>
@@ -733,7 +736,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.ToTable("ClientWallets", (string)null);
+                    b.ToTable("ClientWallets");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.CreditPackage", b =>
@@ -801,7 +804,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "Tier")
                         .IsUnique();
 
-                    b.ToTable("CreditPackages", (string)null);
+                    b.ToTable("CreditPackages");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.DebiCheckMandate", b =>
@@ -914,7 +917,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId", "Status");
 
-                    b.ToTable("Mandates", (string)null);
+                    b.ToTable("Mandates");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.Loan", b =>
@@ -1054,7 +1057,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId", "Status");
 
-                    b.ToTable("Loans", (string)null);
+                    b.ToTable("Loans");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.LoanScheduleEntry", b =>
@@ -1105,7 +1108,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("LoanId", "InstalmentNumber")
                         .IsUnique();
 
-                    b.ToTable("LoanScheduleEntries", (string)null);
+                    b.ToTable("LoanScheduleEntries");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.MandateEvent", b =>
@@ -1144,7 +1147,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("MandateId", "OccurredUtc");
 
-                    b.ToTable("MandateEvents", (string)null);
+                    b.ToTable("MandateEvents");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.NetcashBatch", b =>
@@ -1208,7 +1211,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("NetcashBatches", (string)null);
+                    b.ToTable("NetcashBatches");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.NetcashBatchError", b =>
@@ -1234,7 +1237,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("BatchId");
 
-                    b.ToTable("NetcashBatchErrors", (string)null);
+                    b.ToTable("NetcashBatchErrors");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.PayNowTransaction", b =>
@@ -1311,7 +1314,7 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.HasIndex("TenantId", "Status");
 
-                    b.ToTable("PayNowTransactions", (string)null);
+                    b.ToTable("PayNowTransactions");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.Tenant", b =>
@@ -1369,7 +1372,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasFilter("[NetcashAccountNumber] IS NOT NULL");
 
-                    b.ToTable("Tenants", (string)null);
+                    b.ToTable("Tenants");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.TenantServiceKey", b =>
@@ -1413,7 +1416,7 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "ServiceId")
                         .IsUnique();
 
-                    b.ToTable("TenantServiceKeys", (string)null);
+                    b.ToTable("TenantServiceKeys");
                 });
 
             modelBuilder.Entity("AMPay.Infrastructure.Identity.ApplicationRole", b =>

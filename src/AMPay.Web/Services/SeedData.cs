@@ -87,6 +87,8 @@ public static class SeedData
             log.LogInformation("Seeded customer tenant {Name}.", albatross.Name);
         }
 
+        await SeedCreditPackagesAsync(db, albatross, log);
+
         // The sudo account.
         var sudoEmail = config["Seed:SuperAdmin:Email"] ?? "admin@ampay.local";
         var sudoPassword = config["Seed:SuperAdmin:Password"];
@@ -124,5 +126,71 @@ public static class SeedData
             await users.AddToRoleAsync(sudo, AppRoles.SuperAdmin);
             log.LogInformation("Seeded super admin {Email}.", sudoEmail);
         }
+    }
+
+    /// <summary>
+    /// The three credit packages, seeded once per tenant.
+    /// <para>
+    /// Only the tier is fixed. Every rate is a starting point for the lender to adjust in
+    /// the UI - which is why these are seeded rows rather than constants. Interest is at
+    /// the statutory 5% per month ceiling on Regular and steps down for better tiers;
+    /// service fee and lending limits move with it. The initiation rate is the same across
+    /// all three and is clamped to the statutory maximum at quote time regardless.
+    /// </para>
+    /// </summary>
+    private static async Task SeedCreditPackagesAsync(
+        AppDbContext db, Tenant tenant, ILogger log)
+    {
+        if (await db.CreditPackages.AnyAsync(p => p.TenantId == tenant.Id)) return;
+
+        db.CreditPackages.AddRange(
+            new CreditPackage
+            {
+                TenantId = tenant.Id,
+                Tier = CreditTier.Regular,
+                Name = "Regular",
+                Description = "Entry tier. Priced at the statutory maximum rate.",
+                MonthlyInterestRate = 0.05m,
+                MonthlyServiceFee = 16m,
+                InitiationFeeRate = 0.15m,
+                CreditLifeRate = 0.0045m,
+                MinLoanAmount = 500m,
+                MaxLoanAmount = 8_000m,
+                MinTermMonths = 1,
+                MaxTermMonths = 6
+            },
+            new CreditPackage
+            {
+                TenantId = tenant.Id,
+                Tier = CreditTier.Gold,
+                Name = "Gold",
+                Description = "Repeat clients in good standing. Lower rate, longer terms.",
+                MonthlyInterestRate = 0.035m,
+                MonthlyServiceFee = 16m,
+                InitiationFeeRate = 0.15m,
+                CreditLifeRate = 0.0045m,
+                MinLoanAmount = 1_000m,
+                MaxLoanAmount = 25_000m,
+                MinTermMonths = 3,
+                MaxTermMonths = 12
+            },
+            new CreditPackage
+            {
+                TenantId = tenant.Id,
+                Tier = CreditTier.Premium,
+                Name = "Premium",
+                Description = "Best rate and highest limits. Reserved for the strongest books.",
+                MonthlyInterestRate = 0.025m,
+                MonthlyServiceFee = 10m,
+                InitiationFeeRate = 0.15m,
+                CreditLifeRate = 0.0045m,
+                MinLoanAmount = 5_000m,
+                MaxLoanAmount = 100_000m,
+                MinTermMonths = 6,
+                MaxTermMonths = 36
+            });
+
+        await db.SaveChangesAsync();
+        log.LogInformation("Seeded three credit packages for {Tenant}.", tenant.Name);
     }
 }
