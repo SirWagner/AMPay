@@ -72,7 +72,11 @@ a:hover { text-decoration: underline; }
 .sidebar {
     width: var(--sidebar-w);
     flex: 0 0 var(--sidebar-w);
-    background: var(--navy-deeper);
+    /* The site's dark hero: navy gradient under a green aurora, with the dot field on top. */
+    background:
+        radial-gradient(320px 260px at 0% 0%, rgba(74, 170, 60, .18), transparent 70%),
+        radial-gradient(360px 300px at 100% 100%, rgba(109, 218, 155, .10), transparent 70%),
+        linear-gradient(170deg, var(--navy-deeper) 0%, var(--navy-dark) 60%, var(--navy-deeper) 100%);
     color: #cfd8ea;
     display: flex;
     flex-direction: column;
@@ -82,25 +86,29 @@ a:hover { text-decoration: underline; }
     overflow-y: auto;
 }
 
+/* Everything in the sidebar sits above its dot field. */
+.sidebar > :not(.network-bg) { position: relative; z-index: 1; }
+
 .sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .45rem;
     padding: 1.15rem 1.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
+.sidebar-brand:hover { text-decoration: none; }
 
-.sidebar-brand .mark {
-    font-family: var(--font-heading);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #fff;
-    display: block;
-    letter-spacing: -.01em;
-}
+.sidebar-logo { height: 37px; width: auto; display: block; }
 
 .sidebar-brand .sub {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
     font-size: .64rem;
     letter-spacing: .14em;
     text-transform: uppercase;
-    color: var(--green-accent);
+    color: #7be07f;
 }
 
 .sidebar-section {
@@ -298,13 +306,15 @@ a:hover { text-decoration: underline; }
     align-items: center;
     gap: .4rem;
     padding: .5rem .95rem;
-    border-radius: var(--radius);
+    /* Pill buttons, as on the public site. */
+    border-radius: 999px;
     border: 1px solid transparent;
     font: inherit;
     font-weight: 600;
     font-size: .85rem;
     cursor: pointer;
     text-decoration: none;
+    white-space: nowrap;
 }
 .btn:hover { text-decoration: none; }
 
@@ -512,14 +522,21 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ---------- Auth ---------- */
 
 .auth-page {
+    position: relative;
+    overflow: hidden;
     min-height: 100vh;
     display: grid;
     place-items: center;
-    background: linear-gradient(160deg, var(--navy-deeper) 0%, var(--navy) 100%);
+    background:
+        radial-gradient(560px 420px at 12% 10%, rgba(74, 170, 60, .22), transparent 60%),
+        radial-gradient(620px 480px at 88% 90%, rgba(109, 218, 155, .16), transparent 60%),
+        linear-gradient(135deg, var(--navy-deeper) 0%, var(--navy-dark) 52%, var(--navy) 100%);
     padding: 2rem 1rem;
 }
 
 .auth-card {
+    position: relative;
+    z-index: 1;
     background: #fff;
     border-radius: var(--radius-lg);
     box-shadow: 0 18px 50px rgba(0, 0, 0, .3);
@@ -528,20 +545,7 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
     padding: 2rem;
 }
 
-.auth-card .mark {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--navy-deeper);
-}
-
-.auth-card .sub {
-    font-size: .64rem;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--green-mid);
-    margin-bottom: 1.5rem;
-}
+.auth-card .auth-logo { height: 32px; width: auto; margin-bottom: 1.5rem; }
 
 /* ---------- Timeline ---------- */
 
@@ -592,7 +596,8 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 900px) {
     .shell { flex-direction: column; }
-    .sidebar { width: 100%; height: auto; position: static; flex: none; }
+    /* Relative, not static: the sidebar's dot field is positioned against it. */
+    .sidebar { width: 100%; height: auto; position: relative; flex: none; }
     .wizard { grid-template-columns: 1fr; }
     .wizard-steps { position: static; }
 }
@@ -1078,4 +1083,162 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
     font-size: .85rem;
     background: #fff;
     max-width: 100%;
+}
+
+/* ==========================================================================
+   Site signature - the live network, aurora and pulse from the public site
+   (hero-network-bg, hero-dark, auth-side), so the console reads as the same
+   product. network.js animates any canvas[data-network].
+   ========================================================================== */
+
+.network-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .9;
+}
+
+/* Cursor spotlight that follows the mouse over an interactive field. */
+.network-glow {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 30%), rgba(74, 170, 60, .16), transparent 68%);
+    opacity: 0;
+    transition: opacity .5s ease;
+}
+.hero-dark:hover .network-glow { opacity: 1; }
+@media (prefers-reduced-motion: reduce), (hover: none) {
+    .network-glow { display: none; }
+}
+
+.pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-accent);
+    flex-shrink: 0;
+    display: inline-block;
+    animation: pulseDot 1.8s ease-out infinite;
+}
+@keyframes pulseDot {
+    0%   { box-shadow: 0 0 0 0 rgba(74, 170, 60, .55); }
+    70%  { box-shadow: 0 0 0 8px rgba(74, 170, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(74, 170, 60, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .pulse-dot { animation: none; }
+}
+
+.hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: .5px solid rgba(255, 255, 255, .22);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, .88);
+    background: rgba(255, 255, 255, .06);
+    backdrop-filter: blur(6px);
+    margin-bottom: 1.25rem;
+}
+
+.btn-lg { padding: .75rem 1.4rem; font-size: .9rem; }
+
+/* ---- page header band: the site's interior page-header, behind every page title ---- */
+
+/* The band sits behind the page without lifting every child into its own layer -
+   which would let a later card cover an earlier one's chart tooltip. */
+.content { position: relative; isolation: isolate; }
+
+.content-band {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 230px;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+        radial-gradient(420px 260px at 12% 0%, rgba(74, 170, 60, .12), transparent 65%),
+        radial-gradient(480px 300px at 92% 10%, rgba(30, 54, 116, .10), transparent 65%),
+        linear-gradient(180deg, #f2f5fb 0%, rgba(246, 247, 249, 0) 100%);
+    -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+.content-band .network-bg { opacity: .45; }
+
+/* ---- dark hero: the dashboard's headline figure, on the site's hero ---- */
+
+.hero.hero-dark {
+    position: relative;
+    overflow: hidden;
+    border: 0;
+    color: rgba(255, 255, 255, .78);
+    background:
+        radial-gradient(560px 420px at 12% 10%, rgba(74, 170, 60, .22), transparent 60%),
+        radial-gradient(620px 480px at 88% 90%, rgba(109, 218, 155, .16), transparent 60%),
+        linear-gradient(135deg, var(--navy-deeper) 0%, var(--navy-dark) 52%, var(--navy) 100%);
+    box-shadow: 0 10px 30px rgba(13, 26, 56, .18);
+}
+.hero.hero-dark > :not(.network-bg):not(.network-glow) { position: relative; z-index: 1; }
+.hero-dark .hero-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: rgba(255, 255, 255, .78);
+}
+.hero-dark .hero-value { color: #fff; }
+.hero-dark .hero-note,
+.hero-dark .muted { color: rgba(255, 255, 255, .68); }
+.hero-dark .hero-facts { border-color: rgba(255, 255, 255, .14); }
+.hero-dark .hero-facts dt { color: rgba(255, 255, 255, .62); }
+.hero-dark .hero-facts dd { color: #fff; }
+.hero-dark a { color: #7be07f; }
+
+/* ---- sign in: the site's split log-in page ---- */
+
+.auth-wrap { min-height: 100vh; display: flex; align-items: stretch; background: #fff; }
+
+.auth-panel {
+    flex: 1;
+    max-width: 460px;
+    margin: 0 auto;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.auth-logo { height: 40px; width: auto; display: block; margin-bottom: 2.25rem; }
+.auth-title { font-size: 28px; color: var(--navy); margin-bottom: .4rem; }
+.auth-sub { font-size: 13.5px; color: var(--text-muted); margin: 0 0 2rem; }
+
+.auth-side {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    background:
+        radial-gradient(560px 420px at 12% 10%, rgba(74, 170, 60, .22), transparent 60%),
+        radial-gradient(620px 480px at 88% 90%, rgba(109, 218, 155, .16), transparent 60%),
+        linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 55%, var(--navy-deeper) 100%);
+}
+.auth-side-content { position: relative; z-index: 1; max-width: 400px; }
+.auth-side h2 { font-size: 42px; color: #fff; line-height: 1.1; margin-bottom: 1rem; }
+.auth-side h2 em { color: #7be07f; }
+.auth-side p { font-size: 14px; color: rgba(255, 255, 255, .72); line-height: 1.75; margin: 0; }
+
+@media (max-width: 860px) {
+    .auth-side { display: none; }
+    .auth-panel { padding: 2rem 1.5rem; }
 }

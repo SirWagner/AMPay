@@ -29,10 +29,12 @@
 
 <div class="shell">
     <aside class="sidebar">
-        <div class="sidebar-brand">
-            <span class="mark">AM-Pay</span>
-            <span class="sub">A Netcash ISV</span>
-        </div>
+        <canvas class="network-bg" data-network="ambient" data-tone="dark" aria-hidden="true"></canvas>
+
+        <a class="sidebar-brand" asp-controller="Home" asp-action="Index">
+            <img src="~/img/ampay-logo-light.png" alt="AM-Pay Fintech" class="sidebar-logo" width="188" height="37" />
+            <span class="sub"><span class="pulse-dot" aria-hidden="true"></span> A Netcash ISV</span>
+        </a>
 
     @{
         // A reviewer's world is the queue and nothing else. Showing them links that lead
@@ -114,6 +116,12 @@
         </header>
 
         <main class="content">
+            @* The site's interior page-header: a faint dot field and aurora behind the
+               page title, fading into the page. Decoration only. *@
+            <div class="content-band" aria-hidden="true">
+                <canvas class="network-bg" data-network="ambient" data-tone="light"></canvas>
+            </div>
+
             @if (TempData["Success"] is string ok)
             {
                 <div class="alert alert-success">@ok</div>
@@ -132,6 +140,7 @@
     </div>
 </div>
 
+<script src="~/js/network.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

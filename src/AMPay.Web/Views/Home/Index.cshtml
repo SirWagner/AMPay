@@ -98,9 +98,11 @@
 
 @* ---------------------------------------------------------------- hero *@
 
-<section class="hero" aria-labelledby="heroLabel">
+<section class="hero hero-dark" aria-labelledby="heroLabel">
+    <canvas class="network-bg" data-network="interactive" data-tone="dark" aria-hidden="true"></canvas>
+    <div class="network-glow" aria-hidden="true"></div>
     <div>
-        <div class="hero-label" id="heroLabel">Collectable each month</div>
+        <div class="hero-label" id="heroLabel"><span class="pulse-dot" aria-hidden="true"></span> Collectable each month</div>
         <div class="hero-value">@Rand(Model.MonthlyCollectionValue)</div>
         <p class="hero-note">
             @if (Model.AuthenticatedMandates == 0)
