@@ -1,0 +1,86 @@
+@model List<AMPay.Web.Models.LoanRow>
+@{
+    ViewData["Title"] = "Loans";
+    var current = ViewBag.Status as LoanStatus?;
+    var filters = new[]
+    {
+        LoanStatus.PendingApproval, LoanStatus.Approved, LoanStatus.Disbursed,
+        LoanStatus.Declined, LoanStatus.Cancelled
+    };
+}
+
+<div class="page-head">
+    <h1>Loans</h1>
+    <p class="lede">
+        Every credit agreement raised against an onboarded client. To raise a new one, open
+        the client and choose <strong>Raise a loan</strong>.
+    </p>
+</div>
+
+<div class="filter-pills">
+    <a asp-action="Index" class="pill @(current is null ? "active" : "")">All</a>
+    @foreach (var s in filters)
+    {
+        <a asp-action="Index" asp-route-status="@s" class="pill @(current == s ? "active" : "")">
+            <partial name="_LoanStatus" model="s" />
+        </a>
+    }
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <p>No loans @(current is null ? "yet" : "with this status").</p>
+            <a asp-controller="Clients" asp-action="Index" asp-route-status="@ClientStatus.Onboarded"
+               class="btn btn-primary">Find an onboarded client</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Loan</th>
+                    <th>Client</th>
+                    <th>Package</th>
+                    <th class="num">Amount</th>
+                    <th class="num">Instalment</th>
+                    <th>Term</th>
+                    <th>Affordability</th>
+                    <th>Status</th>
+                    <th>Raised</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var l in Model)
+                {
+                    <tr>
+                        <td class="mono"><a asp-action="Details" asp-route-id="@l.Id">@l.LoanNumber</a></td>
+                        <td>
+                            <a asp-controller="Clients" asp-action="Details" asp-route-id="@l.ClientId">@l.ClientName</a>
+                            <div class="muted small mono">@l.ClientNumber</div>
+                        </td>
+                        <td>@l.PackageName</td>
+                        <td class="num">R @l.Principal.ToString("N2")</td>
+                        <td class="num">R @l.FirstInstalment.ToString("N2")</td>
+                        <td>@l.NumberOfInstalments mo</td>
+                        <td>
+                            @switch (l.Affordability)
+                            {
+                                case AffordabilityOutcome.Pass: <span class="badge badge-green">Pass</span> break;
+                                case AffordabilityOutcome.Marginal: <span class="badge badge-amber">Marginal</span> break;
+                                case AffordabilityOutcome.Fail: <span class="badge badge-red">Fail</span> break;
+                                default: <span class="muted small">&ndash;</span> break;
+                            }
+                        </td>
+                        <td><partial name="_LoanStatus" model="l.Status" /></td>
+                        <td class="muted small">@l.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

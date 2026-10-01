@@ -45,12 +45,25 @@ public class ClientReference
     public string? Comments { get; set; }
 }
 
-/// <summary>Budgets tab - the client's declared income and expenditure lines.</summary>
+/// <summary>
+/// One line of the client's monthly budget, captured on the Financial step. The expense and
+/// debt totals on <see cref="ClientFinancial"/> are the sums of these lines.
+/// </summary>
 public class ClientBudget
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ClientId { get; set; }
     public Client? Client { get; set; }
+
+    public BudgetLineKind Kind { get; set; } = BudgetLineKind.Expense;
+
+    /// <summary>
+    /// A <see cref="Credit.BudgetCategories"/> key, or <see cref="Credit.BudgetCategories.Custom"/>
+    /// for a line the operator added.
+    /// </summary>
+    public string? Category { get; set; }
+
+    public int DisplayOrder { get; set; }
 
     public string Description { get; set; } = string.Empty;
     public DateTime BudgetDate { get; set; } = DateTime.UtcNow.Date;
@@ -113,6 +126,22 @@ public class ClientDocument
 
     public DateTime UploadedUtc { get; set; } = DateTime.UtcNow;
     public string? UploadedByUserId { get; set; }
+
+    // ---- Review ----
+    // A document is uploaded by a capturer and passed by a reviewer. The two are separate
+    // people on purpose: the person who onboards a client should not be the only person who
+    // attests that the client's ID is genuine.
+
+    public DocumentReviewStatus ReviewStatus { get; set; } = DocumentReviewStatus.Pending;
+
+    public DateTime? ReviewedUtc { get; set; }
+    public string? ReviewedByUserId { get; set; }
+
+    /// <summary>Why a document was rejected. Required on rejection so the capturer can fix it.</summary>
+    public string? ReviewNotes { get; set; }
+
+    /// <summary>SHA-256 of the stored bytes. Detects a file swapped after it was approved.</summary>
+    public string? ContentHash { get; set; }
 }
 
 /// <summary>Take Picture tab - the client's photograph, captured from webcam or uploaded.</summary>

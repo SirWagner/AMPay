@@ -23,9 +23,14 @@
                 <label for="status">Status</label>
                 <select id="status" name="status">
                     <option value="">All</option>
-                    @foreach (var s in Enum.GetValues<ClientStatus>())
+                    @* Lifecycle order, not declaration order - the enum numbers are
+                       historical and reading them in that sequence makes no sense. *@
+                    @foreach (var s in ClientStatusInfo.Pipeline.Concat(
+                                  new[] { ClientStatus.Suspended, ClientStatus.Closed, ClientStatus.Declined }))
                     {
-                        <option value="@s" selected="@(ViewBag.Status?.ToString() == s.ToString())">@s</option>
+                        <option value="@s" selected="@(ViewBag.Status?.ToString() == s.ToString())">
+                            @ClientStatusInfo.Label(s)
+                        </option>
                     }
                 </select>
             </div>
@@ -71,13 +76,7 @@
                             <a asp-action="Details" asp-route-id="@c.Id"><strong>@c.FullName</strong></a>
                         </td>
                         <td class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(c.IdNumber)</td>
-                        <td>
-                            <span class="badge @(c.Status switch {
-                                                    ClientStatus.Active => "badge-green",
-                                                    ClientStatus.Suspended => "badge-amber",
-                                                    ClientStatus.Closed => "badge-red",
-                                                    _ => "badge-grey" })">@c.Status</span>
-                        </td>
+                        <td><partial name="_ClientStatus" model="c.Status" /></td>
                         <td>
                             @if (c.Mandates.Count == 0)
                             {
@@ -92,7 +91,7 @@
                         <td>
                             <div class="row-actions">
                                 <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-outline btn-sm">Edit</a>
-                                @if (c.Status == ClientStatus.Active)
+                                @if (ClientStatusInfo.CanBorrow(c.Status))
                                 {
                                     <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@c.Id"
                                        class="btn btn-primary btn-sm">New mandate</a>

@@ -29,16 +29,40 @@
 
 <div class="shell">
     <aside class="sidebar">
-        <div class="sidebar-brand">
-            <span class="mark">AM-Pay</span>
-            <span class="sub">A Netcash ISV</span>
-        </div>
+        <canvas class="network-bg" data-network="ambient" data-tone="dark" aria-hidden="true"></canvas>
+
+        <a class="sidebar-brand" asp-controller="Home" asp-action="Index">
+            <img src="~/img/ampay-logo-light.png" alt="AM-Pay Fintech" class="sidebar-logo" width="188" height="37" />
+            <span class="sub"><span class="pulse-dot" aria-hidden="true"></span> A Netcash ISV</span>
+        </a>
+
+    @{
+        // A reviewer's world is the queue and nothing else. Showing them links that lead
+        // straight to an access-denied page is not security, it is just rude.
+        var isReviewerOnly = User.IsInRole(AppRoles.Reviewer) &&
+                             !User.IsInRole(AppRoles.TenantAdmin) &&
+                             !User.IsInRole(AppRoles.SuperAdmin);
+
+        var canReview = User.IsInRole(AppRoles.Reviewer) || User.IsInRole(AppRoles.TenantAdmin) ||
+                        User.IsInRole(AppRoles.SuperAdmin);
+    }
 
         <div class="sidebar-section">Operations</div>
         <a class="nav-link @Active("Home")" asp-controller="Home" asp-action="Index">Dashboard</a>
-        <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
-        <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
-        <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
+        @if (!isReviewerOnly)
+        {
+            <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
+        }
+        @if (canReview)
+        {
+            <a class="nav-link @Active("Documents")" asp-controller="Documents" asp-action="Index">Document review</a>
+        }
+        @if (!isReviewerOnly)
+        {
+            <a class="nav-link @Active("Loans")" asp-controller="Loans" asp-action="Index">Loans</a>
+            <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
+            <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
+        }
 
         @if (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin))
         {
@@ -47,6 +71,7 @@
             {
                 <a class="nav-link @Active("Tenants")" asp-controller="Tenants" asp-action="Index">Customers</a>
             }
+            <a class="nav-link @Active("CreditPackages")" asp-controller="CreditPackages" asp-action="Index">Credit packages</a>
             <a class="nav-link @Active("ServiceKeys")" asp-controller="ServiceKeys" asp-action="Index">Netcash service keys</a>
             <a class="nav-link @Active("Users")" asp-controller="Users" asp-action="Index">Users</a>
         }
@@ -81,6 +106,7 @@
                     @if (User.IsInRole(AppRoles.SuperAdmin)) { <span>Super administrator</span> }
                     else if (User.IsInRole(AppRoles.TenantAdmin)) { <span>Customer administrator</span> }
                     else if (User.IsInRole(AppRoles.Capturer)) { <span>Capturer</span> }
+                    else if (User.IsInRole(AppRoles.Reviewer)) { <span>Document reviewer</span> }
                     else { <span>Viewer</span> }
                 </div>
                 <form asp-controller="Account" asp-action="Logout" method="post">
@@ -90,6 +116,12 @@
         </header>
 
         <main class="content">
+            @* The site's interior page-header: a faint dot field and aurora behind the
+               page title, fading into the page. Decoration only. *@
+            <div class="content-band" aria-hidden="true">
+                <canvas class="network-bg" data-network="ambient" data-tone="light"></canvas>
+            </div>
+
             @if (TempData["Success"] is string ok)
             {
                 <div class="alert alert-success">@ok</div>
@@ -108,6 +140,7 @@
     </div>
 </div>
 
+<script src="~/js/network.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

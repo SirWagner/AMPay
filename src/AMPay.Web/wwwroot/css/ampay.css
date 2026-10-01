@@ -19,7 +19,9 @@
     --red-light: #fdecea;
 
     --text-body: #444;
-    --text-muted: #777;
+    /* #777 measured 4.48:1 on white - just under the 4.5:1 AA floor for the small
+       text it is used for. #6b6b6b is 5.33:1 and reads the same. */
+    --text-muted: #6b6b6b;
     --text-heading: var(--navy-deeper);
     --border: #e5e5e5;
 
@@ -70,7 +72,11 @@ a:hover { text-decoration: underline; }
 .sidebar {
     width: var(--sidebar-w);
     flex: 0 0 var(--sidebar-w);
-    background: var(--navy-deeper);
+    /* The site's dark hero: navy gradient under a green aurora, with the dot field on top. */
+    background:
+        radial-gradient(320px 260px at 0% 0%, rgba(74, 170, 60, .18), transparent 70%),
+        radial-gradient(360px 300px at 100% 100%, rgba(109, 218, 155, .10), transparent 70%),
+        linear-gradient(170deg, var(--navy-deeper) 0%, var(--navy-dark) 60%, var(--navy-deeper) 100%);
     color: #cfd8ea;
     display: flex;
     flex-direction: column;
@@ -80,25 +86,29 @@ a:hover { text-decoration: underline; }
     overflow-y: auto;
 }
 
+/* Everything in the sidebar sits above its dot field. */
+.sidebar > :not(.network-bg) { position: relative; z-index: 1; }
+
 .sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .45rem;
     padding: 1.15rem 1.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
+.sidebar-brand:hover { text-decoration: none; }
 
-.sidebar-brand .mark {
-    font-family: var(--font-heading);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #fff;
-    display: block;
-    letter-spacing: -.01em;
-}
+.sidebar-logo { height: 37px; width: auto; display: block; }
 
 .sidebar-brand .sub {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
     font-size: .64rem;
     letter-spacing: .14em;
     text-transform: uppercase;
-    color: var(--green-accent);
+    color: #7be07f;
 }
 
 .sidebar-section {
@@ -208,16 +218,16 @@ a:hover { text-decoration: underline; }
 }
 
 .stat .label {
-    font-size: .68rem;
-    letter-spacing: .1em;
-    text-transform: uppercase;
+    font-size: .78rem;
     color: var(--text-muted);
 }
 
 .stat .value {
-    font-family: var(--font-heading);
+    /* Figures are set in the UI sans, never the serif: a display face on a number
+       reads as decoration. Proportional digits - tabular-nums is for columns. */
+    font-family: var(--font-body);
     font-size: 1.85rem;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-heading);
     line-height: 1.1;
     margin-top: .2rem;
@@ -296,13 +306,15 @@ a:hover { text-decoration: underline; }
     align-items: center;
     gap: .4rem;
     padding: .5rem .95rem;
-    border-radius: var(--radius);
+    /* Pill buttons, as on the public site. */
+    border-radius: 999px;
     border: 1px solid transparent;
     font: inherit;
     font-weight: 600;
     font-size: .85rem;
     cursor: pointer;
     text-decoration: none;
+    white-space: nowrap;
 }
 .btn:hover { text-decoration: none; }
 
@@ -510,14 +522,21 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ---------- Auth ---------- */
 
 .auth-page {
+    position: relative;
+    overflow: hidden;
     min-height: 100vh;
     display: grid;
     place-items: center;
-    background: linear-gradient(160deg, var(--navy-deeper) 0%, var(--navy) 100%);
+    background:
+        radial-gradient(560px 420px at 12% 10%, rgba(74, 170, 60, .22), transparent 60%),
+        radial-gradient(620px 480px at 88% 90%, rgba(109, 218, 155, .16), transparent 60%),
+        linear-gradient(135deg, var(--navy-deeper) 0%, var(--navy-dark) 52%, var(--navy) 100%);
     padding: 2rem 1rem;
 }
 
 .auth-card {
+    position: relative;
+    z-index: 1;
     background: #fff;
     border-radius: var(--radius-lg);
     box-shadow: 0 18px 50px rgba(0, 0, 0, .3);
@@ -526,20 +545,7 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
     padding: 2rem;
 }
 
-.auth-card .mark {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--navy-deeper);
-}
-
-.auth-card .sub {
-    font-size: .64rem;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--green-mid);
-    margin-bottom: 1.5rem;
-}
+.auth-card .auth-logo { height: 32px; width: auto; margin-bottom: 1.5rem; }
 
 /* ---------- Timeline ---------- */
 
@@ -590,7 +596,649 @@ table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 900px) {
     .shell { flex-direction: column; }
-    .sidebar { width: 100%; height: auto; position: static; flex: none; }
+    /* Relative, not static: the sidebar's dot field is positioned against it. */
+    .sidebar { width: 100%; height: auto; position: relative; flex: none; }
     .wizard { grid-template-columns: 1fr; }
     .wizard-steps { position: static; }
+}
+
+/* ---------------------------------------------------------------- charts */
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+
+.chart-grid .card-body > p.muted:first-child { margin-top: 0; }
+
+/* ------------------------------------------------------- document review */
+
+.row-between { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+
+.review-form { display: inline-flex; align-items: center; gap: .35rem; }
+
+.inline-reason {
+    width: 170px;
+    padding: .3rem .5rem;
+    font-size: .8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.detail-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .4rem 1rem;
+    margin: 0 0 1rem;
+    font-size: .85rem;
+}
+
+.detail-list dt { color: var(--text-muted); }
+.detail-list dd { margin: 0; color: var(--text-body); }
+
+/* ----------------------------------------------------------------- loans */
+
+.loan-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+/* The quote follows the operator down the form on a wide screen. */
+.loan-layout > aside { position: sticky; top: 1rem; }
+
+@media (max-width: 1000px) {
+    .loan-layout { grid-template-columns: 1fr; }
+    .loan-layout > aside { position: static; }
+}
+
+.package-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: .75rem;
+}
+.package-grid.wide { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem; }
+
+.package-option { display: block; cursor: pointer; }
+.package-option input { position: absolute; opacity: 0; pointer-events: none; }
+
+.package-body {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    padding: .85rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition: border-color .12s, box-shadow .12s;
+}
+.package-option:hover .package-body { border-color: #c5d2ea; }
+.package-option input:checked + .package-body {
+    border-color: var(--navy);
+    box-shadow: 0 0 0 3px rgba(30, 54, 116, .12);
+}
+.package-option input:focus-visible + .package-body { outline: 2px solid var(--navy); outline-offset: 2px; }
+
+.package-name { font-family: var(--font-heading); font-weight: 700; color: var(--navy-deeper); font-size: 1.05rem; }
+.package-rate { font-size: 1.35rem; font-weight: 700; color: var(--green-mid); }
+.package-rate small { font-size: .72rem; font-weight: 400; color: var(--text-muted); }
+.package-meta { font-size: .74rem; color: var(--text-muted); }
+
+.quote-headline {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: .85rem;
+    margin-bottom: .85rem;
+    border-bottom: 1px solid var(--border);
+}
+.quote-headline .label {
+    font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+}
+.quote-headline .value {
+    font-family: var(--font-heading); font-size: 2rem; font-weight: 700; color: var(--navy-deeper);
+}
+.quote-headline .note { font-size: .78rem; color: var(--text-muted); }
+
+.quote-table td { padding: .35rem 0; }
+.quote-table td.num { text-align: right; white-space: nowrap; }
+tr.total td { border-top: 2px solid var(--border); font-weight: 700; color: var(--navy-deeper); }
+
+.affordability strong { display: block; margin-bottom: .2rem; }
+.affordability div { line-height: 1.45; }
+
+.decision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+.decision-grid form { display: flex; flex-direction: column; gap: .75rem; align-items: flex-start; }
+.decision-grid .field { width: 100%; }
+
+ol.steps { margin: 0; padding-left: 1.2rem; line-height: 1.8; }
+
+.filter-pills { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.pill {
+    display: inline-flex; align-items: center;
+    padding: .3rem .75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: .8rem;
+    color: var(--text-body);
+    text-decoration: none;
+}
+.pill.active { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(30, 54, 116, .12); }
+.pill .badge { background: transparent; padding: 0; }
+
+label.check { display: inline-flex; align-items: center; gap: .45rem; font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+/* ============================================================== dashboard
+
+   Built to the dataviz method: the form is chosen by the data's job, colour by the
+   job it does, and every chart hex below comes from the documented reference palette
+   rather than being picked by eye. The two ordinal ramps were run through
+   validate_palette.js --ordinal against this surface (#ffffff) and pass every check.
+
+   Light only, because the rest of the application is. A dark theme would need its
+   own validated steps, not an automatic flip of these.
+   ========================================================================= */
+
+.dash {
+    --viz-grid: #e1e0d9;          /* hairline gridline, one step off the surface */
+    --viz-axis: #c3c2b7;          /* baseline */
+    --viz-series-1: #2a78d6;      /* a single series: one colour, no legend box */
+
+    /* Ordinal ramp, five steps: stages of the onboarding funnel, light to dark. */
+    --ord5-1: #86b6ef;
+    --ord5-2: #5598e7;
+    --ord5-3: #2a78d6;
+    --ord5-4: #1c5cab;
+    --ord5-5: #104281;
+
+    /* Ordinal ramp, three steps: Regular < Gold < Premium. */
+    --ord3-1: #6da7ec;
+    --ord3-2: #2a78d6;
+    --ord3-3: #184f95;
+
+    /* Status: reserved meaning, never reused for a plain series, always shown with
+       an icon and a label. Warning is under 3:1 on white by design - the label is
+       what carries it. */
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-critical: #d03b3b;
+    --status-neutral: #898781;
+}
+
+/* ---- hero: the one number the dashboard leads with ---- */
+
+.hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 1.4rem 1.5rem;
+    margin-bottom: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.hero-label { font-size: .85rem; color: var(--text-muted); }
+
+.hero-value {
+    font-family: var(--font-body);
+    font-size: 3rem;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.05;
+    color: var(--text-heading);
+    margin: .3rem 0 .35rem;
+}
+
+.hero-note { font-size: .82rem; color: var(--text-muted); margin: 0; }
+
+.hero-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 1.5rem;
+    align-content: center;
+    margin: 0;
+    padding-left: 1.5rem;
+    border-left: 1px solid var(--border);
+}
+
+.hero-facts dt { font-size: .76rem; color: var(--text-muted); }
+.hero-facts dd { margin: .15rem 0 0; font-size: 1.2rem; font-weight: 600; color: var(--text-heading); }
+
+@media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-value { font-size: 2.4rem; }
+    .hero-facts { padding: 1rem 0 0; border-left: 0; border-top: 1px solid var(--border); }
+}
+
+/* ---- work waiting on someone: tiles that lead to the queue ---- */
+
+.attention {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.attention-tile {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    padding: 1rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color .12s, box-shadow .12s;
+}
+
+.attention-tile:hover { border-color: #c5d2ea; box-shadow: var(--shadow); }
+.attention-tile:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.attention-tile .label { font-size: .8rem; color: var(--text-muted); }
+.attention-tile .value { font-size: 1.85rem; font-weight: 600; line-height: 1.1; color: var(--text-heading); }
+.attention-tile .state { display: flex; align-items: center; gap: .35rem; font-size: .76rem; color: var(--text-body); }
+.attention-tile .go { margin-left: auto; color: var(--navy); }
+
+.status-icon { flex: 0 0 auto; width: 14px; height: 14px; }
+.status-icon.good { color: var(--status-good); }
+.status-icon.warning { color: var(--status-warning); }
+.status-icon.critical { color: var(--status-critical); }
+.status-icon.neutral { color: var(--status-neutral); }
+
+/* ---- chart card chrome ---- */
+
+.viz-sub { font-size: .8rem; color: var(--text-muted); margin: 0 0 1rem; }
+
+/* Every chart's accessible twin: the same numbers as a plain table. */
+.viz-table { margin-top: 1rem; padding-top: .6rem; border-top: 1px solid var(--border); }
+.viz-table summary { cursor: pointer; font-size: .78rem; color: var(--navy); }
+.viz-table table { margin-top: .5rem; }
+.viz-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.viz-empty { font-size: .85rem; color: var(--text-muted); padding: 1.5rem 0; text-align: center; }
+
+/* ---- horizontal bars: thin, square at the baseline, round at the data end ---- */
+
+.hbar { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+
+.hbar-row {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 34%) minmax(0, 1fr);
+    align-items: center;
+    gap: .75rem;
+    padding: .1rem .25rem;
+    border-radius: 6px;
+}
+
+.hbar-row:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
+.hbar-label { font-size: .82rem; color: var(--text-body); }
+
+.hbar-track {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 26px;
+    border-left: 1px solid var(--viz-axis);
+}
+
+/* The fill leaves room for its own value label, so a full-length bar never pushes
+   the number off the card. --f is the fraction of the longest bar. */
+.hbar-fill {
+    height: 20px;
+    width: calc((100% - 6.5em) * var(--f, 0));
+    background: var(--c, var(--viz-series-1));
+    border-radius: 0 4px 4px 0;
+    transition: filter .12s;
+}
+
+.hbar-row:hover .hbar-fill,
+.hbar-row:focus-visible .hbar-fill { filter: brightness(1.12); }
+
+.hbar-value {
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---- columns: time along the bottom, magnitude up ---- */
+
+.cols { padding-left: 1.9rem; }
+
+.cols-plot {
+    position: relative;
+    height: 150px;
+    margin-top: 1.1rem;                /* headroom for the tallest column's label */
+    border-bottom: 1px solid var(--viz-axis);
+}
+
+.cols-grid {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--viz-grid);
+}
+
+.cols-grid span {
+    position: absolute;
+    left: -1.9rem;
+    width: 1.5rem;
+    transform: translateY(-50%);
+    text-align: right;
+    font-size: .7rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.cols-bars {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    align-items: end;
+}
+
+.col {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    border-radius: 4px;
+}
+
+.col:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
+
+.col-bar {
+    width: min(22px, 62%);
+    height: var(--h, 0%);
+    background: var(--viz-series-1);
+    border-radius: 4px 4px 0 0;
+    transition: filter .12s;
+}
+
+.col:hover .col-bar,
+.col:focus-visible .col-bar { filter: brightness(1.12); }
+
+.col-value {
+    position: absolute;
+    bottom: calc(var(--h, 0%) + 3px);
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    font-variant-numeric: tabular-nums;
+}
+
+.cols-axis {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    margin-top: 6px;
+}
+
+.cols-axis span { text-align: center; font-size: .68rem; color: var(--text-muted); }
+
+/* ---- stacked status bar: part-to-whole, 2px surface gap between segments ---- */
+
+.stack {
+    display: flex;
+    gap: 2px;
+    height: 18px;
+    margin: .2rem 0 1.1rem;
+    background: var(--surface);
+}
+
+.stack-seg { flex-basis: 0; min-width: 4px; transition: filter .12s; }
+.stack-seg:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.stack-seg:last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.stack-seg:hover, .stack-seg:focus-visible { filter: brightness(1.1); }
+.stack-seg:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.stack-seg.good { background: var(--status-good); }
+.stack-seg.warning { background: var(--status-warning); }
+.stack-seg.critical { background: var(--status-critical); }
+.stack-seg.neutral { background: var(--status-neutral); }
+
+.status-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+
+.status-list li {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .6rem;
+    font-size: .84rem;
+}
+
+.status-list .what { color: var(--text-body); }
+.status-list .why { display: block; font-size: .74rem; color: var(--text-muted); }
+.status-list .count { font-weight: 600; color: var(--text-heading); font-variant-numeric: tabular-nums; }
+
+/* ---- the one tooltip: value first, label second ---- */
+
+.viz-tip {
+    position: fixed;
+    z-index: 60;
+    max-width: 240px;
+    padding: .45rem .65rem;
+    border-radius: 6px;
+    background: var(--navy-deeper);
+    box-shadow: var(--shadow);
+    color: #fff;
+    font-size: .76rem;
+    line-height: 1.35;
+    pointer-events: none;
+}
+
+.viz-tip strong { display: block; font-size: .9rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.viz-tip span { color: #c9d2e6; }
+
+/* The dashboard charts sit two by two, so no card is stranded on a row of its own,
+   and collapse to one column where two would squeeze the labels. */
+.dash .chart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 960px) {
+    .dash .chart-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------------------------------------------------------------- budget */
+
+.budget-table td { vertical-align: top; }
+.budget-table input:not([type=hidden]) {
+    padding: .35rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font: inherit;
+    color: var(--text-body);
+    background: #fff;
+    width: 100%;
+    min-width: 8rem;
+}
+.budget-table td.num input { text-align: right; max-width: 10rem; }
+.budget-table input:focus {
+    outline: none;
+    border-color: var(--green-accent);
+    box-shadow: 0 0 0 3px rgba(74, 170, 60, .15);
+}
+.net-of-net { max-width: 36rem; }
+
+/* The form's default button: reachable by Enter, invisible to everyone else. */
+.default-submit { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.budget-add { align-items: center; }
+.budget-add select {
+    padding: .3rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: .85rem;
+    background: #fff;
+    max-width: 100%;
+}
+
+/* ==========================================================================
+   Site signature - the live network, aurora and pulse from the public site
+   (hero-network-bg, hero-dark, auth-side), so the console reads as the same
+   product. network.js animates any canvas[data-network].
+   ========================================================================== */
+
+.network-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .9;
+}
+
+/* Cursor spotlight that follows the mouse over an interactive field. */
+.network-glow {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 30%), rgba(74, 170, 60, .16), transparent 68%);
+    opacity: 0;
+    transition: opacity .5s ease;
+}
+.hero-dark:hover .network-glow { opacity: 1; }
+@media (prefers-reduced-motion: reduce), (hover: none) {
+    .network-glow { display: none; }
+}
+
+.pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-accent);
+    flex-shrink: 0;
+    display: inline-block;
+    animation: pulseDot 1.8s ease-out infinite;
+}
+@keyframes pulseDot {
+    0%   { box-shadow: 0 0 0 0 rgba(74, 170, 60, .55); }
+    70%  { box-shadow: 0 0 0 8px rgba(74, 170, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(74, 170, 60, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .pulse-dot { animation: none; }
+}
+
+.hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: .5px solid rgba(255, 255, 255, .22);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, .88);
+    background: rgba(255, 255, 255, .06);
+    backdrop-filter: blur(6px);
+    margin-bottom: 1.25rem;
+}
+
+.btn-lg { padding: .75rem 1.4rem; font-size: .9rem; }
+
+/* ---- page header band: the site's interior page-header, behind every page title ---- */
+
+/* The band sits behind the page without lifting every child into its own layer -
+   which would let a later card cover an earlier one's chart tooltip. */
+.content { position: relative; isolation: isolate; }
+
+.content-band {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 230px;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+        radial-gradient(420px 260px at 12% 0%, rgba(74, 170, 60, .12), transparent 65%),
+        radial-gradient(480px 300px at 92% 10%, rgba(30, 54, 116, .10), transparent 65%),
+        linear-gradient(180deg, #f2f5fb 0%, rgba(246, 247, 249, 0) 100%);
+    -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+.content-band .network-bg { opacity: .45; }
+
+/* ---- dark hero: the dashboard's headline figure, on the site's hero ---- */
+
+.hero.hero-dark {
+    position: relative;
+    overflow: hidden;
+    border: 0;
+    color: rgba(255, 255, 255, .78);
+    background:
+        radial-gradient(560px 420px at 12% 10%, rgba(74, 170, 60, .22), transparent 60%),
+        radial-gradient(620px 480px at 88% 90%, rgba(109, 218, 155, .16), transparent 60%),
+        linear-gradient(135deg, var(--navy-deeper) 0%, var(--navy-dark) 52%, var(--navy) 100%);
+    box-shadow: 0 10px 30px rgba(13, 26, 56, .18);
+}
+.hero.hero-dark > :not(.network-bg):not(.network-glow) { position: relative; z-index: 1; }
+.hero-dark .hero-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: rgba(255, 255, 255, .78);
+}
+.hero-dark .hero-value { color: #fff; }
+.hero-dark .hero-note,
+.hero-dark .muted { color: rgba(255, 255, 255, .68); }
+.hero-dark .hero-facts { border-color: rgba(255, 255, 255, .14); }
+.hero-dark .hero-facts dt { color: rgba(255, 255, 255, .62); }
+.hero-dark .hero-facts dd { color: #fff; }
+.hero-dark a { color: #7be07f; }
+
+/* ---- sign in: the site's split log-in page ---- */
+
+.auth-wrap { min-height: 100vh; display: flex; align-items: stretch; background: #fff; }
+
+.auth-panel {
+    flex: 1;
+    max-width: 460px;
+    margin: 0 auto;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.auth-logo { height: 40px; width: auto; display: block; margin-bottom: 2.25rem; }
+.auth-title { font-size: 28px; color: var(--navy); margin-bottom: .4rem; }
+.auth-sub { font-size: 13.5px; color: var(--text-muted); margin: 0 0 2rem; }
+
+.auth-side {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    background:
+        radial-gradient(560px 420px at 12% 10%, rgba(74, 170, 60, .22), transparent 60%),
+        radial-gradient(620px 480px at 88% 90%, rgba(109, 218, 155, .16), transparent 60%),
+        linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 55%, var(--navy-deeper) 100%);
+}
+.auth-side-content { position: relative; z-index: 1; max-width: 400px; }
+.auth-side h2 { font-size: 42px; color: #fff; line-height: 1.1; margin-bottom: 1rem; }
+.auth-side h2 em { color: #7be07f; }
+.auth-side p { font-size: 14px; color: rgba(255, 255, 255, .72); line-height: 1.75; margin: 0; }
+
+@media (max-width: 860px) {
+    .auth-side { display: none; }
+    .auth-panel { padding: 2rem 1.5rem; }
 }

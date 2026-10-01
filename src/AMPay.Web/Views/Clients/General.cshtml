@@ -8,7 +8,7 @@
 <div class="page-head">
     <h1>@(isNew ? "Capture a new client" : Model.FirstName + " " + Model.Surname)</h1>
     <p class="lede">
-        Step 1 of 13 &mdash; general details. Everything the DebiCheck mandate needs about who
+        @OnboardingSteps.Caption(OnboardingStep.General) &mdash; general details. Everything the DebiCheck mandate needs about who
         this person is.
     </p>
 </div>

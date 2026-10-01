@@ -1,0 +1,138 @@
+using System.Globalization;
+using AMPay.Domain.Credit;
+using AMPay.Domain.Enums;
+using Microsoft.Extensions.Options;
+
+namespace AMPay.Infrastructure.Credit;
+
+/// <summary>
+/// NCA s78-81 affordability assessment.
+/// <para>
+/// Discretionary income is net income less the applied expense floor and existing debt
+/// service. The floor is the <em>greater</em> of what the client declared and the
+/// Regulation 23A(7) minimum for their income band - a client who under-declares their
+/// living costs, whether to qualify or through optimism, must not be lent into hardship on
+/// the strength of it.
+/// </para>
+/// </summary>
+public class AffordabilityService : IAffordabilityService
+{
+
+    private readonly AffordabilityNorms _norms;
+
+    public AffordabilityService(IOptions<AffordabilityNorms> norms) => _norms = norms.Value;
+
+    public AffordabilityResult Assess(AffordabilityInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        // Other income moves the client up the bands as surely as salary does: the norm is
+        // what a household on that total income is assumed to spend.
+        var statutoryMinimum = Round(_norms.MinimumExpensesFor(input.TotalGrossIncome));
+
+        // Without income there is nothing to assess. This is a data gap, not a decline -
+        // the distinction matters, because a decline is reportable and a gap is fixable.
+        // Salary is required even when there is other income: this lender advances against
+        // a payslip, and other income alone is declared rather than evidenced.
+        if (input.NetMonthlyIncome <= 0 || input.GrossMonthlyIncome <= 0)
+        {
+            return new AffordabilityResult
+            {
+                Outcome = AffordabilityOutcome.Insufficient,
+                StatutoryMinimumExpenses = statutoryMinimum,
+                AppliedExpenses = 0m,
+                DiscretionaryIncome = 0m,
+                SurplusAfterInstalment = 0m,
+                UtilisationRatio = 0m,
+                MaximumAffordableInstalment = 0m,
+                Reasoning =
+                    "No income on file. Capture gross and net monthly income on the client " +
+                    "Financial tab before assessing affordability."
+            };
+        }
+
+        var applied = Math.Max(Round(input.DeclaredMonthlyExpenses), statutoryMinimum);
+        var discretionary = Round(input.TotalNetIncome - applied - input.ExistingDebtRepayments);
+        var surplus = Round(discretionary - input.ProposedInstalment);
+
+        var utilisation = discretionary > 0
+            ? Math.Round(input.ProposedInstalment / discretionary, 4, MidpointRounding.AwayFromZero)
+            : 0m;
+
+        var maxAffordable = discretionary > 0 ? discretionary : 0m;
+
+        var usingStatutory = statutoryMinimum > Round(input.DeclaredMonthlyExpenses);
+        var floorNote = usingStatutory
+            ? $" The Regulation 23A minimum of {Money(statutoryMinimum)} was applied instead of the " +
+              $"declared {Money(input.DeclaredMonthlyExpenses)}, being the higher of the two."
+            : $" The declared expenses of {Money(input.DeclaredMonthlyExpenses)} exceed the " +
+              $"Regulation 23A minimum of {Money(statutoryMinimum)} and were used.";
+
+        var income = input.OtherMonthlyIncome > 0
+            ? $"Net income {Money(input.NetMonthlyIncome)} plus other income " +
+              $"{Money(input.OtherMonthlyIncome)}"
+            : $"Net income {Money(input.NetMonthlyIncome)}";
+
+        var basis =
+            $"{income} less expenses {Money(applied)} " +
+            $"less existing debt {Money(input.ExistingDebtRepayments)} leaves discretionary " +
+            $"income of {Money(discretionary)}.{floorNote}";
+
+        AffordabilityOutcome outcome;
+        string verdict;
+
+        if (discretionary <= 0)
+        {
+            outcome = AffordabilityOutcome.Fail;
+            verdict =
+                " There is no discretionary income. No further credit may be advanced - " +
+                "doing so would be reckless under s80 of the National Credit Act.";
+        }
+        else if (input.ProposedInstalment > discretionary)
+        {
+            outcome = AffordabilityOutcome.Fail;
+            verdict =
+                $" The proposed instalment of {Money(input.ProposedInstalment)} exceeds that by " +
+                $"{Money(input.ProposedInstalment - discretionary)}. The client cannot service " +
+                $"this loan. The largest instalment that fits is {Money(maxAffordable)}.";
+        }
+        else if (utilisation > _norms.MarginalUtilisationThreshold)
+        {
+            outcome = AffordabilityOutcome.Marginal;
+            verdict =
+                $" The proposed instalment of {Money(input.ProposedInstalment)} consumes " +
+                $"{utilisation:P1} of it, leaving {Money(surplus)}. That is within the client's " +
+                $"means but above the {_norms.MarginalUtilisationThreshold:P0} comfort threshold, " +
+                "so it needs a human decision.";
+        }
+        else
+        {
+            outcome = AffordabilityOutcome.Pass;
+            verdict =
+                $" The proposed instalment of {Money(input.ProposedInstalment)} consumes " +
+                $"{utilisation:P1} of it, leaving {Money(surplus)} a month.";
+        }
+
+        return new AffordabilityResult
+        {
+            Outcome = outcome,
+            StatutoryMinimumExpenses = statutoryMinimum,
+            AppliedExpenses = applied,
+            DiscretionaryIncome = discretionary,
+            SurplusAfterInstalment = surplus,
+            UtilisationRatio = utilisation,
+            MaximumAffordableInstalment = maxAffordable,
+            Reasoning = basis + verdict
+        };
+    }
+
+    /// <summary>
+    /// R 14,500.00 - the same shape as every other amount in the app. Not the en-ZA culture
+    /// format (R14 500,00): this text sits on screen next to figures formatted the other way.
+    /// </summary>
+    private static string Money(decimal value) =>
+        "R " + value.ToString("N2", CultureInfo.InvariantCulture);
+
+    private static decimal Round(decimal value) =>
+        Math.Round(value, 2, MidpointRounding.AwayFromZero);
+}

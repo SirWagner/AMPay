@@ -123,12 +123,15 @@ than thirteen independent forms — a part-finished capture survives the operato
 browser.
 
 Steps 1–7 (General, Employment, Financial, Banking, Payback, Address, Other details) are
-built and carry everything Netcash needs to authenticate a collection. Steps 8–13 are not,
-and none of them block a mandate:
+built and carry everything Netcash needs to authenticate a collection. Budgets (step 9) is
+captured on the Financial step, beside the income it is set against: the Maxmoney budget
+lines, an "Add expense" line, and the NET of NET — income less the greater of the budget and
+the Regulation 23A minimum, less debt instalments. The rest of steps 8–13 are not built, and
+none of them block a mandate:
 
 | Step | What is missing |
 |---|---|
-| References, Budgets, Notes | Plain CRUD over entities that already exist. |
+| References, Notes | Plain CRUD over entities that already exist. |
 | Credit check | A decision: Compuscan/Experian directly, or Netcash risk reports (service id 3). See `ICreditBureauClient`. |
 | Documents, Photograph | Azure Blob Storage — private container, downloads through an authorised action, never a public URL. |
 

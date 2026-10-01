@@ -9,7 +9,7 @@
 <div class="page-head">
     <h1>@wizard.ClientName</h1>
     <p class="lede">
-        Step 4 of 13 &mdash; banking. The account DebiCheck will collect from. Only banks that
+        @OnboardingSteps.Caption(OnboardingStep.Banking) &mdash; banking. The account DebiCheck will collect from. Only banks that
         participate in DebiCheck are listed.
     </p>
 </div>
@@ -143,7 +143,7 @@
                 </div>
                 <div class="card-foot">
                     <button type="submit" class="btn btn-primary">Add account</button>
-                    <a asp-action="Payback" asp-route-id="@Model.ClientId" class="btn btn-navy">Continue to payback</a>
+                    <a asp-action="Address" asp-route-id="@Model.ClientId" class="btn btn-navy">Continue to address</a>
                 </div>
             </div>
         </form>

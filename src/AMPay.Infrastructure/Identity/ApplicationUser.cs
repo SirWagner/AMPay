@@ -54,11 +54,23 @@ public static class AppRoles
     /// <summary>Read-only access within one tenant.</summary>
     public const string Viewer = "Viewer";
 
+    /// <summary>
+    /// Verifies supporting documents and nothing else. Sees a client's identifying details
+    /// and their uploaded files so the two can be compared, but cannot capture, amend,
+    /// originate a mandate or raise a loan.
+    /// <para>
+    /// The narrowness is the point. Verification is a control, and a control performed by
+    /// the same person who captured the file is not a control.
+    /// </para>
+    /// </summary>
+    public const string Reviewer = "Reviewer";
+
     public static readonly IReadOnlyDictionary<string, string> All = new Dictionary<string, string>
     {
         [SuperAdmin] = "AM-Pay platform administrator. Full cross-tenant access.",
         [TenantAdmin] = "Administers one customer account, its users and its Netcash service keys.",
-        [Capturer] = "Captures clients and originates DebiCheck mandates.",
+        [Capturer] = "Onboards clients and originates DebiCheck mandates.",
+        [Reviewer] = "Verifies client documents only. No capture, no mandates, no lending.",
         [Viewer] = "Read-only access to one customer account."
     };
 }
@@ -74,4 +86,23 @@ public static class AppPolicies
 
     /// <summary>Creating or changing client and mandate data.</summary>
     public const string CanCapture = "CanCapture";
+
+    /// <summary>
+    /// Approving or rejecting supporting documents. Satisfied by a Reviewer, and by the
+    /// administrator roles so that a small office is not locked out of its own queue.
+    /// Deliberately NOT satisfied by Capturer.
+    /// </summary>
+    public const string CanReviewDocuments = "CanReviewDocuments";
+
+    /// <summary>
+    /// Seeing a client file and its documents. Everyone who works a client can read one.
+    /// </summary>
+    public const string CanViewClients = "CanViewClients";
+
+    /// <summary>
+    /// Taking the credit decision: approving, declining, overriding an affordability flag,
+    /// marking a loan disbursed, and repricing the credit packages. A capturer quotes and
+    /// submits; an administrator decides.
+    /// </summary>
+    public const string CanApproveCredit = "CanApproveCredit";
 }

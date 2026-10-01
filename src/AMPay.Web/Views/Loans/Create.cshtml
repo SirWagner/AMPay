@@ -1,0 +1,326 @@
+@model AMPay.Web.Models.LoanCreateModel
+@{
+    ViewData["Title"] = "Raise a loan";
+    string Pct(decimal fraction, int dp = 2) => (fraction * 100m).ToString("N" + dp) + "%";
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Raise a loan</h1>
+        <p class="lede">
+            For <strong>@Model.ClientName</strong> <span class="mono">(@Model.ClientNumber)</span>.
+            Choose a package, the amount and the number of instalments &mdash; the instalment,
+            fees and repayment schedule are calculated for you.
+        </p>
+    </div>
+    <a asp-controller="Clients" asp-action="Details" asp-route-id="@Model.ClientId" class="btn btn-outline">Back to client</a>
+</div>
+
+@if (!Model.HasFinancials)
+{
+    <div class="alert alert-warn">
+        This client has no income on file, so affordability cannot be assessed and the loan
+        cannot be submitted. Capture gross and net monthly income on the
+        <a asp-controller="Clients" asp-action="Financial" asp-route-id="@Model.ClientId">Financial step</a> first.
+    </div>
+}
+
+<form asp-action="Create" method="post" id="loanForm">
+    <input type="hidden" asp-for="ClientId" />
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="loan-layout">
+        <div>
+            <div class="card">
+                <div class="card-head"><h2>Credit package</h2></div>
+                <div class="card-body">
+                    <div class="package-grid">
+                        @foreach (var p in Model.Packages)
+                        {
+                            <label class="package-option">
+                                <input type="radio" name="CreditPackageId" value="@p.Id"
+                                       checked="@(Model.CreditPackageId == p.Id)"
+                                       data-min-loan="@p.MinLoanAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                       data-max-loan="@p.MaxLoanAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                       data-min-term="@p.MinTermMonths"
+                                       data-max-term="@p.MaxTermMonths" />
+                                <span class="package-body">
+                                    <span class="package-name">@p.Name</span>
+                                    <span class="package-rate">@Pct(p.MonthlyInterestRate) <small>per month</small></span>
+                                    <span class="package-meta">
+                                        R @p.MonthlyServiceFee.ToString("N2") service fee &middot;
+                                        @Pct(p.InitiationFeeRate, 0) initiation &middot;
+                                        @Pct(p.CreditLifeRate) credit life
+                                    </span>
+                                    <span class="package-meta">
+                                        R @p.MinLoanAmount.ToString("N0") &ndash; R @p.MaxLoanAmount.ToString("N0")
+                                        &middot; @p.MinTermMonths&ndash;@p.MaxTermMonths months
+                                    </span>
+                                </span>
+                            </label>
+                        }
+                    </div>
+                    <span asp-validation-for="CreditPackageId" class="field-error"></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Amount and term</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label asp-for="Principal"></label>
+                            <input asp-for="Principal" type="number" step="0.01" min="1" />
+                            <span class="hint" id="principalHint">The amount the client receives.</span>
+                            <span asp-validation-for="Principal" class="field-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="NumberOfInstalments"></label>
+                            <input asp-for="NumberOfInstalments" type="number" step="1" min="1" />
+                            <span class="hint" id="termHint">Monthly instalments.</span>
+                            <span asp-validation-for="NumberOfInstalments" class="field-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="FirstCollectionDate"></label>
+                            <input asp-for="FirstCollectionDate" type="date" />
+                            <span class="hint">Defaults to the client's next pay day, at least a week away.</span>
+                            <span asp-validation-for="FirstCollectionDate" class="field-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="TrackingDays"></label>
+                            <input asp-for="TrackingDays" type="number" min="1" max="10" />
+                            <span class="hint">Days the bank may keep retrying a failed collection (1&ndash;10).</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <aside>
+            <div class="card quote-card">
+                <div class="card-head"><h2>Quote</h2></div>
+                <div class="card-body" id="quotePanel">
+                    <p class="muted small mb-0" id="quotePrompt">
+                        Enter an amount and the number of instalments to see the quote.
+                    </p>
+
+                    <div id="quoteBody" hidden>
+                        <div class="quote-headline">
+                            <span class="label">Monthly instalment</span>
+                            <span class="value" id="qInstalment">&ndash;</span>
+                            <span class="note" id="qInstalmentNote"></span>
+                        </div>
+
+                        <table class="data quote-table">
+                            <tbody>
+                            <tr><td>Loan amount</td><td class="num" id="qPrincipal"></td></tr>
+                            <tr><td>Initiation fee <span class="muted small">(added to the loan)</span></td><td class="num" id="qInitiation"></td></tr>
+                            <tr><td>Interest <span class="muted small" id="qRate"></span></td><td class="num" id="qInterest"></td></tr>
+                            <tr><td>Service fees <span class="muted small" id="qFee"></span></td><td class="num" id="qServiceFees"></td></tr>
+                            <tr><td>Credit life insurance <span class="muted small" id="qLifeRate"></span></td><td class="num" id="qCreditLife"></td></tr>
+                            <tr class="total"><td>Total repayable</td><td class="num" id="qTotal"></td></tr>
+                            <tr><td class="muted">Total cost of credit</td><td class="num muted" id="qCost"></td></tr>
+                            </tbody>
+                        </table>
+
+                        <div id="qNotices"></div>
+                        <div id="qAffordability"></div>
+                    </div>
+
+                    <div class="alert alert-error" id="quoteError" hidden></div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-primary" id="submitLoan"
+                            disabled="@(!Model.HasFinancials)">Submit for approval</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="card" id="scheduleCard" hidden>
+        <div class="card-head"><h2>Repayment schedule</h2></div>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Due</th>
+                    <th class="num">Opening balance</th>
+                    <th class="num">Interest</th>
+                    <th class="num">Capital</th>
+                    <th class="num">Service fee</th>
+                    <th class="num">Credit life</th>
+                    <th class="num">Instalment</th>
+                    <th class="num">Closing balance</th>
+                </tr>
+                </thead>
+                <tbody id="scheduleRows"></tbody>
+            </table>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+(function () {
+    var form = document.getElementById('loanForm');
+    var quoteUrl = '@Url.Action("Quote")';
+    var clientId = '@Model.ClientId';
+    var hasFinancials = @(Model.HasFinancials ? "true" : "false");
+
+    var el = function (id) { return document.getElementById(id); };
+
+    // Same shape as the server's N2 formatting, so figures read identically everywhere.
+    var money = function (n) {
+        return 'R ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    var pct = function (f, dp) { return (Number(f) * 100).toFixed(dp === undefined ? 2 : dp) + '%'; };
+    var date = function (iso) {
+        return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+    var esc = function (s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    };
+
+    function selectedPackage() {
+        return form.querySelector('input[name="CreditPackageId"]:checked');
+    }
+
+    function updateHints() {
+        var p = selectedPackage();
+        if (!p) return;
+        el('principalHint').textContent =
+            'The amount the client receives. This package lends ' +
+            money(p.dataset.minLoan) + ' to ' + money(p.dataset.maxLoan) + '.';
+        el('termHint').textContent =
+            'Monthly instalments, ' + p.dataset.minTerm + ' to ' + p.dataset.maxTerm + ' on this package.';
+    }
+
+    function showError(message) {
+        el('quoteBody').hidden = true;
+        el('scheduleCard').hidden = true;
+        el('quotePrompt').hidden = true;
+        el('quoteError').hidden = false;
+        el('quoteError').textContent = message;
+        el('submitLoan').disabled = true;
+    }
+
+    function render(q) {
+        el('quotePrompt').hidden = true;
+        el('quoteError').hidden = true;
+        el('quoteBody').hidden = false;
+        el('scheduleCard').hidden = false;
+
+        el('qInstalment').textContent = money(q.firstInstalment);
+        el('qInstalmentNote').textContent = q.firstInstalment === q.finalInstalment
+            ? 'for ' + q.numberOfInstalments + ' months'
+            : 'first instalment, falling to ' + money(q.finalInstalment) +
+              ' as the balance reduces';
+
+        el('qPrincipal').textContent = money(q.principal);
+        el('qInitiation').textContent = money(q.initiationFee);
+        el('qRate').textContent = '(' + pct(q.monthlyInterestRate) + ' per month)';
+        el('qInterest').textContent = money(q.totalInterest);
+        el('qFee').textContent = '(' + money(q.monthlyServiceFee) + ' per month)';
+        el('qServiceFees').textContent = money(q.totalServiceFees);
+        el('qLifeRate').textContent = '(' + pct(q.creditLifeRate) + ' of the balance per month)';
+        el('qCreditLife').textContent = money(q.totalCreditLife);
+        el('qTotal').textContent = money(q.totalRepayable);
+        el('qCost').textContent = money(q.totalCostOfCredit);
+
+        el('qNotices').innerHTML = (q.notices || []).map(function (n) {
+            return '<div class="alert alert-info small">' + esc(n) + '</div>';
+        }).join('');
+
+        var a = q.affordability;
+        if (!a) {
+            el('qAffordability').innerHTML =
+                '<div class="alert alert-warn small">Affordability cannot be assessed: no income on file.</div>';
+        } else {
+            var tone = { Pass: 'alert-success', Marginal: 'alert-warn', Fail: 'alert-error' }[a.outcome] || 'alert-info';
+            var title = {
+                Pass: 'Affordable',
+                Marginal: 'Marginal — needs an approver’s reason',
+                Fail: 'Not affordable',
+                Insufficient: 'Cannot assess'
+            }[a.outcome] || a.outcome;
+            el('qAffordability').innerHTML =
+                '<div class="alert ' + tone + ' small affordability">' +
+                '<strong>' + esc(title) + '</strong>' +
+                '<div>' + esc(a.reasoning) + '</div></div>';
+        }
+
+        el('scheduleRows').innerHTML = q.schedule.map(function (r) {
+            return '<tr>' +
+                '<td>' + r.instalmentNumber + '</td>' +
+                '<td>' + date(r.dueDate) + '</td>' +
+                '<td class="num">' + money(r.openingBalance) + '</td>' +
+                '<td class="num">' + money(r.interestPortion) + '</td>' +
+                '<td class="num">' + money(r.capitalPortion) + '</td>' +
+                '<td class="num">' + money(r.serviceFee) + '</td>' +
+                '<td class="num">' + money(r.creditLifePremium) + '</td>' +
+                '<td class="num"><strong>' + money(r.instalmentTotal) + '</strong></td>' +
+                '<td class="num">' + money(r.closingBalance) + '</td>' +
+                '</tr>';
+        }).join('');
+
+        el('submitLoan').disabled = !hasFinancials ||
+            (a && a.outcome === 'Insufficient');
+    }
+
+    var pending = null, sequence = 0;
+
+    function requote() {
+        var p = selectedPackage();
+        var principal = form.elements['Principal'].value;
+        var instalments = form.elements['NumberOfInstalments'].value;
+        var first = form.elements['FirstCollectionDate'].value;
+
+        if (!p || !principal || !instalments) {
+            el('quoteBody').hidden = true;
+            el('scheduleCard').hidden = true;
+            el('quoteError').hidden = true;
+            el('quotePrompt').hidden = false;
+            el('submitLoan').disabled = true;
+            return;
+        }
+
+        var params = new URLSearchParams({
+            clientId: clientId, packageId: p.value,
+            principal: principal, instalments: instalments
+        });
+        if (first) params.append('firstCollection', first);
+
+        // Only the most recent request may paint the panel; an older, slower response
+        // arriving late would otherwise overwrite the figures for what was typed last.
+        var mine = ++sequence;
+
+        fetch(quoteUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (q) {
+                if (mine !== sequence) return;
+                if (q.ok) render(q); else showError(q.error || 'This loan cannot be quoted.');
+            })
+            .catch(function () {
+                if (mine === sequence) showError('The quote could not be calculated. Try again.');
+            });
+    }
+
+    function schedule() {
+        clearTimeout(pending);
+        pending = setTimeout(requote, 250);
+    }
+
+    form.addEventListener('input', schedule);
+    form.addEventListener('change', function (e) {
+        if (e.target.name === 'CreditPackageId') updateHints();
+        schedule();
+    });
+
+    updateHints();
+    requote();
+})();
+</script>
+}

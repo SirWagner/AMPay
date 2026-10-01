@@ -1,0 +1,234 @@
+@model AMPay.Web.Models.ClientDocumentsModel
+@using AMPay.Web.Controllers
+@{
+    ViewData["Title"] = "Documents";
+
+    string Tone(DocumentReviewStatus s) => s switch
+    {
+        DocumentReviewStatus.Approved => "badge-green",
+        DocumentReviewStatus.Rejected => "badge-red",
+        _ => "badge-amber"
+    };
+
+    string Label(DocumentReviewStatus s) => s switch
+    {
+        DocumentReviewStatus.Approved => "Accepted",
+        DocumentReviewStatus.Rejected => "Rejected",
+        _ => "Awaiting review"
+    };
+}
+
+<div class="page-head row-between">
+    <div>
+        <h1>@Model.ClientName</h1>
+        <p class="lede">
+            Client <span class="mono">@Model.ClientNumber</span> &middot;
+            <partial name="_ClientStatus" model="Model.ClientStatus" />
+        </p>
+    </div>
+    <div class="row-actions">
+        @if (Model.CanOpenClientFile)
+        {
+            <a asp-controller="Clients" asp-action="Details" asp-route-id="@Model.ClientId"
+               class="btn btn-outline">Back to client</a>
+        }
+        else
+        {
+            <a asp-action="Index" class="btn btn-outline">Back to the queue</a>
+        }
+    </div>
+</div>
+
+@if (Model.Outstanding.Count > 0)
+{
+    <div class="alert alert-info">
+        Still required before this client can be onboarded:
+        <strong>@string.Join(", ", Model.Outstanding.Select(DocumentsController.Describe))</strong>.
+    </div>
+}
+else if (Model.ClientStatus == ClientStatus.PendingVerification)
+{
+    <div class="alert alert-info">
+        All required documents are on file and waiting for a reviewer. The client is
+        onboarded automatically once the identity document and payslip are both accepted.
+    </div>
+}
+
+<div class="chart-grid">
+    @* A reviewer cannot upload - the POST would refuse them, so do not offer the form. *@
+    @if (Model.CanOpenClientFile)
+    {
+    <div class="card">
+        <div class="card-head"><h3>Upload a document</h3></div>
+        <div class="card-body">
+            <form asp-action="Upload" asp-route-id="@Model.ClientId" method="post"
+                  enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+
+                <div class="field">
+                    <label for="documentType">Document type</label>
+                    <select id="documentType" name="documentType" required>
+                        @foreach (var t in Enum.GetValues<DocumentType>())
+                        {
+                            <option value="@t" selected="@(Model.Outstanding.Contains(t))">
+                                @DocumentsController.Describe(t)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="file">File</label>
+                    <input type="file" id="file" name="file" required
+                           accept="@Model.AcceptedExtensions" />
+                    <span class="muted small">
+                        @Model.AcceptedExtensions &middot; up to @Model.MaxFileSizeDisplay.
+                        A clear photograph of the original is acceptable.
+                    </span>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </form>
+        </div>
+    </div>
+    }
+
+    <div class="card">
+        <div class="card-head"><h3>Check the documents against this</h3></div>
+        <div class="card-body">
+            <dl class="detail-list">
+                <dt>@(Model.IsSaIdNumber ? "SA ID number" : "Passport / registration")</dt>
+                <dd class="mono">@Model.IdNumber</dd>
+
+                @if (Model.DateOfBirth is not null)
+                {
+                    <dt>Date of birth</dt>
+                    <dd>@Model.DateOfBirth.Value.ToString("dd MMMM yyyy")</dd>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.MobileNumber))
+                {
+                    <dt>Mobile</dt>
+                    <dd class="mono">@Model.MobileNumber</dd>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.EmployerName))
+                {
+                    <dt>Employer</dt>
+                    <dd>@Model.EmployerName @if (!string.IsNullOrWhiteSpace(Model.Occupation)) { <span class="muted">&middot; @Model.Occupation</span> }</dd>
+                }
+
+                @if (Model.GrossMonthlyIncome is not null)
+                {
+                    <dt>Gross monthly</dt>
+                    <dd>R @Model.GrossMonthlyIncome.Value.ToString("N2")</dd>
+                }
+
+                @if (Model.NetMonthlyIncome is not null)
+                {
+                    <dt>Net monthly</dt>
+                    <dd>R @Model.NetMonthlyIncome.Value.ToString("N2")</dd>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.BankAccountHolder))
+                {
+                    <dt>Account holder</dt>
+                    <dd>
+                        @Model.BankAccountHolder
+                        <div class="muted small">@Model.BankName &middot; <span class="mono">@Model.MaskedAccountNumber</span></div>
+                    </dd>
+                }
+            </dl>
+
+            <p class="muted small mb-0">
+                The identity document must match the name and number above; the payslip must
+                match the employer and income. Reject anything that does not reconcile.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h3>Documents on file</h3></div>
+
+    @if (Model.Documents.Count == 0)
+    {
+        <div class="empty">Nothing uploaded yet.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>File</th>
+                    <th>Uploaded</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var d in Model.Documents)
+                {
+                    <tr>
+                        <td><strong>@DocumentsController.Describe(d.DocumentType)</strong></td>
+                        <td>
+                            <a asp-action="Download" asp-route-id="@d.Id" target="_blank"
+                               rel="noopener">@d.FileName</a>
+                            <div class="muted small">@d.SizeDisplay</div>
+                        </td>
+                        <td class="muted small">
+                            @d.UploadedUtc.ToString("dd MMM yyyy HH:mm")
+                            @if (d.UploadedBy is not null)
+                            {
+                                <div>by @d.UploadedBy</div>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge @Tone(d.ReviewStatus)">@Label(d.ReviewStatus)</span>
+                            @if (d.ReviewedBy is not null)
+                            {
+                                <div class="muted small">@d.ReviewedBy, @d.ReviewedUtc?.ToString("dd MMM")</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(d.ReviewNotes))
+                            {
+                                <div class="muted small"><em>@d.ReviewNotes</em></div>
+                            }
+                        </td>
+                        <td>
+                            <div class="row-actions">
+                                @if (Model.CanReview && d.ReviewStatus != DocumentReviewStatus.Approved)
+                                {
+                                    <form asp-action="Review" asp-route-id="@d.Id" method="post"
+                                          class="review-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="outcome" value="@DocumentReviewStatus.Approved" />
+                                        <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+                                    </form>
+
+                                    <form asp-action="Review" asp-route-id="@d.Id" method="post"
+                                          class="review-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="outcome" value="@DocumentReviewStatus.Rejected" />
+                                        <input type="text" name="notes" placeholder="Reason for rejection"
+                                               class="inline-reason" />
+                                        <button type="submit" class="btn btn-outline btn-sm">Reject</button>
+                                    </form>
+                                }
+                                @if (d.ReviewStatus != DocumentReviewStatus.Approved)
+                                {
+                                    <form asp-action="Remove" asp-route-id="@d.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline btn-sm">Remove</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
