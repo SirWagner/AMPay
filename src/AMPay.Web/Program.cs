@@ -168,6 +168,23 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 // Applies migrations and seeds roles, the platform tenant and the sudo user.
-await SeedData.InitialiseAsync(app.Services, app.Configuration);
+// Azure SQL's free and serverless tiers pause when idle and take minutes to wake, refusing
+// connections meanwhile (error 40613). Wait for the database rather than crash the app -
+// Azure gives a starting container up to WEBSITES_CONTAINER_START_TIME_LIMIT (600s) here.
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+for (var attempt = 1; ; attempt++)
+{
+    try
+    {
+        await SeedData.InitialiseAsync(app.Services, app.Configuration);
+        break;
+    }
+    catch (Exception ex) when (attempt < 16 && ex is not OperationCanceledException)
+    {
+        startupLog.LogWarning("Database not ready (attempt {Attempt}): {Message} Retrying in 30 seconds.",
+            attempt, ex.GetBaseException().Message);
+        await Task.Delay(TimeSpan.FromSeconds(30));
+    }
+}
 
 app.Run();

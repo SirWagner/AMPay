@@ -88,10 +88,22 @@ app.MapGet("/healthz", async (PortalDbContext db, CancellationToken ct) =>
     await db.Database.CanConnectAsync(ct) ? Results.Text("ok") : Results.Text("database unreachable", statusCode: 503));
 
 // The portal's own database, migrated on start. It never touches AM-Pay's.
-using (var scope = app.Services.CreateScope())
+// A paused free-tier database takes minutes to wake: wait for it rather than crash.
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+for (var attempt = 1; ; attempt++)
 {
-    var db = scope.ServiceProvider.GetRequiredService<PortalDbContext>();
-    await db.Database.MigrateAsync();
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<PortalDbContext>().Database.MigrateAsync();
+        break;
+    }
+    catch (Exception ex) when (attempt < 16 && ex is not OperationCanceledException)
+    {
+        startupLog.LogWarning("Database not ready (attempt {Attempt}): {Message} Retrying in 30 seconds.",
+            attempt, ex.GetBaseException().Message);
+        await Task.Delay(TimeSpan.FromSeconds(30));
+    }
 }
 
 app.Run();
