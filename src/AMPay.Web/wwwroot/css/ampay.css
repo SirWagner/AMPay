@@ -1334,3 +1334,12 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
 .public-foot { max-width: 900px; margin: 0 auto; padding: 0 16px 2rem; color: var(--text-muted); font-size: .78rem; }
 .sign-panel { margin-top: 1.25rem; }
 .pin-input { font-size: 1.4rem; letter-spacing: .4em; max-width: 12rem; text-align: center; }
+
+/* The product the signed-in person is in: "Loan Flow" for a lender, "Platform" for AM-Pay. */
+.sidebar-brand .product-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #fff;
+    margin-top: -.15rem;
+}

@@ -18,7 +18,8 @@ namespace AMPay.Web.Controllers;
 /// that can leak one.
 /// </para>
 /// </summary>
-[Authorize(Policy = AppPolicies.TenantAdministration)]
+// The Netcash integration runs under AM-Pay's ISV number: platform staff only.
+[Authorize(Policy = AppPolicies.PlatformOnly)]
 public class ServiceKeysController : Controller
 {
     private readonly AppDbContext _db;

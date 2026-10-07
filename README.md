@@ -7,6 +7,17 @@ AM-Pay Fintech is the ISV. Customers (NCR-registered lenders and merchants) trad
 each with their own Netcash merchant account and service keys. Albatross Money (NCRCP9166) is
 customer number one.
 
+## How the app is separated
+
+- **AM-Pay Platform** is for AM-Pay. The super admin sees every customer AM-Pay has onboarded,
+  and can open any of them.
+- **AM-Pay Loan Flow** is for the lender. A lender's staff sign in to Loan Flow and see only
+  their own business - their borrowers, loans and settings - never another lender's.
+- **Each customer sees the product they bought.** A customer on Loan Flow lands in Loan Flow;
+  a customer on Payroll (to come) will land in Payroll. The super admin sees it all.
+- **Borrowers** apply through their lender's self-service link (`src/AMPay.Portal`), also
+  branded AM-Pay Loan Flow.
+
 ---
 
 ## Running it

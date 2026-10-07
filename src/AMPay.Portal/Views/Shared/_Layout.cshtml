@@ -35,7 +35,7 @@
             }
             else
             {
-                <strong>Loan application</strong>
+                <strong>AM-Pay Loan Flow</strong>
             }
         </div>
         @if (signedIn)
@@ -64,7 +64,7 @@
             Questions: @(lender.ContactNumber ?? lender.ContactEmail ?? "contact the lender").
         </p>
     }
-    <p>Secure application service by AM-Pay.</p>
+    <p>Powered by <strong>AM-Pay Loan Flow</strong> - secure loan applications.</p>
 </footer>
 <script src="~/js/network.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
