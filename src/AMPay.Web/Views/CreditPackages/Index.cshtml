@@ -23,12 +23,12 @@
     }
 </div>
 
-@if (!canManage)
+@if (canManage)
 {
-    <div class="alert alert-info">
-        Pricing is managed by the AM-Pay platform administrator. Contact them to add a
-        package or change a rate.
-    </div>
+    <p class="muted small">
+        You set your own pricing. Every rate is held to the National Credit Act limits shown on each package, changes
+        apply only to loans quoted afterwards, and every change is recorded with your name.
+    </p>
 }
 
 @if (Model.Count == 0)

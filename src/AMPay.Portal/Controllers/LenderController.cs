@@ -36,6 +36,27 @@ public class LenderController : PortalControllerBase
         });
     }
 
+    /// <summary>The lender's logo for its public pages. Cached: a new logo changes the ?v= in the URL.</summary>
+    [HttpGet("logo")]
+    public async Task<IActionResult> Logo([FromRoute] string code)
+    {
+        var lender = await LenderAsync(code);
+        if (lender is null) return NotFound();
+
+        var logo = await Db.LenderLogos.AsNoTracking().FirstOrDefaultAsync(l => l.LenderId == lender.Id);
+        if (logo is null) return NotFound();
+
+        Response.OnStarting(() =>
+        {
+            // Overrides the no-store set for pages: a logo is public and safe to cache.
+            Response.Headers.CacheControl = "public, max-age=86400";
+            Response.Headers.Remove("Pragma");
+            return Task.CompletedTask;
+        });
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(logo.Data, logo.ContentType);
+    }
+
     // ---------------------------------------------------------------- sign in
 
     [HttpGet("start")]

@@ -27,7 +27,13 @@
         <div>
             @if (lender is not null)
             {
-                <a href="/a/@lender.PublicCode" style="color:#fff;text-decoration:none;"><strong>@lender.DisplayName</strong></a>
+                <a href="/a/@lender.PublicCode" class="lender-brand">
+                    @if (lender.LogoUpdatedUtc is { } logoV)
+                    {
+                        <span class="lender-logo"><img src="/a/@lender.PublicCode/logo?v=@logoV.Ticks" alt="" /></span>
+                    }
+                    <strong>@lender.DisplayName</strong>
+                </a>
                 @if (!string.IsNullOrWhiteSpace(lender.NcrNumber))
                 {
                     <div class="ncr">Registered credit provider @lender.NcrNumber</div>

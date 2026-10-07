@@ -248,3 +248,8 @@ h2 { color: var(--ink); font-size: 1.15rem; margin: 0 0 12px; }
     .network-glow { display: none; }
     .pulse-dot { animation: none; }
 }
+
+/* The lender's own logo in the header, on a white tile so any logo reads on navy. */
+.lender-brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; }
+.lender-logo { background: #fff; border-radius: 8px; padding: 4px 8px; display: inline-flex; align-items: center; }
+.lender-logo img { max-height: 32px; max-width: 140px; object-fit: contain; display: block; }

@@ -91,6 +91,7 @@ builder.Services.AddScoped<INetcashCapabilityService, NetcashCapabilityService>(
 builder.Services.Configure<PortalOptions>(builder.Configuration.GetSection(PortalOptions.SectionName));
 builder.Services.AddHttpClient<IPortalApi, PortalClient>();
 builder.Services.AddScoped<PortalImporter>();
+builder.Services.AddScoped<PortalSync>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
