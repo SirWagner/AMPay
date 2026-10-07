@@ -3,6 +3,8 @@
 @using AMPay.Web.Services
 @using Microsoft.Extensions.Options
 @inject ICurrentTenant CurrentTenant
+@inject AMPay.Infrastructure.Data.AppDbContext Db
+@using Microsoft.EntityFrameworkCore
 @inject IOptions<NetcashOptions> NetcashOptions
 @{
     await CurrentTenant.LoadAsync();
@@ -14,6 +16,11 @@
     // own business; AM-Pay's super admin runs the platform and can open any customer.
     var isPlatform = User.IsInRole(AppRoles.SuperAdmin);
     var product = isPlatform ? "Platform" : "Loan Flow";
+
+    // The lender's own logo, when they have uploaded one. Only the timestamp is read here.
+    DateTime? logoVersion = CurrentTenant.TenantId is { } logoTenant
+        ? await Db.TenantLogos.Where(l => l.TenantId == logoTenant).Select(l => (DateTime?)l.UpdatedUtc).FirstOrDefaultAsync()
+        : null;
 }
 <!DOCTYPE html>
 <html lang="en-ZA">
@@ -48,6 +55,12 @@
                 <span class="sub"><span class="pulse-dot" aria-hidden="true"></span> @(CurrentTenant.TenantName ?? "Loan Flow")</span>
             }
         </a>
+        @if (logoVersion is not null)
+        {
+            <div class="lender-logo" title="@CurrentTenant.TenantName">
+                <img src="/logo/@CurrentTenant.TenantId?v=@logoVersion.Value.Ticks" alt="@CurrentTenant.TenantName" />
+            </div>
+        }
 
     @{
         // A reviewer's world is the queue and nothing else. Showing them links that lead
@@ -93,6 +106,7 @@
             <div class="sidebar-section">Settings</div>
             <a class="nav-link @Active("CreditPackages")" asp-controller="CreditPackages" asp-action="Index">Credit packages</a>
             <a class="nav-link @Active("SelfService")" asp-controller="SelfService" asp-action="Index">Self-service link</a>
+            <a class="nav-link @Active("Branding")" asp-controller="Branding" asp-action="Index">Branding</a>
             <a class="nav-link @Active("ContractTemplates")" asp-controller="ContractTemplates" asp-action="Index">Contract wording</a>
             <a class="nav-link @Active("Outbox")" asp-controller="Outbox" asp-action="Index">Messages sent</a>
             <a class="nav-link @Active("Users")" asp-controller="Users" asp-action="Index">Users</a>

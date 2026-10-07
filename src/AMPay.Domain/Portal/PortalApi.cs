@@ -84,7 +84,10 @@ public record PortalLenderSync(
     string? ContactEmail,
     string? WhatsAppNumber,
     bool IsActive,
-    IReadOnlyList<PortalPackage> Packages);
+    IReadOnlyList<PortalPackage> Packages,
+    string? LogoContentType = null,
+    /// <summary>The lender's logo (PNG, JPEG or WebP, 300 KB at most), base64. Null removes it.</summary>
+    string? LogoBase64 = null);
 
 public record PortalPackage(
     string Name,

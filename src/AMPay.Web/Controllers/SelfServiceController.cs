@@ -19,13 +19,15 @@ public class SelfServiceController : Controller
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
     private readonly IPortalApi _portal;
+    private readonly PortalSync _sync;
     private readonly ILogger<SelfServiceController> _log;
 
-    public SelfServiceController(AppDbContext db, ICurrentTenant tenant, IPortalApi portal, ILogger<SelfServiceController> log)
+    public SelfServiceController(AppDbContext db, ICurrentTenant tenant, IPortalApi portal, PortalSync sync, ILogger<SelfServiceController> log)
     {
         _db = db;
         _tenant = tenant;
         _portal = portal;
+        _sync = sync;
         _log = log;
     }
 
@@ -120,8 +122,7 @@ public class SelfServiceController : Controller
     {
         try
         {
-            var packages = await _db.CreditPackages.AsNoTracking().Where(p => p.TenantId == t.Id).ToListAsync();
-            await _portal.PutLenderAsync(code, PortalClient.SyncFor(t, packages));
+            await _sync.PushAsync(t, code);
             return true;
         }
         catch (PortalUnavailableException ex)

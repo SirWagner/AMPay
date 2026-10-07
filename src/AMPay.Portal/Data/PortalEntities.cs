@@ -30,6 +30,9 @@ public class Lender
 
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
+    /// <summary>When the logo last changed; null when there is none. The bytes live in LenderLogo.</summary>
+    public DateTime? LogoUpdatedUtc { get; set; }
+
     public string DisplayName => string.IsNullOrWhiteSpace(TradingName) ? Name : TradingName;
 }
 
@@ -159,4 +162,12 @@ public class OtpChallenge
     public int FailedAttempts { get; set; }
     public DateTime? ConsumedUtc { get; set; }
     public string? RequestIp { get; set; }
+}
+
+/// <summary>A lender's logo, in its own table so pages that load the lender never load the bytes.</summary>
+public class LenderLogo
+{
+    public Guid LenderId { get; set; }
+    public string ContentType { get; set; } = "image/png";
+    public byte[] Data { get; set; } = Array.Empty<byte>();
 }

@@ -13,6 +13,7 @@ public class PortalDbContext : DbContext
     public DbSet<ApplicationDocument> Documents => Set<ApplicationDocument>();
     public DbSet<CallbackRequest> Callbacks => Set<CallbackRequest>();
     public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
+    public DbSet<LenderLogo> LenderLogos => Set<LenderLogo>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -90,6 +91,14 @@ public class PortalDbContext : DbContext
             e.Property(x => x.RequestIp).HasMaxLength(64);
             e.HasIndex(x => new { x.LenderId, x.HandledUtc });
             e.HasOne(x => x.Lender).WithMany().HasForeignKey(x => x.LenderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<LenderLogo>(e =>
+        {
+            e.HasKey(x => x.LenderId);
+            e.HasOne<Lender>().WithOne().HasForeignKey<LenderLogo>(x => x.LenderId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Data).IsRequired();
         });
 
         b.Entity<OtpChallenge>(e =>

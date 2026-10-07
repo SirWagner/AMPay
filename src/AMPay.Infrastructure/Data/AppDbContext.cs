@@ -10,6 +10,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
     public DbSet<TenantServiceKey> TenantServiceKeys => Set<TenantServiceKey>();
 
     public DbSet<Client> Clients => Set<Client>();
@@ -129,6 +130,15 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
             // Only one tenant may be the platform owner.
             e.HasIndex(x => x.IsPlatformOwner).IsUnique().HasFilter("[IsPlatformOwner] = 1");
+        });
+
+        b.Entity<TenantLogo>(e =>
+        {
+            e.HasKey(x => x.TenantId);
+            e.HasOne(x => x.Tenant).WithOne().HasForeignKey<TenantLogo>(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Data).IsRequired();
+            e.Property(x => x.UpdatedByUserId).HasMaxLength(64);
         });
 
         b.Entity<TenantServiceKey>(e =>

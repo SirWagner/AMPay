@@ -14,10 +14,11 @@ namespace AMPay.Web.Controllers;
 /// <summary>
 /// The price lists every loan is quoted against, per customer account.
 /// <para>
-/// Pricing is set by the AM-Pay platform administrator and nobody else. A customer's own
-/// administrator can see their packages - they need to know what they are selling - but
-/// cannot change them: the rates are regulated, and a customer repricing its own book is a
-/// compliance exposure for the platform whose ISV number the collections run under.
+/// Each lender prices its own book: its administrators (and AM-Pay's super admin) create
+/// and edit packages. What they cannot do is break the law - every rate is checked here
+/// against the configured NCA ceilings, and the pricing engine clamps again when it quotes.
+/// Every change is logged with who made it, and a lender with a self-service link has its
+/// new packages sent to the portal so client estimates stay right.
 /// </para>
 /// <para>
 /// Repricing affects only loans quoted afterwards. Every loan copies the rates it was
@@ -30,17 +31,20 @@ public class CreditPackagesController : Controller
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
     private readonly NcaCreditLimits _limits;
+    private readonly PortalSync _portalSync;
     private readonly ILogger<CreditPackagesController> _log;
 
     public CreditPackagesController(
         AppDbContext db,
         ICurrentTenant tenant,
         IOptions<NcaCreditLimits> limits,
+        PortalSync portalSync,
         ILogger<CreditPackagesController> log)
     {
         _db = db;
         _tenant = tenant;
         _limits = limits.Value;
+        _portalSync = portalSync;
         _log = log;
     }
 
@@ -63,7 +67,7 @@ public class CreditPackagesController : Controller
             .ToListAsync();
 
         ViewBag.Limits = _limits;
-        ViewBag.CanManage = User.IsInRole(AppRoles.SuperAdmin);
+        ViewBag.CanManage = User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin);
         ViewBag.CustomerName = _tenant.TenantName;
         ViewBag.MissingTiers = CreditPackageDefaults
             .MissingFor(_tenant.TenantId.Value, packages.Select(p => (p.Tier, p.Name)))
@@ -76,7 +80,6 @@ public class CreditPackagesController : Controller
     // ---------------------------------------------------------------- create
 
     [HttpGet]
-    [Authorize(Policy = AppPolicies.PlatformOnly)]
     public async Task<IActionResult> Create()
     {
         await _tenant.LoadAsync();
@@ -100,7 +103,6 @@ public class CreditPackagesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = AppPolicies.PlatformOnly)]
     public async Task<IActionResult> Create(CreditPackageEditModel model)
     {
         await _tenant.LoadAsync();
@@ -122,8 +124,9 @@ public class CreditPackagesController : Controller
         await _db.SaveChangesAsync();
 
         _log.LogInformation(
-            "Credit package {Package} created for tenant {TenantId}: {Rate:P2}/month, R{Fee} service fee.",
-            package.Name, tenantId, package.MonthlyInterestRate, package.MonthlyServiceFee);
+            "Credit package {Package} created for tenant {TenantId} by {User}: {Rate:P2}/month, R{Fee} service fee.",
+            package.Name, tenantId, User.Identity?.Name, package.MonthlyInterestRate, package.MonthlyServiceFee);
+        await SyncPortalAsync(tenantId);
 
         TempData["Success"] = package.IsActive
             ? $"{package.Name} created and available for new loans."
@@ -135,7 +138,6 @@ public class CreditPackagesController : Controller
     // ---------------------------------------------------------------- edit
 
     [HttpGet]
-    [Authorize(Policy = AppPolicies.PlatformOnly)]
     public async Task<IActionResult> Edit(Guid id)
     {
         var package = await LoadAsync(id);
@@ -150,7 +152,6 @@ public class CreditPackagesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = AppPolicies.PlatformOnly)]
     public async Task<IActionResult> Edit(CreditPackageEditModel model)
     {
         var package = await LoadAsync(model.Id);
@@ -169,8 +170,9 @@ public class CreditPackagesController : Controller
         await _db.SaveChangesAsync();
 
         _log.LogInformation(
-            "Credit package {Package} repriced for tenant {TenantId}: {Rate:P2}/month, R{Fee} service fee.",
-            package.Name, package.TenantId, package.MonthlyInterestRate, package.MonthlyServiceFee);
+            "Credit package {Package} repriced for tenant {TenantId} by {User}: {Rate:P2}/month, R{Fee} service fee.",
+            package.Name, package.TenantId, User.Identity?.Name, package.MonthlyInterestRate, package.MonthlyServiceFee);
+        await SyncPortalAsync(package.TenantId);
 
         TempData["Success"] =
             $"{package.Name} updated. The new pricing applies to loans quoted from now on; " +
@@ -187,7 +189,6 @@ public class CreditPackagesController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = AppPolicies.PlatformOnly)]
     public async Task<IActionResult> AddStandard()
     {
         await _tenant.LoadAsync();
@@ -209,6 +210,7 @@ public class CreditPackagesController : Controller
 
             _log.LogInformation("Added {Count} standard credit package(s) for tenant {TenantId}.",
                 missing.Count, tenantId);
+            await SyncPortalAsync(tenantId);
         }
 
         TempData["Success"] = missing.Count == 0
@@ -303,6 +305,16 @@ public class CreditPackagesController : Controller
         MaxTermMonths = p.MaxTermMonths,
         IsActive = p.IsActive
     };
+
+    /// <summary>
+    /// Sends the lender's packages to the self-service portal so clients' estimates match.
+    /// Best effort: the price change itself is already saved, and the Self-service link page
+    /// can resend if the portal was unreachable.
+    /// </summary>
+    private async Task SyncPortalAsync(Guid tenantId)
+    {
+        if (await _portalSync.RefreshAsync(tenantId) is { } warning) TempData["Info"] = warning;
+    }
 
     private async Task<CreditPackage?> LoadAsync(Guid id)
     {

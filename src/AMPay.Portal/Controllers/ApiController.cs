@@ -66,6 +66,36 @@ public class ApiController : ControllerBase
         lender.IsActive = body.IsActive;
         lender.PackagesJson = JsonSerializer.Serialize(body.Packages);
         lender.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        // The logo travels with every sync; null means the lender removed it.
+        var existing = await _db.LenderLogos.FirstOrDefaultAsync(l => l.LenderId == lender.Id);
+        if (string.IsNullOrEmpty(body.LogoBase64))
+        {
+            if (existing is not null) _db.LenderLogos.Remove(existing);
+            lender.LogoUpdatedUtc = null;
+        }
+        else
+        {
+            byte[] bytes;
+            try { bytes = Convert.FromBase64String(body.LogoBase64); }
+            catch (FormatException) { return BadRequest("The logo is not valid base64."); }
+
+            // Checked again here: the portal trusts nothing it is sent, even by AM-Pay.
+            var type = AMPay.Domain.Entities.TenantLogo.SniffContentType(bytes);
+            if (bytes.Length > AMPay.Domain.Entities.TenantLogo.MaxBytes || type is null)
+                return BadRequest("The logo must be a PNG, JPEG or WebP of 300 KB or less.");
+
+            var changed = existing is null || !existing.Data.AsSpan().SequenceEqual(bytes);
+            if (existing is null)
+            {
+                existing = new LenderLogo { LenderId = lender.Id };
+                _db.LenderLogos.Add(existing);
+            }
+            existing.ContentType = type;
+            existing.Data = bytes;
+            if (changed) lender.LogoUpdatedUtc = DateTime.UtcNow;
+        }
 
         await _db.SaveChangesAsync();
         return NoContent();

@@ -1,0 +1,46 @@
+@{
+    var version = ViewBag.LogoVersion as DateTime?;
+    var tenantId = (Guid)ViewBag.TenantId;
+}
+
+<div class="page-head">
+    <h1>Branding</h1>
+    <p class="lede">
+        Your logo appears in your Loan Flow and on your self-service page, so clients and staff see @ViewBag.TenantName,
+        not just AM-Pay.
+    </p>
+</div>
+
+<div class="card" style="max-width:40rem;">
+    <div class="card-head"><h3>Your logo</h3></div>
+    <div class="card-body">
+        @if (version is not null)
+        {
+            <div class="logo-preview">
+                <img src="/logo/@tenantId?v=@version.Value.Ticks" alt="@ViewBag.TenantName logo" />
+            </div>
+            <p class="muted small">Last changed @version.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm").</p>
+        }
+        else
+        {
+            <p class="muted">No logo yet. Until you add one, your company name is shown instead.</p>
+        }
+
+        <form asp-action="Upload" method="post" enctype="multipart/form-data" style="margin-top:1rem;">
+            <div class="field">
+                <label for="file">@(version is null ? "Upload your logo" : "Replace your logo")</label>
+                <input id="file" type="file" name="file" accept="image/png,image/jpeg,image/webp" required />
+                <span class="hint">PNG, JPG or WebP, up to 300 KB. A wide logo on a transparent or white background works best, about 400 pixels wide.</span>
+            </div>
+            <button type="submit" class="btn btn-primary">Save logo</button>
+        </form>
+    </div>
+    @if (version is not null)
+    {
+        <div class="card-foot">
+            <form asp-action="Remove" method="post">
+                <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Remove your logo?');">Remove logo</button>
+            </form>
+        </div>
+    }
+</div>
