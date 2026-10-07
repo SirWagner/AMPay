@@ -21,6 +21,14 @@ public class ApplicationUser : IdentityUser<Guid>
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginUtc { get; set; }
 
+    /// <summary>
+    /// Set when an administrator chooses the password - on creation or reset. The user cannot
+    /// reach anything but the change-password page until they replace it with their own.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
+    public DateTime? PasswordChangedUtc { get; set; }
+
     /// <summary>True when this user is not scoped to a tenant, i.e. AM-Pay platform staff.</summary>
     public bool IsPlatformUser => TenantId is null;
 }

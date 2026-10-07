@@ -1,6 +1,7 @@
 using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
+using AMPay.Infrastructure.Contracts;
 using AMPay.Infrastructure.Data;
 using AMPay.Infrastructure.Identity;
 using AMPay.Web.Models;
@@ -36,6 +37,7 @@ public class LoansController : Controller
     private readonly ILoanPricingService _pricing;
     private readonly IAffordabilityService _affordability;
     private readonly UserManager<ApplicationUser> _users;
+    private readonly ContractService _contracts;
     private readonly ILogger<LoansController> _log;
 
     public LoansController(
@@ -44,6 +46,7 @@ public class LoansController : Controller
         ILoanPricingService pricing,
         IAffordabilityService affordability,
         UserManager<ApplicationUser> users,
+        ContractService contracts,
         ILogger<LoansController> log)
     {
         _db = db;
@@ -51,6 +54,7 @@ public class LoansController : Controller
         _pricing = pricing;
         _affordability = affordability;
         _users = users;
+        _contracts = contracts;
         _log = log;
     }
 
@@ -314,6 +318,18 @@ public class LoansController : Controller
         ViewBag.CanDecide = canDecide;
         ViewBag.CanCapture = canDecide || User.IsInRole(AppRoles.Capturer);
 
+        ViewBag.Contracts = new LoanContractsPanel
+        {
+            LoanId = loan.Id,
+            LoanStatus = loan.Status,
+            Contracts = await _db.LoanContracts.AsNoTracking()
+                .Where(c => c.LoanId == loan.Id)
+                .OrderByDescending(c => c.Issue)
+                .ToListAsync(),
+            CanCapture = (bool)ViewBag.CanCapture,
+            CanDecide = canDecide
+        };
+
         return View(loan);
     }
 
@@ -451,6 +467,12 @@ public class LoansController : Controller
         if (loan.Status != LoanStatus.Approved)
             return Refuse(id, "Only an approved loan can be marked as disbursed.");
 
+        // The client agrees before the money moves - never the other way round.
+        var signed = await _db.LoanContracts.AnyAsync(c => c.LoanId == loan.Id && c.Status == ContractStatus.Signed);
+        if (!signed)
+            return Refuse(id, "The client has not signed the credit agreement yet. Issue the contract, send it, and " +
+                              "pay out only once it shows as signed.");
+
         loan.Status = LoanStatus.Disbursed;
         loan.DisbursedUtc = DateTime.UtcNow;
 
@@ -486,6 +508,7 @@ public class LoansController : Controller
             return Refuse(id, "Only a loan that has not been disbursed can be cancelled.");
 
         loan.Status = LoanStatus.Cancelled;
+        await _contracts.VoidOpenForLoanAsync(loan.Id, "The loan was cancelled.", _users.GetUserId(User));
         await _db.SaveChangesAsync();
 
         TempData["Success"] = $"Loan {loan.LoanNumber} cancelled.";

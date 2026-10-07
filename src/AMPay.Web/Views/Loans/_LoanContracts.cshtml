@@ -1,0 +1,82 @@
+@model LoanContractsPanel
+@{
+    var current = Model.Current;
+    var history = Model.Contracts.Where(c => current is null || c.Id != current.Id).ToList();
+    var canIssue = Model.CanCapture && Model.LoanStatus == LoanStatus.Approved && current?.Status != ContractStatus.Signed;
+}
+
+@if (Model.LoanStatus is LoanStatus.Approved or LoanStatus.Disbursed || Model.Contracts.Count > 0)
+{
+    <div class="card">
+        <div class="card-head flex-between">
+            <h3>Credit agreement and mandate</h3>
+            @if (current is not null)
+            {
+                <partial name="_ContractStatus" model="current.Status" />
+            }
+        </div>
+        <div class="card-body">
+            @if (current is null)
+            {
+                <p class="mb-0">
+                    No contract has been issued. Issuing freezes the quote, payment schedule, budget, credit life and the
+                    DebiCheck mandate details into one pack for the client to read and sign.
+                </p>
+            }
+            else
+            {
+                <p class="mb-0">
+                    <a asp-controller="Contracts" asp-action="Details" asp-route-id="@current.Id" class="mono">@current.Reference</a>
+                    issued @current.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                    @if (!current.TemplatesApproved) { <span class="badge badge-amber">Draft wording</span> }
+                    @if (current.Status == ContractStatus.Signed)
+                    {
+                        <text>&middot; signed @current.SignedUtc?.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                            @(current.SignatureMethod == SignatureMethod.OnlineOtp ? "online" : "on paper")</text>
+                    }
+                </p>
+            }
+
+            @if (history.Count > 0)
+            {
+                <details style="margin-top:.75rem;">
+                    <summary class="small">Earlier issues (@history.Count)</summary>
+                    <ul class="small">
+                        @foreach (var h in history)
+                        {
+                            <li>
+                                <a asp-controller="Contracts" asp-action="Details" asp-route-id="@h.Id" class="mono">@h.Reference</a>
+                                &middot; <partial name="_ContractStatus" model="h.Status" />
+                                @if (h.VoidReason is not null) { <span class="muted">&middot; @h.VoidReason</span> }
+                            </li>
+                        }
+                    </ul>
+                </details>
+            }
+        </div>
+        <div class="card-foot contract-actions">
+            @if (current is not null)
+            {
+                <a asp-controller="Contracts" asp-action="Details" asp-route-id="@current.Id" class="btn btn-primary">
+                    @(current.IsOpen && Model.CanCapture ? "View and send" : "View contract")
+                </a>
+                <a asp-controller="Contracts" asp-action="Pdf" asp-route-id="@current.Id" class="btn btn-outline">Download PDF</a>
+            }
+            @if (canIssue)
+            {
+                <form asp-controller="Contracts" asp-action="Issue" asp-route-loanId="@Model.LoanId" method="post">
+                    @Html.AntiForgeryToken()
+                    @if (current is null)
+                    {
+                        <button type="submit" class="btn btn-primary">Issue contract</button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-outline"
+                                onclick="return confirm('Issue a new contract? The current one will be voided and its link will stop working.');">Issue again</button>
+                    }
+                </form>
+            }
+        </div>
+    </div>
+}

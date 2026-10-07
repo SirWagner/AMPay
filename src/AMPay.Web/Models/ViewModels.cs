@@ -534,6 +534,22 @@ public class TenantModel
     [Display(Name = "Contact number"), StringLength(20)]
     public string? ContactNumber { get; set; }
 
+    // Printed on every contract pack.
+    [StringLength(20), Display(Name = "VAT number")]
+    public string? VatNumber { get; set; }
+
+    [StringLength(300), Display(Name = "Physical address")]
+    public string? PhysicalAddress { get; set; }
+
+    [StringLength(300), Display(Name = "Postal address")]
+    public string? PostalAddress { get; set; }
+
+    [StringLength(200), Display(Name = "Credit life insurer")]
+    public string? CreditLifeUnderwriter { get; set; }
+
+    [StringLength(200), Display(Name = "Credit life administrator")]
+    public string? CreditLifeAdministrator { get; set; }
+
     public TenantStatus Status { get; set; } = TenantStatus.Onboarding;
 }
 

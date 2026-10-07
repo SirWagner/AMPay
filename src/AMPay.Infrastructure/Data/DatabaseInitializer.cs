@@ -46,7 +46,8 @@ public static class DatabaseInitializer
         new Dictionary<string, string>
         {
             ["20260914194411_InitialSchema"] = "Tenants",
-            ["20260916194822_CreditOrigination"] = "CreditPackages"
+            ["20260916194822_CreditOrigination"] = "CreditPackages",
+            ["20261007092442_ContractPacksAndMessaging"] = "LoanContracts"
         };
 
     public static async Task InitialiseAsync(

@@ -1,0 +1,126 @@
+@model ContractPageModel
+@{
+    var c = Model.Contract;
+    var link = TempData["SigningLink"] as string;
+    string When(DateTime? utc) => utc is null ? "" : AMPay.Domain.Contracts.ContractFormat.SastTime(utc.Value);
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Contract <span class="mono">@c.Reference</span></h1>
+        <p class="lede">
+            Loan <a asp-controller="Loans" asp-action="Details" asp-route-id="@c.LoanId">@Model.LoanNumber</a> &middot;
+            <partial name="_ContractStatus" model="c.Status" />
+        </p>
+    </div>
+    <div class="contract-actions">
+        <a asp-action="Pdf" asp-route-id="@c.Id" asp-route-inline="true" target="_blank" rel="noopener" class="btn btn-outline">Open PDF</a>
+        <a asp-action="Pdf" asp-route-id="@c.Id" class="btn btn-primary">Download PDF</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(link))
+{
+    <div class="alert alert-info">
+        <strong>Signing link for the client</strong> &mdash; shown once. Only a fingerprint of it is stored, so copy it now if you
+        want to send it another way (WhatsApp, for example). Sending again creates a new link and stops this one.
+        <div class="contract-link">
+            <input id="signingLink" type="text" readonly value="@link" aria-label="Signing link" />
+            <button type="button" class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(document.getElementById('signingLink').value); this.textContent='Copied';">Copy</button>
+        </div>
+    </div>
+}
+
+@if (c.Status == ContractStatus.Voided)
+{
+    <div class="alert alert-error">
+        Voided on @When(c.VoidedUtc) by @Model.Who(c.VoidedByUserId): <em>@c.VoidReason</em>
+    </div>
+}
+
+<div class="chart-grid">
+    <div class="card">
+        <div class="card-head"><h3>Where it stands</h3></div>
+        <div class="card-body">
+            <ol class="timeline">
+                <li>Issued @When(c.CreatedUtc) by @Model.Who(c.CreatedByUserId)@(c.TemplatesApproved ? "" : " - draft wording")</li>
+                @if (c.SentUtc is not null)
+                {
+                    <li>Sent by @c.SentChannels on @When(c.SentUtc) by @Model.Who(c.SentByUserId)</li>
+                }
+                @if (c.FirstViewedUtc is not null)
+                {
+                    <li>Opened by the client on @When(c.FirstViewedUtc)</li>
+                }
+                @if (c.SignedUtc is not null)
+                {
+                    <li>
+                        <strong>Signed @When(c.SignedUtc)</strong>
+                        @(c.SignatureMethod == SignatureMethod.OnlineOtp
+                            ? "online with a one-time PIN"
+                            : $"on paper, recorded by {Model.Who(c.SignedRecordedByUserId)}")
+                        @if (c.SignedCopyDocumentId is not null)
+                        {
+                            <text>&middot; <a asp-controller="Documents" asp-action="Download" asp-route-id="@c.SignedCopyDocumentId" target="_blank" rel="noopener">signed copy</a></text>
+                        }
+                    </li>
+                }
+            </ol>
+            @if (c.IsOpen && c.AccessExpiresUtc is not null)
+            {
+                <p class="muted small mb-0">The client's link works until @When(c.AccessExpiresUtc).</p>
+            }
+        </div>
+    </div>
+
+    @if (c.IsOpen && Model.CanCapture)
+    {
+        <div class="card">
+            <div class="card-head"><h3>Send for signature</h3></div>
+            <div class="card-body">
+                @if (Model.MessagesStubbed)
+                {
+                    <div class="stub-banner small" style="margin-bottom:.75rem;">
+                        No SMS or email provider is connected yet. Messages are recorded under <em>Messages sent</em> and not delivered.
+                    </div>
+                }
+                <form asp-action="Send" asp-route-id="@c.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <label class="check"><input type="checkbox" name="sms" value="true" checked /> SMS to @(Model.Document.Snapshot.Borrower.Mobile ?? "no cell number on file")</label>
+                    <label class="check"><input type="checkbox" name="email" value="true" checked /> Email to @(Model.Document.Snapshot.Borrower.Email ?? "no email on file")</label>
+                    <p class="muted small">The client gets a link to read the agreement and mandate, download them, and sign with a PIN sent to their cell.</p>
+                    <button type="submit" class="btn btn-primary">@(c.SentUtc is null ? "Send to client" : "Send again (new link)")</button>
+                </form>
+
+                <hr />
+
+                <form asp-action="UploadSigned" asp-route-id="@c.Id" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div class="field">
+                        <label for="file">Or upload the copy the client signed on paper</label>
+                        <input id="file" type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required />
+                    </div>
+                    <label class="check"><input type="checkbox" name="confirmed" value="true" required /> The client signed this agreement, reference @c.Reference.</label>
+                    <button type="submit" class="btn btn-outline">Record as signed</button>
+                </form>
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.CanDecide && c.Status != ContractStatus.Voided)
+{
+    <details class="card" style="padding:1rem 1.25rem;">
+        <summary>Void this contract</summary>
+        <form asp-action="Void" asp-route-id="@c.Id" method="post" style="margin-top:.75rem;">
+            @Html.AntiForgeryToken()
+            <div class="field">
+                <label for="reason">Reason</label>
+                <textarea id="reason" name="reason" required placeholder="For example: the client asked for a different term."></textarea>
+            </div>
+            <button type="submit" class="btn btn-danger btn-sm">Void contract</button>
+        </form>
+    </details>
+}
+
+<partial name="_ContractDocument" model="Model.Document" />

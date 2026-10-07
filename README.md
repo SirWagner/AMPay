@@ -191,6 +191,23 @@ without one: the capability rules above (including every refusal), and the NIF b
 key-record ordering, row padding, footer totals, rands-to-cents rounding, and the
 `SUCCESSFUL WITH ERRORS` load-report case that reads like success but is a partial failure.
 
+## Deploying to Azure
+
+One command, from the repository root, after `az login`:
+
+```powershell
+.\deploy\deploy-azure.ps1
+```
+
+It runs the tests, publishes, refuses to ship local data (App_Data, database files, `folder/`,
+user-secrets), zips for Linux, deploys, and waits for `/healthz` to report the app and its
+database up. Migrations apply themselves at startup. `-SkipTests` skips the tests;
+`-AppName` / `-ResourceGroup` (or `AMPAY_AZ_APP` / `AMPAY_AZ_RG`) target another environment.
+
+Staging runs in South Africa North: Linux App Service B1, Azure SQL (free offer, signs in with
+the app's managed identity - no SQL passwords), Key Vault for secrets. A monthly budget emails
+at 80% and 100% and, at 100%, a runbook stops the app and drops its plan to the free tier.
+
 ## The gaps, in one place
 
 Search the source for `GAP` — each one names the operation to call and the fields it needs.

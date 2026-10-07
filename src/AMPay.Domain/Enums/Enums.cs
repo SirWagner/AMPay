@@ -177,7 +177,69 @@ public enum DocumentType
     ProofOfAddress = 3,
     Combined = 4,
     SignedMandate = 5,
+    /// <summary>A credit agreement signed on paper and scanned back in.</summary>
+    SignedAgreement = 6,
+    /// <summary>The client's photograph, from the webcam or an upload.</summary>
+    Photograph = 7,
+    /// <summary>A credit bureau report (Compuscan, Experian) attached to an enquiry.</summary>
+    CreditReport = 8,
     Other = 99
+}
+
+// ---------------------------------------------------------------------------------------
+// Contracts
+// ---------------------------------------------------------------------------------------
+
+/// <summary>Where a loan's contract pack is in its life.</summary>
+public enum ContractStatus
+{
+    /// <summary>Generated and frozen, not yet sent. Can still be voided and re-issued.</summary>
+    Issued = 0,
+    /// <summary>Link sent to the client.</summary>
+    Sent = 1,
+    /// <summary>The client has proved their cell number and opened the pack.</summary>
+    Viewed = 2,
+    /// <summary>Signed online or by an uploaded paper copy. Final.</summary>
+    Signed = 3,
+    /// <summary>Withdrawn before signature - terms changed, sent in error.</summary>
+    Voided = 4
+}
+
+/// <summary>How a contract was signed.</summary>
+public enum SignatureMethod
+{
+    None = 0,
+    /// <summary>One-time code to the client's cell, then accepted online.</summary>
+    OnlineOtp = 1,
+    /// <summary>Signed on paper; a scan uploaded by staff.</summary>
+    UploadedSignedCopy = 2
+}
+
+/// <summary>
+/// The editable legal parts of a contract pack. The figures, parties and schedule are
+/// generated from the loan; only the wording of these sections comes from a template.
+/// </summary>
+public enum ContractTemplateKind
+{
+    CreditAgreementTerms = 0,
+    DebitOrderAuthorisation = 1,
+    BudgetAcknowledgement = 2,
+    CreditLifeDisclosure = 3
+}
+
+/// <summary>How a message reaches the client.</summary>
+public enum MessageChannel
+{
+    Sms = 0,
+    Email = 1
+}
+
+public enum MessageStatus
+{
+    /// <summary>Recorded in the outbox only - no provider is configured.</summary>
+    Stubbed = 0,
+    Sent = 1,
+    Failed = 2
 }
 
 public enum BatchStatus { Draft = 0, Uploaded = 1, ReportRequested = 2, Successful = 3, SuccessfulWithErrors = 4, Unsuccessful = 5 }

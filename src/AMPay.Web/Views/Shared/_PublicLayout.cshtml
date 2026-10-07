@@ -1,0 +1,30 @@
+@* Pages a lender's client sees: no sidebar, no staff navigation, nothing that reveals the console. *@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>@ViewData["Title"] &middot; @(ViewData["Lender"] ?? "AM-Pay")</title>
+    <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
+</head>
+<body class="public-page">
+<header class="public-top">
+    <div class="public-top-inner">
+        <strong>@(ViewData["Lender"] ?? "AM-Pay")</strong>
+        <span class="muted small">Secure document</span>
+    </div>
+</header>
+
+<main class="public-main">
+    @RenderBody()
+</main>
+
+<footer class="public-foot">
+    Agreements are processed by AM-Pay on behalf of the credit provider named above, a registered credit provider
+    under the National Credit Act.
+</footer>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

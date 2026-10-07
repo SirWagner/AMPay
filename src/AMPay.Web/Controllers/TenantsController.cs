@@ -96,6 +96,11 @@ public class TenantsController : Controller
             NetcashAccountNumber = model.NetcashAccountNumber?.Trim(),
             ContactEmail = model.ContactEmail?.Trim(),
             ContactNumber = model.ContactNumber?.Trim(),
+            VatNumber = model.VatNumber?.Trim(),
+            PhysicalAddress = model.PhysicalAddress?.Trim(),
+            PostalAddress = model.PostalAddress?.Trim(),
+            CreditLifeUnderwriter = model.CreditLifeUnderwriter?.Trim(),
+            CreditLifeAdministrator = model.CreditLifeAdministrator?.Trim(),
             Status = model.Status
         };
 
@@ -147,6 +152,11 @@ public class TenantsController : Controller
             NetcashAccountNumber = tenant.NetcashAccountNumber,
             ContactEmail = tenant.ContactEmail,
             ContactNumber = tenant.ContactNumber,
+            VatNumber = tenant.VatNumber,
+            PhysicalAddress = tenant.PhysicalAddress,
+            PostalAddress = tenant.PostalAddress,
+            CreditLifeUnderwriter = tenant.CreditLifeUnderwriter,
+            CreditLifeAdministrator = tenant.CreditLifeAdministrator,
             Status = tenant.Status
         });
     }
@@ -168,6 +178,11 @@ public class TenantsController : Controller
         tenant.NetcashAccountNumber = model.NetcashAccountNumber?.Trim();
         tenant.ContactEmail = model.ContactEmail?.Trim();
         tenant.ContactNumber = model.ContactNumber?.Trim();
+        tenant.VatNumber = model.VatNumber?.Trim();
+        tenant.PhysicalAddress = model.PhysicalAddress?.Trim();
+        tenant.PostalAddress = model.PostalAddress?.Trim();
+        tenant.CreditLifeUnderwriter = model.CreditLifeUnderwriter?.Trim();
+        tenant.CreditLifeAdministrator = model.CreditLifeAdministrator?.Trim();
         tenant.Status = model.Status;
         tenant.UpdatedUtc = DateTime.UtcNow;
 

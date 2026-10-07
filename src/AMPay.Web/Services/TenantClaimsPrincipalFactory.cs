@@ -28,6 +28,9 @@ public class TenantClaimsPrincipalFactory
         if (!string.IsNullOrWhiteSpace(user.FullName))
             identity.AddClaim(new Claim("ampay:full_name", user.FullName));
 
+        if (user.MustChangePassword)
+            identity.AddClaim(new Claim(AppClaims.MustChangePassword, "true"));
+
         return identity;
     }
 }

@@ -1242,3 +1242,95 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
     .auth-side { display: none; }
     .auth-panel { padding: 2rem 1.5rem; }
 }
+
+/* ----------------------------------------------------------------- contract packs */
+
+.contract-doc {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem 2rem;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    color: var(--text-body);
+    font-size: .88rem;
+    line-height: 1.5;
+}
+
+.contract-doc section { margin-top: 1.5rem; }
+.contract-doc h3 {
+    font-size: .95rem;
+    color: var(--navy);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: .35rem;
+    margin: 0 0 .75rem;
+}
+
+.contract-head { display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+.contract-head h2 { font-size: 1.15rem; margin: .2rem 0 0; color: var(--navy-deeper); }
+.contract-lender { font-weight: 700; color: var(--navy); font-size: 1.3rem; }
+.contract-meta { display: grid; grid-template-columns: max-content auto; gap: .2rem .75rem; margin: 0; font-size: .82rem; }
+.contract-meta dt { color: var(--text-muted); }
+.contract-meta dd { margin: 0; }
+
+.contract-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.contract-quote td.code { width: 3.2rem; color: var(--text-muted); font-size: .8rem; }
+.contract-quote tr.sub td { font-weight: 600; }
+.contract-terms p { text-align: justify; margin: 0 0 .55rem; }
+.contract-foot { margin-top: 1.5rem; padding-top: .75rem; border-top: 1px solid var(--border); }
+
+.contract-draft-mark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(5rem, 16vw, 11rem);
+    font-weight: 800;
+    letter-spacing: .1em;
+    color: rgba(192, 57, 43, .08);
+    transform: rotate(-35deg);
+    pointer-events: none;
+    user-select: none;
+}
+
+.contract-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.contract-actions form { display: inline; }
+.contract-link {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    margin-top: .5rem;
+}
+.contract-link input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; }
+
+.template-body {
+    width: 100%;
+    min-height: 24rem;
+    font-family: inherit;
+    font-size: .88rem;
+    line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+    .contract-doc { padding: 1.1rem 1rem; }
+    .contract-parties { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------------- public pages (signing, self-service) */
+
+.public-page { min-height: 100vh; background: var(--page-bg); }
+.public-top {
+    background: var(--navy-deeper);
+    color: #fff;
+    padding: .9rem 16px;
+}
+.public-top-inner, .public-main { max-width: 900px; margin: 0 auto; }
+.public-top-inner { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.public-top strong { font-size: 1.05rem; }
+.public-top .muted { color: rgba(255, 255, 255, .7); }
+.public-main { padding: 1.5rem 16px 3rem; }
+.public-foot { max-width: 900px; margin: 0 auto; padding: 0 16px 2rem; color: var(--text-muted); font-size: .78rem; }
+.sign-panel { margin-top: 1.25rem; }
+.pin-input { font-size: 1.4rem; letter-spacing: .4em; max-width: 12rem; text-align: center; }

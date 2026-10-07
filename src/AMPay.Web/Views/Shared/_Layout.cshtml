@@ -72,6 +72,8 @@
                 <a class="nav-link @Active("Tenants")" asp-controller="Tenants" asp-action="Index">Customers</a>
             }
             <a class="nav-link @Active("CreditPackages")" asp-controller="CreditPackages" asp-action="Index">Credit packages</a>
+            <a class="nav-link @Active("ContractTemplates")" asp-controller="ContractTemplates" asp-action="Index">Contract wording</a>
+            <a class="nav-link @Active("Outbox")" asp-controller="Outbox" asp-action="Index">Messages sent</a>
             <a class="nav-link @Active("ServiceKeys")" asp-controller="ServiceKeys" asp-action="Index">Netcash service keys</a>
             <a class="nav-link @Active("Users")" asp-controller="Users" asp-action="Index">Users</a>
         }
@@ -109,6 +111,7 @@
                     else if (User.IsInRole(AppRoles.Reviewer)) { <span>Document reviewer</span> }
                     else { <span>Viewer</span> }
                 </div>
+                <a asp-controller="Account" asp-action="ChangePassword" class="btn btn-outline btn-sm">Change password</a>
                 <form asp-controller="Account" asp-action="Logout" method="post">
                     <button type="submit" class="btn btn-outline btn-sm">Sign out</button>
                 </form>

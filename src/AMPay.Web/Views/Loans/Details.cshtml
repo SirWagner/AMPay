@@ -206,6 +206,7 @@ else if (Model.Status == LoanStatus.Approved)
                             <a asp-controller="Mandates" asp-action="Details" asp-route-id="@Model.MandateId">view it</a>.</text>
                     }
                 </li>
+                <li>Issue the contract and send it to the client with the mandate. Wait for it to show as signed.</li>
                 <li>Pay the loan amount of @R(Model.Principal) to the client.</li>
                 <li>Mark the loan as disbursed.</li>
             </ol>
@@ -253,6 +254,8 @@ else if (Model.Status is LoanStatus.Disbursed)
         }
     </div>
 }
+
+<partial name="_LoanContracts" model="(LoanContractsPanel)ViewBag.Contracts" />
 
 @if (canCapture && (Model.Status is LoanStatus.PendingApproval or LoanStatus.Approved))
 {

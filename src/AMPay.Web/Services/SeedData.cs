@@ -1,3 +1,4 @@
+using AMPay.Domain.Contracts;
 using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
@@ -92,6 +93,7 @@ public static class SeedData
         }
 
         await SeedCreditPackagesAsync(db, log);
+        await SeedContractTemplatesAsync(db, log);
 
         // The sudo account.
         var sudoEmail = config["Seed:SuperAdmin:Email"] ?? "admin@ampay.local";
@@ -163,6 +165,34 @@ public static class SeedData
             await db.SaveChangesAsync();
 
             log.LogInformation("Added {Count} standard credit package(s) for {Tenant}.", missing.Count, tenant.Name);
+        }
+    }
+
+    /// <summary>
+    /// Gives every lender the placeholder contract wording for any section it lacks. Never
+    /// replaces wording a lender has edited or approved.
+    /// </summary>
+    private static async Task SeedContractTemplatesAsync(AppDbContext db, ILogger log)
+    {
+        var tenants = await db.Tenants
+            .Where(t => !t.IsPlatformOwner)
+            .Select(t => new { t.Id, t.Name })
+            .ToListAsync();
+
+        foreach (var tenant in tenants)
+        {
+            var have = await db.ContractTemplates
+                .Where(t => t.TenantId == tenant.Id)
+                .Select(t => t.Kind)
+                .ToListAsync();
+
+            var missing = ContractTemplateDefaults.MissingFor(tenant.Id, have);
+            if (missing.Count == 0) continue;
+
+            db.ContractTemplates.AddRange(missing);
+            await db.SaveChangesAsync();
+
+            log.LogInformation("Added {Count} draft contract template(s) for {Tenant}.", missing.Count, tenant.Name);
         }
     }
 }

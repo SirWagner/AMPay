@@ -6,7 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AMPay.Web.Controllers;
 
-[AllowAnonymous]
+// Anonymous per action, not per class: a class-level [AllowAnonymous] would override the
+// [Authorize] on ChangePassword and serve it to signed-out visitors.
 public class AccountController : Controller
 {
     private readonly SignInManager<ApplicationUser> _signIn;
@@ -23,6 +24,7 @@ public class AccountController : Controller
         _log = log;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult Login(string? returnUrl = null)
     {
@@ -30,6 +32,7 @@ public class AccountController : Controller
         return View(new LoginViewModel { ReturnUrl = returnUrl });
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model)
@@ -58,6 +61,9 @@ public class AccountController : Controller
 
             _log.LogInformation("User {Email} signed in.", model.Email);
 
+            if (user?.MustChangePassword == true)
+                return RedirectToAction(nameof(ChangePassword));
+
             // Never redirect to an absolute URL supplied in the query string.
             if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
                 return Redirect(model.ReturnUrl);
@@ -78,6 +84,7 @@ public class AccountController : Controller
         return View(model);
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
@@ -91,6 +98,58 @@ public class AccountController : Controller
         return RedirectToAction(nameof(Login));
     }
 
+    // ---------------------------------------------------------------- password
+
+    [HttpGet]
+    [Authorize]
+    public IActionResult ChangePassword()
+    {
+        ViewData["Title"] = "Change password";
+        ViewBag.Forced = User.HasClaim(c => c.Type == Services.AppClaims.MustChangePassword);
+        return View(new ChangePasswordViewModel());
+    }
+
+    [HttpPost]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        ViewData["Title"] = "Change password";
+        ViewBag.Forced = User.HasClaim(c => c.Type == Services.AppClaims.MustChangePassword);
+
+        if (model.NewPassword == model.CurrentPassword)
+            ModelState.AddModelError(nameof(model.NewPassword), "Choose a password different from the current one.");
+
+        if (!ModelState.IsValid) return View(model);
+
+        var user = await _users.GetUserAsync(User);
+        if (user is null) return RedirectToAction(nameof(Login));
+
+        var result = await _users.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+        if (!result.Succeeded)
+        {
+            foreach (var e in result.Errors)
+                ModelState.AddModelError(
+                    e.Code == "PasswordMismatch" ? nameof(model.CurrentPassword) : nameof(model.NewPassword),
+                    e.Code == "PasswordMismatch" ? "The current password is not correct." : e.Description);
+            return View(model);
+        }
+
+        user.MustChangePassword = false;
+        user.PasswordChangedUtc = DateTime.UtcNow;
+        await _users.UpdateAsync(user);
+
+        // New cookie without the must-change claim. Changing the password also rotated the
+        // security stamp, so sessions elsewhere on the old password end at their next check.
+        await _signIn.RefreshSignInAsync(user);
+
+        _log.LogInformation("User {Email} changed their password.", user.Email);
+
+        TempData["Success"] = "Your password has been changed.";
+        return RedirectToAction("Index", "Home");
+    }
+
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult Denied()
     {
@@ -111,4 +170,18 @@ public class LoginViewModel
     public bool RememberMe { get; set; }
 
     public string? ReturnUrl { get; set; }
+}
+
+public class ChangePasswordViewModel
+{
+    [Required, DataType(DataType.Password), Display(Name = "Current password")]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required, DataType(DataType.Password), Display(Name = "New password")]
+    [StringLength(100, MinimumLength = 12, ErrorMessage = "Use at least 12 characters.")]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required, DataType(DataType.Password), Display(Name = "Confirm new password")]
+    [Compare(nameof(NewPassword), ErrorMessage = "The two new passwords do not match.")]
+    public string ConfirmPassword { get; set; } = string.Empty;
 }

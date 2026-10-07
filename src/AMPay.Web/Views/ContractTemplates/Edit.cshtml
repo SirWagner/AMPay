@@ -1,0 +1,55 @@
+@model ContractTemplateEditModel
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@Model.Title</h1>
+        <p class="lede">@AMPay.Web.Controllers.ContractTemplatesController.Describe(Model.Kind)</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline">All sections</a>
+</div>
+
+@if (Model.IsApproved)
+{
+    <div class="alert alert-success">
+        Approved by @(Model.ApprovedBy ?? "an administrator") on @Model.ApprovedUtc?.ToString("dd MMM yyyy").
+        Saving a change withdraws the approval.
+    </div>
+}
+
+<form asp-action="Edit" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="field">
+                <label asp-for="Title">Heading</label>
+                <input asp-for="Title" />
+                <span asp-validation-for="Title" class="field-error"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Body"></label>
+                <textarea asp-for="Body" class="template-body" spellcheck="true"></textarea>
+                <span class="hint">Plain text. Leave a blank line between paragraphs. Numbering is typed, not automatic.</span>
+                <span asp-validation-for="Body" class="field-error"></span>
+            </div>
+        </div>
+        <div class="card-foot">
+            <button type="submit" class="btn btn-primary">Save wording</button>
+        </div>
+    </div>
+</form>
+
+@if (!Model.IsApproved)
+{
+    <form asp-action="Approve" asp-route-id="@Model.Id" method="post" class="card" style="padding:1rem 1.25rem;">
+        @Html.AntiForgeryToken()
+        <h3 style="margin-top:0;">Approve this wording</h3>
+        <label class="check">
+            <input type="checkbox" name="attorneyConfirmed" value="true" required />
+            <span>Our attorney has approved this wording, exactly as saved above, for use with clients.</span>
+        </label>
+        <button type="submit" class="btn btn-navy" style="margin-top:.75rem;">Approve</button>
+    </form>
+}

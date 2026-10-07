@@ -1,0 +1,53 @@
+@model List<OutboundMessage>
+
+<div class="page-head">
+    <h1>Messages sent</h1>
+    <p class="lede">
+        SMS and email sent to clients@(ViewBag.CustomerName is string n ? " of " + n : ""), newest first. The latest 200 are shown.
+    </p>
+</div>
+
+@if ((bool)ViewBag.Stubbed)
+{
+    <div class="stub-banner" style="margin-bottom:1rem;">
+        No SMS or email provider is connected. These messages were recorded here and <strong>not delivered</strong>.
+        While testing, this is where to read a signing link or PIN.
+    </div>
+}
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="card-body"><p class="empty mb-0">Nothing has been sent yet.</p></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr><th>When</th><th>Channel</th><th>To</th><th>About</th><th>Message</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var m in Model)
+                {
+                    <tr>
+                        <td class="small" style="white-space:nowrap;">@AMPay.Domain.Contracts.ContractFormat.SastTime(m.CreatedUtc)</td>
+                        <td>@m.Channel</td>
+                        <td class="mono small">@m.To</td>
+                        <td class="small">@m.Context</td>
+                        <td class="small" style="white-space:pre-line;max-width:34rem;">@if (m.Subject is not null){<strong>@m.Subject</strong><br />}@m.Body</td>
+                        <td>
+                            @switch (m.Status)
+                            {
+                                case MessageStatus.Stubbed: <span class="badge badge-amber">Not delivered (test)</span> break;
+                                case MessageStatus.Sent: <span class="badge badge-green">Sent</span> break;
+                                default: <span class="badge badge-red" title="@m.Error">Failed</span> break;
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

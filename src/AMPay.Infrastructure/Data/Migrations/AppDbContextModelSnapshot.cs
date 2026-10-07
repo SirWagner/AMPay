@@ -750,6 +750,53 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("ClientWallets");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.ContractTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ApprovedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ApprovedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("ContractTemplates");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.CreditPackage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1073,6 +1120,146 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("Loans");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.LoanContract", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AccessExpiresUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AccessTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FirstViewedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Issue")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("OtpExpiresUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OtpFailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OtpHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("OtpSentUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("SentByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SentChannels")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("SentUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SignatureMethod")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("SignedCopyDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SignedIdNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("SignedIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("SignedMobile")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("SignedName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SignedRecordedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SignedUserAgent")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<DateTime?>("SignedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("TemplatesApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("VoidedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("VoidedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessTokenHash")
+                        .IsUnique()
+                        .HasFilter("[AccessTokenHash] IS NOT NULL");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
+
+                    b.HasIndex("SignedCopyDocumentId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("LoanId", "Issue")
+                        .IsUnique();
+
+                    b.ToTable("LoanContracts");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.LoanScheduleEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1253,6 +1440,58 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("NetcashBatchErrors");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.OutboundMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Context")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ProviderReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("To")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Context");
+
+                    b.HasIndex("CreatedUtc");
+
+                    b.ToTable("OutboundMessages");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.PayNowTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1345,6 +1584,14 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CreditLifeAdministrator")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("CreditLifeUnderwriter")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<bool>("IsPlatformOwner")
                         .HasColumnType("bit");
 
@@ -1361,6 +1608,14 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasMaxLength(11)
                         .HasColumnType("nvarchar(11)");
 
+                    b.Property<string>("PhysicalAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("PostalAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("RegistrationNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1374,6 +1629,10 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("VatNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
@@ -1503,6 +1762,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -1510,6 +1772,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("PasswordChangedUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
@@ -1816,6 +2081,17 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.ContractTemplate", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.CreditPackage", b =>
                 {
                     b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
@@ -1883,6 +2159,40 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("CreditPackage");
 
                     b.Navigation("Mandate");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.LoanContract", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.Loan", "Loan")
+                        .WithMany()
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.ClientDocument", "SignedCopyDocument")
+                        .WithMany()
+                        .HasForeignKey("SignedCopyDocumentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Loan");
+
+                    b.Navigation("SignedCopyDocument");
 
                     b.Navigation("Tenant");
                 });

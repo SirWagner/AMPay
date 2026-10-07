@@ -455,6 +455,9 @@ public class DocumentsController : Controller
         DocumentType.ProofOfAddress => "Proof of address",
         DocumentType.Combined => "Combined supporting pack",
         DocumentType.SignedMandate => "Signed mandate",
+        DocumentType.SignedAgreement => "Signed credit agreement",
+        DocumentType.Photograph => "Photograph",
+        DocumentType.CreditReport => "Credit bureau report",
         _ => "Other document"
     };
 }

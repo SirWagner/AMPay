@@ -68,7 +68,8 @@ else if (Model.ClientStatus == ClientStatus.PendingVerification)
                 <div class="field">
                     <label for="documentType">Document type</label>
                     <select id="documentType" name="documentType" required>
-                        @foreach (var t in Enum.GetValues<DocumentType>())
+                        @* A signed agreement is recorded from its contract page, so it is tied to the pack it signs. *@
+                        @foreach (var t in Enum.GetValues<DocumentType>().Where(t => t != DocumentType.SignedAgreement))
                         {
                             <option value="@t" selected="@(Model.Outstanding.Contains(t))">
                                 @DocumentsController.Describe(t)

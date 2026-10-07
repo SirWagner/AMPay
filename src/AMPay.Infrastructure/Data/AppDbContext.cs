@@ -32,6 +32,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<LoanScheduleEntry> LoanScheduleEntries => Set<LoanScheduleEntry>();
     public DbSet<AffordabilityAssessment> AffordabilityAssessments => Set<AffordabilityAssessment>();
 
+    public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
+    public DbSet<LoanContract> LoanContracts => Set<LoanContract>();
+    public DbSet<OutboundMessage> OutboundMessages => Set<OutboundMessage>();
+
     public DbSet<DebiCheckMandate> Mandates => Set<DebiCheckMandate>();
     public DbSet<MandateEvent> MandateEvents => Set<MandateEvent>();
     public DbSet<PayNowTransaction> PayNowTransactions => Set<PayNowTransaction>();
@@ -48,6 +52,60 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         b.Entity<ClientBankAccount>().Ignore(x => x.MaskedAccountNumber);
         b.Entity<TenantServiceKey>().Ignore(x => x.NeedsRevalidation);
         b.Entity<DebiCheckMandate>().Ignore(x => x.IsCollectable);
+        b.Entity<LoanContract>().Ignore(x => x.IsOpen);
+
+        b.Entity<ContractTemplate>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Body).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.Kind }).IsUnique();
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<LoanContract>(e =>
+        {
+            e.Property(x => x.Reference).HasMaxLength(40).IsRequired();
+            e.Property(x => x.SnapshotJson).IsRequired();
+            e.Property(x => x.SnapshotHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.SentChannels).HasMaxLength(20);
+            e.Property(x => x.AccessTokenHash).HasMaxLength(64);
+            e.Property(x => x.OtpHash).HasMaxLength(64);
+            e.Property(x => x.SignedName).HasMaxLength(200);
+            e.Property(x => x.SignedIdNumber).HasMaxLength(20);
+            e.Property(x => x.SignedMobile).HasMaxLength(20);
+            e.Property(x => x.SignedIp).HasMaxLength(64);
+            e.Property(x => x.SignedUserAgent).HasMaxLength(400);
+            e.Property(x => x.VoidReason).HasMaxLength(500);
+
+            e.HasIndex(x => x.Reference).IsUnique();
+            e.HasIndex(x => new { x.LoanId, x.Issue }).IsUnique();
+
+            // The token arrives in a public URL; finding the contract by it must be an index
+            // seek, and two contracts can never share one.
+            e.HasIndex(x => x.AccessTokenHash).IsUnique().HasFilter("[AccessTokenHash] IS NOT NULL");
+
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Loan).WithMany().HasForeignKey(x => x.LoanId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Client).WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.SignedCopyDocument).WithMany().HasForeignKey(x => x.SignedCopyDocumentId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        b.Entity<OutboundMessage>(e =>
+        {
+            e.Property(x => x.To).HasMaxLength(254).IsRequired();
+            e.Property(x => x.Subject).HasMaxLength(300);
+            e.Property(x => x.Body).IsRequired();
+            e.Property(x => x.ProviderReference).HasMaxLength(100);
+            e.Property(x => x.Error).HasMaxLength(1000);
+            e.Property(x => x.Context).HasMaxLength(100);
+            e.HasIndex(x => x.CreatedUtc);
+            e.HasIndex(x => x.Context);
+        });
         b.Entity<Loan>().Ignore(x => x.LatestAssessment);
         b.Entity<Loan>().Ignore(x => x.IsEditable);
 
@@ -58,6 +116,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.RegistrationNumber).HasMaxLength(50);
             e.Property(x => x.NcrNumber).HasMaxLength(50);
             e.Property(x => x.NetcashAccountNumber).HasMaxLength(11);
+            e.Property(x => x.VatNumber).HasMaxLength(20);
+            e.Property(x => x.PhysicalAddress).HasMaxLength(300);
+            e.Property(x => x.PostalAddress).HasMaxLength(300);
+            e.Property(x => x.CreditLifeUnderwriter).HasMaxLength(200);
+            e.Property(x => x.CreditLifeAdministrator).HasMaxLength(200);
             e.HasIndex(x => x.NetcashAccountNumber).IsUnique()
                 .HasFilter("[NetcashAccountNumber] IS NOT NULL");
 

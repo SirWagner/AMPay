@@ -55,10 +55,21 @@
                             <span class="badge @(u.IsActive ? "badge-green" : "badge-red")">
                                 @(u.IsActive ? "Active" : "Deactivated")
                             </span>
+                            @if (u.MustChangePassword)
+                            {
+                                <span class="badge badge-amber" title="Still on a password an administrator set">Must change password</span>
+                            }
                         </td>
                         <td class="muted small">@(u.LastLoginUtc?.ToString("dd MMM yyyy HH:mm") ?? "never")</td>
-                        <td>
-                            <form asp-action="ToggleActive" method="post">
+                        <td class="row-actions" style="white-space:nowrap;">
+                            <form asp-action="ResetPassword" method="post" style="display:inline">
+                                <input type="hidden" name="id" value="@u.Id" />
+                                @* The name travels in a data attribute: inside the script string, a name with an apostrophe could break out. *@
+                                <button type="submit" class="btn btn-outline btn-sm"
+                                        data-confirm="Reset the password for @u.FullName? Their current password stops working immediately."
+                                        onclick="return confirm(this.dataset.confirm);">Reset password</button>
+                            </form>
+                            <form asp-action="ToggleActive" method="post" style="display:inline">
                                 <input type="hidden" name="id" value="@u.Id" />
                                 <button type="submit" class="btn @(u.IsActive ? "btn-danger" : "btn-outline") btn-sm">
                                     @(u.IsActive ? "Deactivate" : "Reactivate")

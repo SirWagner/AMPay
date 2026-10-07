@@ -112,6 +112,8 @@ public class UsersController : Controller
             Email = model.Email.Trim(),
             EmailConfirmed = true,
             FullName = model.FullName.Trim(),
+            // The administrator chose this password, so the user must replace it first.
+            MustChangePassword = true,
             // A super admin is deliberately unscoped - that is what makes them cross-tenant.
             TenantId = model.Role == AppRoles.SuperAdmin ? null : model.TenantId
         };
@@ -155,11 +157,90 @@ public class UsersController : Controller
         user.IsActive = !user.IsActive;
         await _users.UpdateAsync(user);
 
+        // Ends sessions already open in other browsers at their next security check.
+        if (!user.IsActive) await _users.UpdateSecurityStampAsync(user);
+
         TempData["Success"] = user.IsActive
             ? $"{user.FullName} reactivated."
             : $"{user.FullName} deactivated.";
 
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Replaces a user's password with a generated temporary one, shown once on the page and
+    /// stored nowhere else. The user must change it at next sign-in, any lockout is lifted,
+    /// and sessions they already have open end at the next security check.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(Guid id)
+    {
+        ViewData["Title"] = "Password reset";
+        await _tenant.LoadAsync();
+
+        var user = await _users.FindByIdAsync(id.ToString());
+        if (user is null) return NotFound();
+
+        // A customer administrator reaches only their own people - which also keeps platform
+        // staff (no tenant) out of their reach.
+        if (!_tenant.IsPlatformUser && user.TenantId != _tenant.TenantId)
+            return Forbid();
+
+        if (user.Id.ToString() == _users.GetUserId(User))
+        {
+            TempData["Error"] = "Use Change password for your own account.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var temporary = TemporaryPassword();
+        var token = await _users.GeneratePasswordResetTokenAsync(user);
+        var result = await _users.ResetPasswordAsync(user, token, temporary);
+
+        if (!result.Succeeded)
+        {
+            TempData["Error"] = string.Join(" ", result.Errors.Select(e => e.Description));
+            return RedirectToAction(nameof(Index));
+        }
+
+        user.MustChangePassword = true;
+        await _users.UpdateAsync(user);
+        await _users.SetLockoutEndDateAsync(user, null);
+        await _users.ResetAccessFailedCountAsync(user);
+
+        _log.LogInformation("Password reset for {Email} by {Admin}.", user.Email, User.Identity?.Name);
+
+        // Rendered directly rather than redirected: the password never sits in TempData or a cookie,
+        // and the page is not cached, so Back cannot bring it up again.
+        Response.Headers.CacheControl = "no-store";
+        return View("PasswordReset", new PasswordResetResult(user.FullName, user.Email ?? "", temporary));
+    }
+
+    /// <summary>16 characters from an unambiguous alphabet, always meeting the password policy.</summary>
+    public static string TemporaryPassword()
+    {
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ", lower = "abcdefghijkmnopqrstuvwxyz",
+                     digits = "23456789", symbols = "!@#$%*?";
+        var all = upper + lower + digits + symbols;
+
+        var chars = new List<char>
+        {
+            upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length)],
+            lower[System.Security.Cryptography.RandomNumberGenerator.GetInt32(lower.Length)],
+            digits[System.Security.Cryptography.RandomNumberGenerator.GetInt32(digits.Length)],
+            symbols[System.Security.Cryptography.RandomNumberGenerator.GetInt32(symbols.Length)]
+        };
+        while (chars.Count < 16)
+            chars.Add(all[System.Security.Cryptography.RandomNumberGenerator.GetInt32(all.Length)]);
+
+        // Shuffle so the guaranteed classes are not always in the first four positions.
+        for (var i = chars.Count - 1; i > 0; i--)
+        {
+            var j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+
+        return new string(chars.ToArray());
     }
 
     private async Task<CreateUserModel> BuildCreateModelAsync(CreateUserModel model)
@@ -174,3 +255,5 @@ public class UsersController : Controller
         return model;
     }
 }
+
+public record PasswordResetResult(string FullName, string Email, string TemporaryPassword);
