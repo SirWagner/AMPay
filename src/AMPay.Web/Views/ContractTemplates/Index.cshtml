@@ -1,0 +1,57 @@
+@model List<ContractTemplate>
+@{
+    var allApproved = Model.Count > 0 && Model.All(t => t.IsApproved);
+}
+
+<div class="page-head">
+    <h1>Contract wording</h1>
+    <p class="lede">
+        The words in @ViewBag.CustomerName's contract packs. The figures &mdash; quote, schedule, budget, mandate &mdash;
+        come from each loan; the wording comes from here.
+    </p>
+</div>
+
+@if (!allApproved)
+{
+    <div class="alert alert-warn">
+        <strong>Not ready for real clients.</strong> AM-Pay supplies placeholder wording only. Replace each section with
+        wording your attorney has approved, then approve it here. Until every section is approved, contracts carry a
+        DRAFT mark, and once SMS and email are connected they cannot be sent or signed.
+    </div>
+}
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr><th>Section</th><th>Where it appears</th><th>Status</th><th>Last changed</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var t in Model)
+            {
+                <tr>
+                    <td><strong>@t.Title</strong></td>
+                    <td class="muted small">@AMPay.Web.Controllers.ContractTemplatesController.Describe(t.Kind)</td>
+                    <td>
+                        @if (t.IsApproved)
+                        {
+                            <span class="badge badge-green">Approved @t.ApprovedUtc?.ToString("dd MMM yyyy")</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-amber">Draft</span>
+                        }
+                    </td>
+                    <td class="small">@((t.UpdatedUtc ?? t.CreatedUtc).ToString("dd MMM yyyy"))</td>
+                    <td class="num"><a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-outline">Edit</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<p class="muted small">
+    Changing wording never alters a contract already issued: each pack keeps the words it was issued with. Issue a
+    contract again to pick up new wording.
+</p>

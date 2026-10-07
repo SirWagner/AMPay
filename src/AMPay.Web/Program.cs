@@ -1,8 +1,21 @@
 using AMPay.Infrastructure;
 using AMPay.Infrastructure.Data;
 using AMPay.Infrastructure.Identity;
+using AMPay.Web.Controllers;
 using AMPay.Web.Services;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Identity;
+
+// One number format for the whole application, whatever the host's regional settings.
+// Two reasons, and the second is the one that matters:
+//  - every amount renders the same way (R 14,500.00) on every screen and in every message;
+//  - a decimal posted from an <input type="number"> always arrives with a "." separator,
+//    and model binding parses form values in the current culture. On a server set to
+//    en-ZA (decimal comma) "5000.50" is rejected as invalid; under a culture that uses "."
+//    to group thousands it would quietly bind as 500050.
+var appCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = appCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = appCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,6 +69,18 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(AppPolicies.CanCapture, p =>
         p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Capturer));
+
+    // A capturer is absent by design: the person who uploaded the ID must not be the
+    // person who attests that it is genuine.
+    options.AddPolicy(AppPolicies.CanReviewDocuments, p =>
+        p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Reviewer));
+
+    options.AddPolicy(AppPolicies.CanViewClients, p =>
+        p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin, AppRoles.Capturer,
+                      AppRoles.Reviewer, AppRoles.Viewer));
+
+    options.AddPolicy(AppPolicies.CanApproveCredit, p =>
+        p.RequireRole(AppRoles.SuperAdmin, AppRoles.TenantAdmin));
 });
 
 builder.Services.AddHttpContextAccessor();
@@ -71,7 +96,38 @@ builder.Services.AddSession(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
-builder.Services.AddControllersWithViews();
+// Holds users on an administrator-set password at the change-password page.
+builder.Services.AddControllersWithViews(options => options.Filters.Add<MustChangePasswordFilter>());
+
+// How quickly a password reset, a password change or a deactivation reaches sessions that
+// are already signed in elsewhere. The default is 30 minutes.
+builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.FromMinutes(5));
+
+// Public pages - contract signing today, the self-service portal's callbacks later - are
+// reachable without signing in, so each client address gets a budget. The PIN policy is the
+// one that matters: with a six-digit PIN, five wrong tries burn it and this caps how fast a
+// guesser can ask for new ones.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    static string ClientKey(HttpContext http) =>
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    options.AddPolicy(RateLimits.PublicPages, http =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(http), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1)
+        }));
+
+    options.AddPolicy(RateLimits.SigningPin, http =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientKey(http), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(10)
+        }));
+});
 
 var app = builder.Build();
 
@@ -89,9 +145,18 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseRateLimiter();
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Liveness for the deploy script and Azure: answers once the app has started, and says
+// whether the database is reachable. Anonymous, and reveals nothing beyond up or down.
+app.MapGet("/healthz", async (AppDbContext db, CancellationToken ct) =>
+{
+    var dbOk = await db.Database.CanConnectAsync(ct);
+    return dbOk ? Results.Text("ok") : Results.Text("database unreachable", statusCode: 503);
+}).AllowAnonymous();
 
 app.MapControllerRoute(
     name: "default",

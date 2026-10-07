@@ -142,4 +142,7 @@ public static class AppClaims
 {
     public const string TenantId = "ampay:tenant_id";
     public const string TenantName = "ampay:tenant_name";
+
+    /// <summary>Present while the user is still on a password an administrator gave them.</summary>
+    public const string MustChangePassword = "ampay:must_change_password";
 }

@@ -1,3 +1,4 @@
+using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Infrastructure.Data;
@@ -95,6 +96,11 @@ public class TenantsController : Controller
             NetcashAccountNumber = model.NetcashAccountNumber?.Trim(),
             ContactEmail = model.ContactEmail?.Trim(),
             ContactNumber = model.ContactNumber?.Trim(),
+            VatNumber = model.VatNumber?.Trim(),
+            PhysicalAddress = model.PhysicalAddress?.Trim(),
+            PostalAddress = model.PostalAddress?.Trim(),
+            CreditLifeUnderwriter = model.CreditLifeUnderwriter?.Trim(),
+            CreditLifeAdministrator = model.CreditLifeAdministrator?.Trim(),
             Status = model.Status
         };
 
@@ -117,6 +123,10 @@ public class TenantsController : Controller
                 Status = ServiceKeyStatus.Unverified
             });
         }
+
+        // A customer with no credit package cannot raise a single loan, so it starts with
+        // the standard three. Its administrator reprices them from Credit packages.
+        _db.CreditPackages.AddRange(CreditPackageDefaults.For(tenant.Id));
 
         await _db.SaveChangesAsync();
 
@@ -142,6 +152,11 @@ public class TenantsController : Controller
             NetcashAccountNumber = tenant.NetcashAccountNumber,
             ContactEmail = tenant.ContactEmail,
             ContactNumber = tenant.ContactNumber,
+            VatNumber = tenant.VatNumber,
+            PhysicalAddress = tenant.PhysicalAddress,
+            PostalAddress = tenant.PostalAddress,
+            CreditLifeUnderwriter = tenant.CreditLifeUnderwriter,
+            CreditLifeAdministrator = tenant.CreditLifeAdministrator,
             Status = tenant.Status
         });
     }
@@ -163,6 +178,11 @@ public class TenantsController : Controller
         tenant.NetcashAccountNumber = model.NetcashAccountNumber?.Trim();
         tenant.ContactEmail = model.ContactEmail?.Trim();
         tenant.ContactNumber = model.ContactNumber?.Trim();
+        tenant.VatNumber = model.VatNumber?.Trim();
+        tenant.PhysicalAddress = model.PhysicalAddress?.Trim();
+        tenant.PostalAddress = model.PostalAddress?.Trim();
+        tenant.CreditLifeUnderwriter = model.CreditLifeUnderwriter?.Trim();
+        tenant.CreditLifeAdministrator = model.CreditLifeAdministrator?.Trim();
         tenant.Status = model.Status;
         tenant.UpdatedUtc = DateTime.UtcNow;
 

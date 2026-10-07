@@ -1,0 +1,99 @@
+@model SignPageModel
+@{
+    Layout = "_PublicLayout";
+    var basePath = "/sign/" + Uri.EscapeDataString(Model.Token);
+    var b = Model.Document.Snapshot.Borrower;
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1 style="font-size:1.35rem;">Your credit agreement</h1>
+        <p class="lede">Hello @b.FullName. Please read your agreement and debit order mandate below, then sign at the bottom.</p>
+    </div>
+    <a href="@basePath/pdf" class="btn btn-outline">Download PDF</a>
+</div>
+
+@if (Model.Stubbed)
+{
+    <div class="stub-banner small" style="margin-bottom:1rem;">
+        Test system: no SMS is really sent. Staff can read the PIN under Messages sent in AM-Pay.
+    </div>
+}
+
+<partial name="_ContractDocument" model="Model.Document" />
+
+<div class="card sign-panel" id="sign">
+    <div class="card-head"><h3>Sign the agreement</h3></div>
+    <div class="card-body">
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-error" role="alert">@Model.Error</div>
+        }
+        @if (Model.Notice is not null)
+        {
+            <div class="alert alert-success" role="status">@Model.Notice</div>
+        }
+
+        @if (Model.Status == ContractStatus.Signed)
+        {
+            <p>This agreement is signed. A copy with the signature record is available to download.</p>
+            <a href="@basePath/pdf" class="btn btn-primary">Download your signed copy</a>
+        }
+        else if (!Model.CanSignOnline)
+        {
+            <p class="mb-0">
+                This agreement cannot be signed online because there is no cell number on it.
+                Contact @Model.Lender@(Model.LenderContact is null ? "" : " on " + Model.LenderContact) to sign it on paper.
+            </p>
+        }
+        else
+        {
+            <ol class="steps">
+                <li>Ask for a one-time PIN. It is sent by SMS to @Model.MaskedMobile.</li>
+                <li>Enter the PIN, your ID number and your full name, and confirm you accept the agreement.</li>
+            </ol>
+
+            <form action="@basePath/pin" method="post" style="margin-bottom:1rem;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn @(Model.PinSent ? "btn-outline" : "btn-primary")">
+                    @(Model.PinSent ? "Send a new PIN" : "Send me a PIN")
+                </button>
+            </form>
+
+            @if (Model.PinSent)
+            {
+                <form action="@basePath" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="pin">PIN</label>
+                            <input id="pin" name="pin" class="pin-input" inputmode="numeric" autocomplete="one-time-code"
+                                   maxlength="6" pattern="\d{6}" required />
+                        </div>
+                        <div class="field">
+                            <label for="idNumber">Your ID number</label>
+                            <input id="idNumber" name="idNumber" inputmode="numeric" maxlength="13" autocomplete="off" required />
+                        </div>
+                        <div class="field">
+                            <label for="fullName">Your full name, as your signature</label>
+                            <input id="fullName" name="fullName" maxlength="200" autocomplete="name" required />
+                        </div>
+                    </div>
+                    <label class="check" style="margin:.5rem 0 1rem;">
+                        <input type="checkbox" name="accepted" value="true" required />
+                        <span>
+                            I have read and understood this agreement, its costs, the payment schedule, the budget and the DebiCheck
+                            debit order mandate, and I accept them. I understand that signing with the PIN is my electronic signature.
+                        </span>
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-lg">Sign agreement @Model.Reference</button>
+                </form>
+            }
+        }
+
+        <p class="muted small" style="margin-top:1rem;margin-bottom:0;">
+            If you did not apply for credit with @Model.Lender, do not sign. Contact them@(Model.LenderContact is null ? "" : " on " + Model.LenderContact).
+            Your bank will separately ask you to approve the DebiCheck mandate.
+        </p>
+    </div>
+</div>

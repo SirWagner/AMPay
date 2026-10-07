@@ -1,0 +1,92 @@
+@model List<AMPay.Web.Models.DocumentQueueRow>
+@using AMPay.Web.Controllers
+@{
+    ViewData["Title"] = "Document review";
+}
+
+<div class="page-head">
+    <h1>Document review</h1>
+    <p class="lede">
+        Supporting documents awaiting verification, oldest first. Accepting a client's
+        identity document and payslip is what moves them from captured to onboarded.
+    </p>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <h3>Awaiting review</h3>
+        @if (Model.Count > 0)
+        {
+            <span class="badge badge-amber">@Model.Count outstanding</span>
+        }
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <p>Nothing is waiting for review.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Waiting</th>
+                    <th>Client</th>
+                    <th>Document</th>
+                    <th>File</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var d in Model)
+                {
+                    <tr>
+                        <td>
+                            <span class="badge badge-grey">@d.Waiting</span>
+                        </td>
+                        <td>
+                            <a asp-action="Client" asp-route-id="@d.ClientId">
+                                <strong>@d.ClientName</strong>
+                            </a>
+                            <div class="muted small mono">@d.ClientNumber</div>
+                        </td>
+                        <td>@DocumentsController.Describe(d.DocumentType)</td>
+                        <td>
+                            <a asp-action="Download" asp-route-id="@d.DocumentId" target="_blank"
+                               rel="noopener">@d.FileName</a>
+                            <div class="muted small">@d.SizeDisplay</div>
+                        </td>
+                        <td>
+                            <div class="row-actions">
+                                <form asp-action="Review" asp-route-id="@d.DocumentId" method="post"
+                                      class="review-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="outcome" value="@DocumentReviewStatus.Approved" />
+                                    <input type="hidden" name="returnTo" value="queue" />
+                                    <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+                                </form>
+
+                                <form asp-action="Review" asp-route-id="@d.DocumentId" method="post"
+                                      class="review-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="outcome" value="@DocumentReviewStatus.Rejected" />
+                                    <input type="hidden" name="returnTo" value="queue" />
+                                    <input type="text" name="notes" placeholder="Reason for rejection"
+                                           class="inline-reason" />
+                                    <button type="submit" class="btn btn-outline btn-sm">Reject</button>
+                                </form>
+
+                                <a asp-action="Client" asp-route-id="@d.ClientId"
+                                   class="btn btn-outline btn-sm">Open file</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

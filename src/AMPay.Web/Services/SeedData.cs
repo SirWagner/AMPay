@@ -1,3 +1,5 @@
+using AMPay.Domain.Contracts;
+using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Infrastructure.Data;
@@ -23,7 +25,10 @@ public static class SeedData
         var roles = sp.GetRequiredService<RoleManager<ApplicationRole>>();
         var log = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Seed");
 
-        await db.Database.MigrateAsync();
+        // Not a bare MigrateAsync: that fails outright when the tables already exist, or when
+        // LocalDB has lost track of a database whose files are still on disk. The
+        // initializer handles both, then migrates whatever is genuinely outstanding.
+        await DatabaseInitializer.InitialiseAsync(db, log);
 
         foreach (var (name, description) in AppRoles.All)
         {
@@ -87,6 +92,9 @@ public static class SeedData
             log.LogInformation("Seeded customer tenant {Name}.", albatross.Name);
         }
 
+        await SeedCreditPackagesAsync(db, log);
+        await SeedContractTemplatesAsync(db, log);
+
         // The sudo account.
         var sudoEmail = config["Seed:SuperAdmin:Email"] ?? "admin@ampay.local";
         var sudoPassword = config["Seed:SuperAdmin:Password"];
@@ -123,6 +131,68 @@ public static class SeedData
 
             await users.AddToRoleAsync(sudo, AppRoles.SuperAdmin);
             log.LogInformation("Seeded super admin {Email}.", sudoEmail);
+        }
+    }
+
+    /// <summary>
+    /// Gives every customer the standard credit packages it is missing.
+    /// <para>
+    /// Every customer, not only the first: a customer created before this ran - or created
+    /// any other way - would otherwise have no package, and a customer without one cannot
+    /// raise a single loan. Only missing tiers are added, so a repriced package is never
+    /// touched and this is safe on every startup.
+    /// </para>
+    /// </summary>
+    private static async Task SeedCreditPackagesAsync(AppDbContext db, ILogger log)
+    {
+        var tenants = await db.Tenants
+            .Where(t => !t.IsPlatformOwner)
+            .Select(t => new { t.Id, t.Name })
+            .ToListAsync();
+
+        foreach (var tenant in tenants)
+        {
+            var existing = await db.CreditPackages
+                .Where(p => p.TenantId == tenant.Id)
+                .Select(p => new { p.Tier, p.Name })
+                .ToListAsync();
+
+            var missing = CreditPackageDefaults.MissingFor(
+                tenant.Id, existing.Select(e => (e.Tier, e.Name)));
+            if (missing.Count == 0) continue;
+
+            db.CreditPackages.AddRange(missing);
+            await db.SaveChangesAsync();
+
+            log.LogInformation("Added {Count} standard credit package(s) for {Tenant}.", missing.Count, tenant.Name);
+        }
+    }
+
+    /// <summary>
+    /// Gives every lender the placeholder contract wording for any section it lacks. Never
+    /// replaces wording a lender has edited or approved.
+    /// </summary>
+    private static async Task SeedContractTemplatesAsync(AppDbContext db, ILogger log)
+    {
+        var tenants = await db.Tenants
+            .Where(t => !t.IsPlatformOwner)
+            .Select(t => new { t.Id, t.Name })
+            .ToListAsync();
+
+        foreach (var tenant in tenants)
+        {
+            var have = await db.ContractTemplates
+                .Where(t => t.TenantId == tenant.Id)
+                .Select(t => t.Kind)
+                .ToListAsync();
+
+            var missing = ContractTemplateDefaults.MissingFor(tenant.Id, have);
+            if (missing.Count == 0) continue;
+
+            db.ContractTemplates.AddRange(missing);
+            await db.SaveChangesAsync();
+
+            log.LogInformation("Added {Count} draft contract template(s) for {Tenant}.", missing.Count, tenant.Name);
         }
     }
 }

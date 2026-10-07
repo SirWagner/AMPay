@@ -1,0 +1,219 @@
+@using AMPay.Domain.Contracts
+@using static AMPay.Domain.Contracts.ContractFormat
+@model ContractDocumentView
+@{
+    var s = Model.Snapshot;
+    var q = s.Quote;
+    var b = s.Borrower;
+    var p = s.Provider;
+    TermsSection? Terms(ContractTemplateKind k) => s.Terms.FirstOrDefault(t => t.Kind == k.ToString());
+}
+
+@functions {
+    private static Microsoft.AspNetCore.Html.IHtmlContent Paras(string body)
+    {
+        var html = new Microsoft.AspNetCore.Html.HtmlContentBuilder();
+        foreach (var para in AMPay.Domain.Contracts.ContractFormat.Paragraphs(body))
+        {
+            html.AppendHtml("<p>");
+            html.Append(para);
+            html.AppendHtml("</p>");
+        }
+        return html;
+    }
+}
+
+<article class="contract-doc @(s.TemplatesApproved ? "" : "is-draft")" aria-label="Credit agreement @s.Reference">
+    @if (!s.TemplatesApproved)
+    {
+        <div class="contract-draft-mark" aria-hidden="true">DRAFT</div>
+        <div class="alert alert-error small">
+            <strong>Draft wording.</strong> The terms in this document have not yet been approved by the credit
+            provider's attorney. Not for signature by a real client.
+        </div>
+    }
+
+    <header class="contract-head">
+        <div>
+            <div class="contract-lender">@(p.TradingName ?? p.RegisteredName)</div>
+            <h2>Pre-agreement statement, quote and short-term credit agreement</h2>
+        </div>
+        <dl class="contract-meta">
+            <dt>Agreement</dt><dd class="mono">@s.Reference</dd>
+            <dt>Issued</dt><dd>@SastTime(s.IssuedUtc)</dd>
+            <dt>Package</dt><dd>@q.PackageName@(q.Customised ? " (customised rates)" : "")</dd>
+        </dl>
+    </header>
+
+    <section>
+        <h3>1. The parties</h3>
+        <div class="contract-parties">
+            <dl class="detail-list">
+                <dt>Credit provider</dt><dd>@p.RegisteredName</dd>
+                @if (p.TradingName is not null) { <dt>Trading as</dt><dd>@p.TradingName</dd> }
+                <dt>Registration</dt><dd>@p.RegistrationNumber</dd>
+                <dt>NCR registration</dt><dd>@p.NcrNumber</dd>
+                @if (p.VatNumber is not null) { <dt>VAT number</dt><dd>@p.VatNumber</dd> }
+                <dt>Address</dt><dd>@p.PhysicalAddress</dd>
+                <dt>Contact</dt><dd>@p.ContactNumber @(p.ContactEmail is null ? "" : " · " + p.ContactEmail)</dd>
+            </dl>
+            <dl class="detail-list">
+                <dt>Borrower</dt><dd>@b.FullName @b.Surname</dd>
+                <dt>ID number</dt><dd class="mono">@b.IdNumber</dd>
+                <dt>Client number</dt><dd class="mono">@b.ClientNumber</dd>
+                <dt>Employer</dt><dd>@b.Employer</dd>
+                <dt>Residential address</dt><dd>@b.ResidentialAddress</dd>
+                <dt>Cell number</dt><dd>@b.Mobile</dd>
+                <dt>Email</dt><dd>@b.Email</dd>
+            </dl>
+        </div>
+    </section>
+
+    <section>
+        <h3>2. Quote and cost of credit</h3>
+        <p class="muted small">Quote dated @Date(q.QuoteDate). This quote is binding on the credit provider for five business days.</p>
+        <table class="data quote-table contract-quote">
+            <tbody>
+            <tr><td class="code">(a)</td><td>Loan amount paid to you</td><td class="num">@Money(q.LoanAmount)</td></tr>
+            <tr><td class="code">(b)</td><td>Optional family funeral insurance paid on your behalf</td><td class="num">@Money(q.FuneralInsurance)</td></tr>
+            <tr><td class="code">(c)</td><td>Optional payment to a third party on your behalf</td><td class="num">@Money(q.ThirdPartyPayment)</td></tr>
+            <tr class="sub"><td class="code">(d)</td><td>Total loan amount (a) + (b) + (c)</td><td class="num">@Money(q.TotalLoanAmount)</td></tr>
+            <tr><td class="code">(f.1)</td><td>Credit life insurance premium</td><td class="num">@Money(q.CreditLife)</td></tr>
+            <tr><td class="code">(f.2)</td><td>Initiation fee</td><td class="num">@Money(q.InitiationFee)</td></tr>
+            <tr><td class="code">(f.3)</td><td>Service fees</td><td class="num">@Money(q.ServiceFees)</td></tr>
+            <tr><td class="code">(f.4)</td><td>Interest</td><td class="num">@Money(q.Interest)</td></tr>
+            <tr><td class="code">(f.5)</td><td>VAT</td><td class="num">@Money(q.Vat)</td></tr>
+            <tr class="sub"><td class="code">(e)</td><td>Total cost of credit (f.1) to (f.5)</td><td class="num">@Money(q.TotalCostOfCredit)</td></tr>
+            <tr class="total"><td class="code">(g)</td><td>Total amount repayable (d) + (e)</td><td class="num">@Money(q.TotalRepayable)</td></tr>
+            <tr><td class="code">(h)</td><td>Interest rate</td><td class="num">@Percent(q.MonthlyInterestRate) a month (@Percent(q.AnnualInterestRate) a year)</td></tr>
+            <tr><td class="code">(i)</td><td>Interest rate on arrears</td><td class="num">@Percent(q.PenaltyInterestRate) a month</td></tr>
+            <tr><td class="code">(j)</td><td>Instalments</td><td class="num">@q.NumberOfInstalments × @Money(q.InstalmentAmount)@(q.FinalInstalmentAmount != 0 && q.FinalInstalmentAmount != q.InstalmentAmount ? ", final " + Money(q.FinalInstalmentAmount) : "")</td></tr>
+            <tr><td class="code"></td><td>Frequency and method</td><td class="num">@q.Frequency, @q.PaymentMethod</td></tr>
+            <tr><td class="code"></td><td>First and final payment</td><td class="num">@Date(q.FirstPaymentDate) to @Date(q.FinalPaymentDate)</td></tr>
+            <tr><td class="code">(l)</td><td>Credit cost multiple (g) / (d)</td><td class="num">@q.CreditCostMultiple.ToString("N2")</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h3>3. Payment schedule</h3>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>#</th><th>Due</th><th class="num">Instalment</th><th class="num">Interest</th>
+                    <th class="num">Capital</th><th class="num">Service fee</th><th class="num">Credit life</th><th class="num">Balance</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var l in s.Schedule)
+                {
+                    <tr>
+                        <td>@l.Number</td><td>@Date(l.DueDate)</td>
+                        <td class="num"><strong>@l.Instalment.ToString("N2")</strong></td>
+                        <td class="num">@l.Interest.ToString("N2")</td>
+                        <td class="num">@l.Capital.ToString("N2")</td>
+                        <td class="num">@l.ServiceFee.ToString("N2")</td>
+                        <td class="num">@l.CreditLife.ToString("N2")</td>
+                        <td class="num">@l.ClosingBalance.ToString("N2")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    @if (Terms(ContractTemplateKind.CreditAgreementTerms) is { } terms)
+    {
+        <section class="contract-terms"><h3>@terms.Title</h3>@Paras(terms.Body)</section>
+    }
+
+    @if (s.Budget is { } budget)
+    {
+        <section>
+            <h3>Budget</h3>
+            <table class="data quote-table">
+                <tbody>
+                <tr><td>Net salary</td><td class="num">@Money(budget.NetSalary)</td></tr>
+                @if (budget.OtherIncome > 0) { <tr><td>Other income</td><td class="num">@Money(budget.OtherIncome)</td></tr> }
+                @foreach (var l in budget.Lines)
+                {
+                    <tr><td>@l.Description@(l.Kind == "Instalment" ? " (credit instalment)" : "")</td><td class="num">@Money(l.Amount)</td></tr>
+                }
+                <tr class="sub"><td>Declared living expenses</td><td class="num">@Money(budget.DeclaredLivingExpenses)</td></tr>
+                <tr><td>Minimum living expenses under the regulations</td><td class="num">@Money(budget.StatutoryMinimum)</td></tr>
+                <tr class="sub"><td>Existing credit instalments</td><td class="num">@Money(budget.DebtInstalments)</td></tr>
+                <tr class="total"><td>Net of net: income left after expenses and instalments</td><td class="num">@Money(budget.NetOfNet)</td></tr>
+                </tbody>
+            </table>
+        </section>
+        @if (Terms(ContractTemplateKind.BudgetAcknowledgement) is { } ack)
+        {
+            <section class="contract-terms"><h3>@ack.Title</h3>@Paras(ack.Body)</section>
+        }
+    }
+
+    @if (s.CreditLife is { } cl)
+    {
+        <section>
+            <h3>Credit life cover</h3>
+            <dl class="detail-list">
+                <dt>Insurer</dt><dd>@(cl.Underwriter ?? "To be confirmed by the credit provider")</dd>
+                <dt>Administrator</dt><dd>@(cl.Administrator ?? "To be confirmed by the credit provider")</dd>
+                <dt>Premium rate</dt><dd>@Percent(cl.MonthlyRate) a month of the outstanding balance</dd>
+                <dt>Total premium</dt><dd>@Money(cl.TotalPremium)</dd>
+                <dt>Sum assured</dt><dd>The outstanding balance, up to @Money(cl.SumAssured)</dd>
+                <dt>Cover period</dt><dd>@Date(cl.CommencementDate) to @Date(cl.TerminationDate)</dd>
+            </dl>
+        </section>
+        @if (Terms(ContractTemplateKind.CreditLifeDisclosure) is { } cld)
+        {
+            <section class="contract-terms"><h3>@cld.Title</h3>@Paras(cld.Body)</section>
+        }
+    }
+
+    <section>
+        <h3>DebiCheck debit order mandate</h3>
+        @{ var m = s.Mandate; }
+        <dl class="detail-list">
+            <dt>Account holder</dt><dd>@(m.AccountHolder ?? "Not captured")</dd>
+            <dt>Bank</dt><dd>@(m.BankName ?? "Not captured") @(m.BranchCode is null ? "" : "(" + m.BranchCode + ")")</dd>
+            <dt>Account</dt><dd class="mono">@(m.MaskedAccountNumber ?? "Not captured") @m.AccountType</dd>
+            <dt>Instalment</dt><dd>@Money(m.InstalmentAmount), @m.Frequency.ToLowerInvariant(), @m.NumberOfInstalments times</dd>
+            <dt>Total to be collected</dt><dd>@Money(m.TotalAmount)</dd>
+            <dt>Collection day</dt><dd>@(m.CollectionDay ?? "Salary day")</dd>
+            <dt>First collection</dt><dd>@(m.FirstCollectionDate is { } fc ? Date(fc) : "As per the payment schedule")</dd>
+            <dt>Tracking</dt><dd>Up to @m.TrackingDays days</dd>
+            <dt>On your bank statement</dt><dd class="mono"><strong>@m.StatementReference</strong></dd>
+        </dl>
+        <p class="muted small">The full account number is held by the credit provider and is masked here so this document can be sent by link safely.</p>
+    </section>
+
+    @if (Terms(ContractTemplateKind.DebitOrderAuthorisation) is { } dor)
+    {
+        <section class="contract-terms"><h3>@dor.Title</h3>@Paras(dor.Body)</section>
+    }
+
+    <section>
+        <h3>Signature</h3>
+        @if (Model.Signature is { } sig)
+        {
+            <div class="alert alert-success small">
+                <strong>
+                    @(sig.Method == SignatureMethod.OnlineOtp
+                        ? "Signed online with a one-time PIN"
+                        : "Signed on paper - the signed copy is on file")
+                </strong>
+                <div>by @sig.SignedName on @SastTime(sig.SignedUtc)@(string.IsNullOrEmpty(sig.MaskedMobile) ? "" : ", PIN sent to " + sig.MaskedMobile)@(string.IsNullOrEmpty(sig.IpAddress) ? "" : ", from " + sig.IpAddress).</div>
+            </div>
+        }
+        else
+        {
+            <p class="muted small">Not yet signed.</p>
+        }
+    </section>
+
+    <footer class="contract-foot muted small">
+        Fingerprint <span class="mono">@ShortHash(Model.Hash)</span> &middot; a SHA-256 digest of this agreement exactly as issued.
+    </footer>
+</article>

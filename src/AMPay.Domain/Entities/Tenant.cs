@@ -30,6 +30,18 @@ public class Tenant
     public string? ContactEmail { get; set; }
     public string? ContactNumber { get; set; }
 
+    // ---- Shown on the contract as the credit provider's details ----
+
+    public string? VatNumber { get; set; }
+    public string? PhysicalAddress { get; set; }
+    public string? PostalAddress { get; set; }
+
+    /// <summary>The credit life underwriter, e.g. "Clientèle Life Assurance Company Limited (FSP 15268)".</summary>
+    public string? CreditLifeUnderwriter { get; set; }
+
+    /// <summary>The administrator, e.g. "Kepler Risk Services (Pty) Ltd".</summary>
+    public string? CreditLifeAdministrator { get; set; }
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedUtc { get; set; }
 

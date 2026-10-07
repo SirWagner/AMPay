@@ -1,0 +1,117 @@
+@model List<CreditPackage>
+@{
+    ViewData["Title"] = "Credit packages";
+    var limits = (AMPay.Domain.Credit.NcaCreditLimits)ViewBag.Limits;
+    var canManage = (bool)ViewBag.CanManage;
+    var missing = (List<string>)ViewBag.MissingTiers;
+    var customer = ViewBag.CustomerName as string;
+    string Pct(decimal f, int dp = 2) => (f * 100m).ToString("N" + dp) + "%";
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Credit packages</h1>
+        <p class="lede">
+            The price lists every loan for <strong>@customer</strong> is quoted against.
+            Changing a package affects only loans quoted afterwards &mdash; existing agreements
+            keep the rates they were signed at.
+        </p>
+    </div>
+    @if (canManage)
+    {
+        <a asp-action="Create" class="btn btn-primary">New package</a>
+    }
+</div>
+
+@if (!canManage)
+{
+    <div class="alert alert-info">
+        Pricing is managed by the AM-Pay platform administrator. Contact them to add a
+        package or change a rate.
+    </div>
+}
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-warn flex-between">
+        <span>This customer has no credit packages, so no loan can be raised for any of its clients.</span>
+        @if (canManage)
+        {
+            <form asp-action="AddStandard" method="post">
+                <button type="submit" class="btn btn-primary btn-sm">Add the standard packages</button>
+            </form>
+        }
+    </div>
+}
+else if (canManage && missing.Count > 0)
+{
+    <div class="alert alert-info flex-between">
+        <span>No package covers the @string.Join(" or ", missing) tier@(missing.Count == 1 ? "" : "s") yet.</span>
+        <form asp-action="AddStandard" method="post">
+            <button type="submit" class="btn btn-outline btn-sm">Add the standard @(missing.Count == 1 ? "package" : "packages")</button>
+        </form>
+    </div>
+}
+
+<div class="package-grid wide">
+    @foreach (var p in Model)
+    {
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <h3>@p.Name</h3>
+                    <span class="badge badge-navy">@p.Tier tier</span>
+                </div>
+                @if (p.IsActive)
+                {
+                    <span class="badge badge-green">Available</span>
+                }
+                else
+                {
+                    <span class="badge badge-grey">Withdrawn</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(p.Description))
+                {
+                    <p class="muted small">@p.Description</p>
+                }
+                <dl class="detail-list">
+                    <dt>Interest</dt><dd><strong>@Pct(p.MonthlyInterestRate)</strong> per month</dd>
+                    <dt>Service fee</dt><dd>R @p.MonthlyServiceFee.ToString("N2") per month</dd>
+                    <dt>Initiation fee</dt><dd>@Pct(p.InitiationFeeRate, 0) of the loan <span class="muted small">(capped by the NCA)</span></dd>
+                    <dt>Credit life</dt><dd>@Pct(p.CreditLifeRate) of the balance per month</dd>
+                    <dt>Loan amount</dt><dd>R @p.MinLoanAmount.ToString("N0") &ndash; R @p.MaxLoanAmount.ToString("N0")</dd>
+                    <dt>Term</dt><dd>@p.MinTermMonths &ndash; @p.MaxTermMonths months</dd>
+                </dl>
+            </div>
+            @if (canManage)
+            {
+                <div class="card-foot">
+                    <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-outline btn-sm">Edit</a>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-head"><h3>Statutory maximums applied at quote time</h3></div>
+    <div class="card-body">
+        <p class="muted small">
+            Whatever a package says, no quote exceeds these. They come from configuration and
+            must be checked against the current National Credit Act regulations before go-live.
+        </p>
+        <dl class="detail-list">
+            <dt>Interest</dt><dd>@Pct(limits.MonthlyInterestCeiling) per month</dd>
+            <dt>Service fee</dt><dd>R @limits.MonthlyServiceFeeCeiling.ToString("N2") per month</dd>
+            <dt>Initiation fee</dt>
+            <dd>
+                R @limits.InitiationFeeBase.ToString("N2") + @Pct(limits.InitiationFeeMarginalRate, 0) of the amount
+                above R @limits.InitiationFeeThreshold.ToString("N0"), never more than R @limits.InitiationFeeCeiling.ToString("N2")
+            </dd>
+            <dt>Credit life</dt><dd>@Pct(limits.CreditLifeCeilingRate) of the balance per month</dd>
+        </dl>
+        <p class="muted small mb-0">All amounts include VAT.</p>
+    </div>
+</div>

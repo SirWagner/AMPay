@@ -11,13 +11,13 @@
     <link rel="stylesheet" href="~/css/ampay.css" asp-append-version="true" />
 </head>
 <body>
-<div class="auth-page">
-    <div class="auth-card">
-        <div class="mark">AM-Pay</div>
-        <div class="sub">A Netcash ISV</div>
+@* The public site's log-in page: form on white, the live network on navy beside it. *@
+<div class="auth-wrap">
+    <main class="auth-panel">
+        <img src="~/img/ampay-logo.png" alt="AM-Pay Fintech" class="auth-logo" width="203" height="40" />
 
-        <h1 style="font-size:1.25rem;">Sign in</h1>
-        <p class="muted small">DebiCheck onboarding and collections console.</p>
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-sub">Sign in to the DebiCheck onboarding and collections console.</p>
 
         <form asp-action="Login" method="post">
             <input type="hidden" asp-for="ReturnUrl" />
@@ -35,16 +35,31 @@
                 <span asp-validation-for="Password" class="field-error"></span>
             </div>
 
-            <div class="check" style="margin-bottom:1.25rem;">
+            <div class="check" style="margin-bottom:1.5rem;">
                 <input asp-for="RememberMe" type="checkbox" />
                 <label asp-for="RememberMe"></label>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
-                Sign in
+            <button type="submit" class="btn btn-navy btn-lg" style="width:100%;justify-content:center;">
+                Sign in <span aria-hidden="true">&rarr;</span>
             </button>
         </form>
-    </div>
+    </main>
+
+    <aside class="auth-side hero-dark">
+        <canvas class="network-bg" data-network="interactive" data-tone="dark" aria-hidden="true"></canvas>
+        <div class="network-glow" aria-hidden="true"></div>
+        <div class="auth-side-content">
+            <div class="hero-pill"><span class="pulse-dot" aria-hidden="true"></span> A Netcash ISV</div>
+            <h2>Payments, <em>orchestrated.</em></h2>
+            <p>
+                Onboard clients, originate credit and collect by DebiCheck &mdash; for every lender trading
+                beneath AM-Pay, from one console.
+            </p>
+        </div>
+    </aside>
 </div>
+
+<script src="~/js/network.js" asp-append-version="true"></script>
 </body>
 </html>

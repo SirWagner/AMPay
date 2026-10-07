@@ -1,0 +1,13 @@
+@model AMPay.Domain.Enums.ContractStatus
+@{
+    var (tone, label) = Model switch
+    {
+        ContractStatus.Issued => ("badge-grey", "Issued, not sent"),
+        ContractStatus.Sent => ("badge-amber", "Sent, awaiting signature"),
+        ContractStatus.Viewed => ("badge-amber", "Opened by client"),
+        ContractStatus.Signed => ("badge-green", "Signed"),
+        ContractStatus.Voided => ("badge-red", "Voided"),
+        _ => ("badge-grey", Model.ToString())
+    };
+}
+<span class="badge @tone">@label</span>

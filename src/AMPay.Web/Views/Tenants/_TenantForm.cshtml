@@ -68,3 +68,32 @@
         </div>
     </div>
 </div>
+
+<div class="card">
+    <div class="card-head"><h2>Shown on contracts</h2></div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="field">
+                <label asp-for="VatNumber"></label>
+                <input asp-for="VatNumber" />
+            </div>
+            <div class="field">
+                <label asp-for="PhysicalAddress"></label>
+                <input asp-for="PhysicalAddress" />
+            </div>
+            <div class="field">
+                <label asp-for="PostalAddress"></label>
+                <input asp-for="PostalAddress" />
+            </div>
+            <div class="field">
+                <label asp-for="CreditLifeUnderwriter"></label>
+                <input asp-for="CreditLifeUnderwriter" placeholder="The insurer that underwrites the policy" />
+            </div>
+            <div class="field">
+                <label asp-for="CreditLifeAdministrator"></label>
+                <input asp-for="CreditLifeAdministrator" placeholder="The policy administrator, if different" />
+            </div>
+        </div>
+        <span class="hint">Changes apply to contracts issued afterwards. A contract already issued keeps the details it was issued with.</span>
+    </div>
+</div>

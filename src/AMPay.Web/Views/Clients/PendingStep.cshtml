@@ -9,9 +9,6 @@
         AMPay.Web.Models.OnboardingStep.References =>
             ("Add, edit and remove the client's references.",
              "Plain CRUD over the ClientReference entity, which already exists."),
-        AMPay.Web.Models.OnboardingStep.Budgets =>
-            ("Capture budget lines against the client.",
-             "Plain CRUD over the ClientBudget entity, which already exists."),
         AMPay.Web.Models.OnboardingStep.CreditCheck =>
             ("Run and review credit bureau enquiries.",
              "Blocked on a decision: Compuscan / Experian directly, or Netcash risk reports (service id 3). See ICreditBureauClient."),
@@ -30,7 +27,7 @@
 
 <div class="page-head">
     <h1>@wizard.ClientName</h1>
-    <p class="lede">Step @((int)step) of 13 &mdash; @label.ToLowerInvariant().</p>
+    <p class="lede">@OnboardingSteps.Caption(step) &mdash; @label.ToLowerInvariant().</p>
 </div>
 
 <div class="wizard">

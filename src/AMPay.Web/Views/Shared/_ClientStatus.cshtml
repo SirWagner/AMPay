@@ -1,0 +1,16 @@
+@model AMPay.Domain.Enums.ClientStatus
+@{
+    // Colour carries meaning here: green is lendable, amber is waiting on us, red is a
+    // dead end, grey is not yet a client.
+    var tone = Model switch
+    {
+        ClientStatus.Active => "badge-green",
+        ClientStatus.Onboarded => "badge-green",
+        ClientStatus.PendingVerification => "badge-amber",
+        ClientStatus.Captured => "badge-navy",
+        ClientStatus.Declined => "badge-red",
+        ClientStatus.Suspended => "badge-red",
+        _ => "badge-grey"
+    };
+}
+<span class="badge @tone" title="@ClientStatusInfo.Description(Model)">@ClientStatusInfo.Label(Model)</span>
