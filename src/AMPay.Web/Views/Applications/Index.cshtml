@@ -1,0 +1,117 @@
+@model AMPay.Web.Controllers.ApplicationsPage
+@using AMPay.Domain.Portal
+@{
+    string When(DateTime? utc) => utc is null ? "" : AMPay.Domain.Contracts.ContractFormat.SastTime(utc.Value);
+    var waiting = Model.Applications.Where(a => a.Status == PortalApplicationStatus.Submitted).ToList();
+    var picked = Model.Applications.Where(a => a.Status == PortalApplicationStatus.PickedUp).ToList();
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Applications</h1>
+        <p class="lede">Made by clients on the self-service portal. Import one to create the client and continue the onboarding.</p>
+    </div>
+    <a asp-controller="SelfService" asp-action="Index" class="btn btn-outline">Self-service link</a>
+</div>
+
+@if (!Model.PortalConfigured)
+{
+    <div class="alert alert-warn">The self-service portal is not connected to this AM-Pay yet.</div>
+}
+else if (!Model.HasLink)
+{
+    <div class="alert alert-info">
+        This customer has no self-service link yet. <a asp-controller="SelfService" asp-action="Index">Create one</a> to start receiving applications.
+    </div>
+}
+@if (Model.Error is not null)
+{
+    <div class="alert alert-error">@Model.Error</div>
+}
+
+<div class="card">
+    <div class="card-head"><h3>Call-back requests <span class="muted small">(@Model.Callbacks.Count open)</span></h3></div>
+    @if (Model.Callbacks.Count == 0)
+    {
+        <div class="card-body"><p class="empty mb-0">No one is waiting for a call.</p></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Asked</th><th>Name</th><th>Cell</th><th>Best time</th><th>Message</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var c in Model.Callbacks)
+                {
+                    <tr>
+                        <td class="small" style="white-space:nowrap;">@When(c.CreatedUtc)</td>
+                        <td><strong>@c.Name</strong></td>
+                        <td class="mono"><a href="tel:+@c.Mobile">@PortalApi.DisplayMobile(c.Mobile)</a></td>
+                        <td class="small">@c.PreferredTime</td>
+                        <td class="small" style="max-width:24rem;">@c.Message</td>
+                        <td>
+                            <form asp-action="CallbackHandled" asp-route-id="@c.Id" method="post">
+                                <button type="submit" class="btn btn-outline btn-sm">Called - done</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-head"><h3>Waiting to be picked up <span class="muted small">(@waiting.Count)</span></h3></div>
+    @if (waiting.Count == 0)
+    {
+        <div class="card-body"><p class="empty mb-0">No new applications.</p></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Submitted</th><th>Reference</th><th>Applicant</th><th>ID number</th><th class="num">Asked for</th><th>Documents</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var a in waiting)
+                {
+                    var known = a.IdNumber is not null && Model.ExistingClients.ContainsKey(a.IdNumber);
+                    <tr>
+                        <td class="small" style="white-space:nowrap;">@When(a.SubmittedUtc)</td>
+                        <td class="mono"><a asp-action="Details" asp-route-id="@a.Id">@a.Reference</a></td>
+                        <td>
+                            <strong>@a.FirstName @a.Surname</strong>
+                            @if (known) { <span class="badge badge-navy" title="Already a client: @Model.ExistingClients[a.IdNumber!].ClientNumber">Existing client</span> }
+                        </td>
+                        <td class="mono small">@AMPay.Domain.Validation.SaIdNumber.Mask(a.IdNumber)</td>
+                        <td class="num">@(a.RequestedAmount is { } amt ? "R " + amt.ToString("N0") : "-") @(a.RequestedTerm is { } t ? $"/ {t} mo" : "")</td>
+                        <td>@a.DocumentCount</td>
+                        <td><a asp-action="Details" asp-route-id="@a.Id" class="btn btn-primary btn-sm">Open</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (picked.Count > 0)
+{
+    <details class="card" style="padding:1rem 1.25rem;">
+        <summary>Already picked up (@picked.Count)</summary>
+        <table class="data" style="margin-top:.75rem;">
+            <tbody>
+            @foreach (var a in picked)
+            {
+                <tr>
+                    <td class="mono"><a asp-action="Details" asp-route-id="@a.Id">@a.Reference</a></td>
+                    <td>@a.FirstName @a.Surname</td>
+                    <td class="small">picked up @When(a.PickedUpUtc)</td>
+                    <td>@if (a.AmpayClientId is { } cid) { <a asp-controller="Clients" asp-action="Details" asp-route-id="@cid">Open client</a> }</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </details>
+}

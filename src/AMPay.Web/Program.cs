@@ -87,6 +87,11 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
 builder.Services.AddScoped<INetcashCapabilityService, NetcashCapabilityService>();
 
+// The self-service portal: a separate app with its own database. AM-Pay calls it; it never calls AM-Pay.
+builder.Services.Configure<PortalOptions>(builder.Configuration.GetSection(PortalOptions.SectionName));
+builder.Services.AddHttpClient<IPortalApi, PortalClient>();
+builder.Services.AddScoped<PortalImporter>();
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {

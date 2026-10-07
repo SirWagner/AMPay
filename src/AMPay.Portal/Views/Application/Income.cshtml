@@ -1,0 +1,73 @@
+@model IncomeModel
+@{
+    ViewData["Title"] = "Work and income";
+    var l = (Lender)ViewData["Lender"]!;
+}
+
+<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
+<h1>Work and income</h1>
+<p class="lede">Use your latest payslip. @l.DisplayName must check that you can afford the repayments, and these figures are where it starts.</p>
+
+<form method="post" action="/a/@l.PublicCode/application/income" class="card" novalidate>
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="field">
+        <label asp-for="EmployerName"></label>
+        <input asp-for="EmployerName" autocomplete="organization" />
+        <span asp-validation-for="EmployerName" class="field-error"></span>
+    </div>
+    <div class="grid-2">
+        <div class="field">
+            <label asp-for="Occupation"></label>
+            <input asp-for="Occupation" autocomplete="organization-title" />
+        </div>
+        <div class="field">
+            <label asp-for="EmployedSince"></label>
+            <input asp-for="EmployedSince" type="date" />
+            <span asp-validation-for="EmployedSince" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="PayFrequency"></label>
+            <select asp-for="PayFrequency">
+                <option>Monthly</option><option>Fortnightly</option><option>Weekly</option>
+            </select>
+        </div>
+        <div class="field">
+            <label asp-for="SalaryDay"></label>
+            <input asp-for="SalaryDay" type="number" inputmode="numeric" min="1" max="31" />
+            <span asp-validation-for="SalaryDay" class="field-error"></span>
+        </div>
+    </div>
+
+    <h2 style="margin-top:8px;">Each month</h2>
+    <div class="grid-2">
+        <div class="field">
+            <label asp-for="GrossMonthlyIncome"></label>
+            <input asp-for="GrossMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span asp-validation-for="GrossMonthlyIncome" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="NetMonthlyIncome"></label>
+            <input asp-for="NetMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span asp-validation-for="NetMonthlyIncome" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="OtherMonthlyIncome"></label>
+            <input asp-for="OtherMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" />
+        </div>
+        <div class="field">
+            <label asp-for="MonthlyExpenses"></label>
+            <input asp-for="MonthlyExpenses" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="hint">Rent, food, transport, school fees, phone.</span>
+            <span asp-validation-for="MonthlyExpenses" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="MonthlyDebtRepayments"></label>
+            <input asp-for="MonthlyDebtRepayments" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="hint">Other loans, store accounts, credit cards.</span>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Save and continue</button>
+</form>

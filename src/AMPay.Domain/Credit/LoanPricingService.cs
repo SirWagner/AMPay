@@ -1,8 +1,8 @@
-using AMPay.Domain.Credit;
+
 using AMPay.Domain.Entities;
 using Microsoft.Extensions.Options;
 
-namespace AMPay.Infrastructure.Credit;
+namespace AMPay.Domain.Credit;
 
 /// <summary>
 /// Reducing-balance loan pricing under the National Credit Act short-term credit rules.

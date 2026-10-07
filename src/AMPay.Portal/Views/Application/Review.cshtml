@@ -1,0 +1,73 @@
+@model ReviewModel
+@{
+    ViewData["Title"] = "Check and submit";
+    var l = (Lender)ViewData["Lender"]!;
+    var a = Model.Application;
+    var basePath = $"/a/{l.PublicCode}/application";
+    string R(decimal? v) => v is null ? "-" : "R " + v.Value.ToString("N2");
+}
+
+<p class="small"><a href="@basePath">&larr; Your application</a></p>
+<h1>Check and submit</h1>
+
+@if (!a.IsEditable)
+{
+    <div class="alert alert-info">This application has been sent to @l.DisplayName and can no longer be changed.</div>
+}
+else if (Model.Missing.Count > 0)
+{
+    <div class="alert alert-warn">Still needed: @string.Join(", ", Model.Missing).</div>
+}
+
+<div class="card">
+    <h2>About you <a class="small" href="@basePath/details" style="font-weight:400;">change</a></h2>
+    <dl class="summary">
+        <dt>Name</dt><dd>@a.Title @a.FirstName @a.MiddleNames @a.Surname</dd>
+        <dt>ID number</dt><dd>@a.IdNumber</dd>
+        <dt>Email</dt><dd>@(a.Email ?? "-")</dd>
+        <dt>Address</dt><dd>@string.Join(", ", new[] { a.AddressLine1, a.AddressLine2, a.Suburb, a.City, a.Province, a.PostalCode }.Where(s => !string.IsNullOrWhiteSpace(s)))</dd>
+    </dl>
+</div>
+
+<div class="card">
+    <h2>Work and income <a class="small" href="@basePath/income" style="font-weight:400;">change</a></h2>
+    <dl class="summary">
+        <dt>Employer</dt><dd>@(a.EmployerName ?? "-") @(a.Occupation is null ? "" : "(" + a.Occupation + ")")</dd>
+        <dt>Pay day</dt><dd>@(a.SalaryDay?.ToString() ?? "-")</dd>
+        <dt>Gross / take-home</dt><dd>@R(a.GrossMonthlyIncome) / @R(a.NetMonthlyIncome)</dd>
+        <dt>Living expenses</dt><dd>@R(a.MonthlyExpenses)</dd>
+        <dt>Other repayments</dt><dd>@R(a.MonthlyDebtRepayments)</dd>
+    </dl>
+</div>
+
+<div class="card">
+    <h2>The loan <a class="small" href="@basePath/loan" style="font-weight:400;">change</a></h2>
+    <dl class="summary">
+        <dt>Amount</dt><dd>@R(a.RequestedAmount)</dd>
+        <dt>Over</dt><dd>@(a.RequestedTerm is null ? "-" : a.RequestedTerm + " months")</dd>
+        <dt>Estimated repayment</dt><dd>@R(a.EstimatedInstalment) a month - an estimate, not an offer</dd>
+        <dt>Documents</dt><dd>@a.Documents.Count uploaded <a class="small" href="@basePath/documents">manage</a></dd>
+    </dl>
+</div>
+
+@if (a.IsEditable)
+{
+    <form method="post" action="@basePath/submit" class="card" novalidate>
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+        <h2>Your consent</h2>
+        <label class="check">
+            <input type="checkbox" name="DataProcessingConsent" value="true" @(Model.DataProcessingConsent ? "checked" : "") />
+            <span>I agree that @l.Name may process my personal information to assess this application and, if approved, to manage my loan, as described under POPIA. The information I gave is true and complete.</span>
+        </label>
+        <label class="check">
+            <input type="checkbox" name="CreditCheckConsent" value="true" @(Model.CreditCheckConsent ? "checked" : "") />
+            <span>I agree that @l.Name may check my credit record with registered credit bureaux and verify my identity, employment and bank account.</span>
+        </label>
+        <label class="check">
+            <input type="checkbox" name="MarketingConsent" value="true" @(Model.MarketingConsent ? "checked" : "") />
+            <span class="muted">Optional: I'd like to hear about other offers from @l.DisplayName.</span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Send my application to @l.DisplayName</button>
+    </form>
+}

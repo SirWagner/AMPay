@@ -1,0 +1,21 @@
+@model StartModel
+@{
+    ViewData["Title"] = "Your cell number";
+    var l = (Lender)ViewData["Lender"]!;
+}
+
+<div class="card">
+    <h1>Your cell number</h1>
+    <p class="lede">We'll send a 6-digit code to this number. It keeps your application private - use the same number to come back later.</p>
+
+    <form method="post" action="/a/@l.PublicCode/start" novalidate>
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+        <div class="field">
+            <label asp-for="Mobile"></label>
+            <input asp-for="Mobile" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" />
+            <span asp-validation-for="Mobile" class="field-error"></span>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Send me a code</button>
+    </form>
+</div>

@@ -121,6 +121,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.PostalAddress).HasMaxLength(300);
             e.Property(x => x.CreditLifeUnderwriter).HasMaxLength(200);
             e.Property(x => x.CreditLifeAdministrator).HasMaxLength(200);
+            e.Property(x => x.SelfServiceCode).HasMaxLength(12);
+            e.HasIndex(x => x.SelfServiceCode).IsUnique().HasFilter("[SelfServiceCode] IS NOT NULL");
+            e.Property(x => x.AdvisorWhatsApp).HasMaxLength(20);
             e.HasIndex(x => x.NetcashAccountNumber).IsUnique()
                 .HasFilter("[NetcashAccountNumber] IS NOT NULL");
 

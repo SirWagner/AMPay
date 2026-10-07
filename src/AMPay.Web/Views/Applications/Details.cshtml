@@ -1,0 +1,103 @@
+@model AMPay.Domain.Portal.PortalApplicationDetail
+@using AMPay.Domain.Portal
+@{
+    var s = Model.Summary;
+    dynamic? existing = ViewBag.Existing;
+    string R(decimal? v) => v is null ? "-" : "R " + v.Value.ToString("N2");
+    string When(DateTime? utc) => utc is null ? "-" : AMPay.Domain.Contracts.ContractFormat.SastTime(utc.Value);
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Application <span class="mono">@s.Reference</span></h1>
+        <p class="lede">
+            @s.FirstName @s.Surname &middot; submitted @When(s.SubmittedUtc)
+            @if (s.Status == PortalApplicationStatus.PickedUp) { <span class="badge badge-green">Picked up @When(s.PickedUpUtc)</span> }
+            else { <span class="badge badge-amber">Waiting</span> }
+        </p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline">All applications</a>
+</div>
+
+<div class="alert alert-info small">
+    Everything below is as the client typed it. Importing creates the client as <strong>captured</strong> and sends the
+    documents for review - nothing is treated as verified until a reviewer and the affordability assessment have done their work.
+</div>
+
+<div class="chart-grid">
+    <div class="card">
+        <div class="card-head"><h3>The client</h3></div>
+        <div class="card-body">
+            <dl class="detail-list">
+                <dt>Name</dt><dd>@Model.Title @s.FirstName @Model.MiddleNames @s.Surname</dd>
+                <dt>ID number</dt><dd class="mono">@s.IdNumber</dd>
+                <dt>Cell</dt><dd class="mono">@PortalApi.DisplayMobile(s.Mobile) <span class="muted small">(verified by SMS code)</span></dd>
+                <dt>Email</dt><dd>@(Model.Email ?? "-")</dd>
+                <dt>Address</dt><dd>@string.Join(", ", new[] { Model.AddressLine1, Model.AddressLine2, Model.Suburb, Model.City, Model.Province, Model.PostalCode }.Where(x => !string.IsNullOrWhiteSpace(x)))</dd>
+                <dt>Employer</dt><dd>@(Model.EmployerName ?? "-") @(Model.Occupation is null ? "" : "(" + Model.Occupation + ")")</dd>
+                <dt>Employed since</dt><dd>@(Model.EmployedSince?.ToString("dd MMM yyyy") ?? "-")</dd>
+                <dt>Pay</dt><dd>@(Model.PayFrequency ?? "-")@(Model.SalaryDay is { } payDay ? $", on day {payDay}" : "")</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h3>Declared income and the request</h3></div>
+        <div class="card-body">
+            <dl class="detail-list">
+                <dt>Gross</dt><dd>@R(Model.GrossMonthlyIncome)</dd>
+                <dt>Take-home</dt><dd>@R(Model.NetMonthlyIncome)</dd>
+                <dt>Other income</dt><dd>@R(Model.OtherMonthlyIncome)</dd>
+                <dt>Living expenses</dt><dd>@R(Model.MonthlyExpenses)</dd>
+                <dt>Other repayments</dt><dd>@R(Model.MonthlyDebtRepayments)</dd>
+                <dt>Asked for</dt><dd><strong>@R(s.RequestedAmount)</strong> over @(s.RequestedTerm?.ToString() ?? "-") months</dd>
+                <dt>Estimate shown</dt><dd>@R(Model.EstimatedInstalment) a month on @(Model.PackageName ?? "-")</dd>
+                <dt>Consent</dt>
+                <dd class="small">
+                    POPIA @(Model.DataProcessingConsent ? "yes" : "no"), credit check @(Model.CreditCheckConsent ? "yes" : "no"),
+                    marketing @(Model.MarketingConsent ? "yes" : "no") &middot; @When(Model.ConsentUtc)
+                </dd>
+            </dl>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h3>Documents (@Model.Documents.Count)</h3></div>
+    <div class="table-wrap">
+        <table class="data">
+            <tbody>
+            @foreach (var d in Model.Documents)
+            {
+                <tr>
+                    <td>@AMPay.Web.Controllers.DocumentsController.Describe(d.DocumentType)</td>
+                    <td class="small">@d.FileName</td>
+                    <td class="small muted">@((d.SizeBytes / 1024.0).ToString("N0")) KB</td>
+                    <td><a asp-action="Document" asp-route-id="@s.Id" asp-route-documentId="@d.Id" target="_blank" rel="noopener">View</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        @if (existing is not null)
+        {
+            <p>
+                <strong>@existing.Name</strong> (client <span class="mono">@existing.ClientNumber</span>) already has this ID number.
+                Importing adds the documents and fills in anything missing on their file; nothing on file is overwritten.
+            </p>
+        }
+        else
+        {
+            <p>No client has this ID number yet. Importing creates a new client.</p>
+        }
+        <form asp-action="Import" asp-route-id="@s.Id" method="post">
+            <button type="submit" class="btn btn-primary">
+                @(s.Status == PortalApplicationStatus.PickedUp ? "Import again (adds any new documents)" : existing is null ? "Create client and continue onboarding" : "Add to existing client")
+            </button>
+        </form>
+    </div>
+</div>

@@ -59,6 +59,10 @@
         }
         @if (!isReviewerOnly)
         {
+            @if (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin) || User.IsInRole(AppRoles.Capturer))
+            {
+                <a class="nav-link @Active("Applications")" asp-controller="Applications" asp-action="Index">Applications</a>
+            }
             <a class="nav-link @Active("Loans")" asp-controller="Loans" asp-action="Index">Loans</a>
             <a class="nav-link @Active("Mandates")" asp-controller="Mandates" asp-action="Index">DebiCheck mandates</a>
             <a class="nav-link @Active("Checkout")" asp-controller="Checkout" asp-action="Index">Pay Now</a>
@@ -72,6 +76,7 @@
                 <a class="nav-link @Active("Tenants")" asp-controller="Tenants" asp-action="Index">Customers</a>
             }
             <a class="nav-link @Active("CreditPackages")" asp-controller="CreditPackages" asp-action="Index">Credit packages</a>
+            <a class="nav-link @Active("SelfService")" asp-controller="SelfService" asp-action="Index">Self-service link</a>
             <a class="nav-link @Active("ContractTemplates")" asp-controller="ContractTemplates" asp-action="Index">Contract wording</a>
             <a class="nav-link @Active("Outbox")" asp-controller="Outbox" asp-action="Index">Messages sent</a>
             <a class="nav-link @Active("ServiceKeys")" asp-controller="ServiceKeys" asp-action="Index">Netcash service keys</a>

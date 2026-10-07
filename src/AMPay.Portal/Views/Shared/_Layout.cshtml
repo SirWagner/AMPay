@@ -1,0 +1,72 @@
+@using Microsoft.Extensions.Options
+@using AMPay.Portal.Services
+@inject IOptions<PortalOptions> Options
+@{
+    var lender = ViewData["Lender"] as Lender;
+    var signedIn = lender is not null && User.Identity?.IsAuthenticated == true &&
+                   User.FindFirst(ApplicantClaims.LenderId)?.Value == lender.Id.ToString();
+}
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>@ViewData["Title"]@(lender is null ? "" : " · " + lender.DisplayName)</title>
+    <link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />
+</head>
+<body>
+@if (Options.Value.UseStubs)
+{
+    <div class="test-banner" role="note">Test system: no SMS is sent and sign-in codes are shown on screen. Do not enter real personal information.</div>
+}
+<div class="stage">
+<canvas class="network-bg" data-network="ambient" data-tone="dark" aria-hidden="true"></canvas>
+<header class="top">
+    <div class="top-inner">
+        <div>
+            @if (lender is not null)
+            {
+                <a href="/a/@lender.PublicCode" style="color:#fff;text-decoration:none;"><strong>@lender.DisplayName</strong></a>
+                @if (!string.IsNullOrWhiteSpace(lender.NcrNumber))
+                {
+                    <div class="ncr">Registered credit provider @lender.NcrNumber</div>
+                }
+            }
+            else
+            {
+                <strong>Loan application</strong>
+            }
+        </div>
+        @if (signedIn)
+        {
+            <form method="post" action="/a/@lender!.PublicCode/signout">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="linkish">Sign out</button>
+            </form>
+        }
+    </div>
+</header>
+</div>
+
+<main class="wrap">
+    @if (TempData["Success"] is string ok) { <div class="alert alert-success" role="status">@ok</div> }
+    @if (TempData["Error"] is string err) { <div class="alert alert-error" role="alert">@err</div> }
+    @RenderBody()
+</main>
+
+<footer class="foot">
+    @if (lender is not null)
+    {
+        <p>
+            Your information is collected for @lender.Name@(string.IsNullOrWhiteSpace(lender.NcrNumber) ? "" : $" (NCR {lender.NcrNumber})")
+            to assess your loan application, as the National Credit Act requires, and is processed under POPIA.
+            Questions: @(lender.ContactNumber ?? lender.ContactEmail ?? "contact the lender").
+        </p>
+    }
+    <p>Secure application service by AM-Pay.</p>
+</footer>
+<script src="~/js/network.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
