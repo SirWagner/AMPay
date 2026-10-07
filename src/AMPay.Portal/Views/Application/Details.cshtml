@@ -1,0 +1,86 @@
+@model DetailsModel
+@{
+    ViewData["Title"] = "About you";
+    var l = (Lender)ViewData["Lender"]!;
+}
+
+<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
+<h1>About you</h1>
+<p class="lede">As it appears on your ID.</p>
+
+<form method="post" action="/a/@l.PublicCode/application/details" class="card" novalidate>
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="grid-2">
+        <div class="field">
+            <label asp-for="Title"></label>
+            <select asp-for="Title">
+                <option value=""></option>
+                <option>Mr</option><option>Mrs</option><option>Ms</option><option>Miss</option><option>Dr</option>
+            </select>
+        </div>
+        <div></div>
+        <div class="field">
+            <label asp-for="FirstName"></label>
+            <input asp-for="FirstName" autocomplete="given-name" />
+            <span asp-validation-for="FirstName" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Surname"></label>
+            <input asp-for="Surname" autocomplete="family-name" />
+            <span asp-validation-for="Surname" class="field-error"></span>
+        </div>
+    </div>
+    <div class="field">
+        <label asp-for="MiddleNames"></label>
+        <input asp-for="MiddleNames" autocomplete="additional-name" />
+    </div>
+    <div class="field">
+        <label asp-for="IdNumber"></label>
+        <input asp-for="IdNumber" inputmode="numeric" maxlength="13" autocomplete="off" />
+        <span class="hint">13 digits. Applications need a South African ID; if you do not have one, talk to an advisor.</span>
+        <span asp-validation-for="IdNumber" class="field-error"></span>
+    </div>
+    <div class="field">
+        <label asp-for="Email"></label>
+        <input asp-for="Email" type="email" autocomplete="email" />
+        <span asp-validation-for="Email" class="field-error"></span>
+    </div>
+
+    <h2 style="margin-top:8px;">Where you live</h2>
+    <div class="field">
+        <label asp-for="AddressLine1"></label>
+        <input asp-for="AddressLine1" autocomplete="address-line1" />
+        <span asp-validation-for="AddressLine1" class="field-error"></span>
+    </div>
+    <div class="field">
+        <label asp-for="AddressLine2"></label>
+        <input asp-for="AddressLine2" autocomplete="address-line2" />
+    </div>
+    <div class="grid-2">
+        <div class="field">
+            <label asp-for="Suburb"></label>
+            <input asp-for="Suburb" />
+        </div>
+        <div class="field">
+            <label asp-for="City"></label>
+            <input asp-for="City" autocomplete="address-level2" />
+            <span asp-validation-for="City" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Province"></label>
+            <select asp-for="Province">
+                <option value=""></option>
+                <option>Eastern Cape</option><option>Free State</option><option>Gauteng</option><option>KwaZulu-Natal</option>
+                <option>Limpopo</option><option>Mpumalanga</option><option>North West</option><option>Northern Cape</option><option>Western Cape</option>
+            </select>
+        </div>
+        <div class="field">
+            <label asp-for="PostalCode"></label>
+            <input asp-for="PostalCode" inputmode="numeric" maxlength="4" autocomplete="postal-code" />
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Save and continue</button>
+</form>

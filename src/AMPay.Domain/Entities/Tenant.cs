@@ -42,6 +42,20 @@ public class Tenant
     /// <summary>The administrator, e.g. "Kepler Risk Services (Pty) Ltd".</summary>
     public string? CreditLifeAdministrator { get; set; }
 
+    // Self-service portal.
+
+    /// <summary>
+    /// The code in the lender's public application link, e.g. GRN4KX in /a/GRN4KX. Null
+    /// until the lender is given a link. Regenerating it kills the old link.
+    /// </summary>
+    public string? SelfServiceCode { get; set; }
+
+    /// <summary>Cell number behind the portal's "Chat on WhatsApp" button. None shows no button.</summary>
+    public string? AdvisorWhatsApp { get; set; }
+
+    /// <summary>When the portal last accepted this lender's details and packages.</summary>
+    public DateTime? PortalSyncedUtc { get; set; }
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedUtc { get; set; }
 

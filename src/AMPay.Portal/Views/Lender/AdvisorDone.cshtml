@@ -1,0 +1,10 @@
+@model Lender
+@{ ViewData["Title"] = "We'll call you"; }
+
+<div class="card">
+    <h1>Thank you - we'll call you</h1>
+    <p class="lede">An advisor from @Model.DisplayName will phone you back@(Model.ContactNumber is null ? "" : $", from {Model.ContactNumber} or another office number"). Calls happen during office hours.</p>
+    <div class="actions">
+        <a class="btn btn-outline" href="/a/@Model.PublicCode">Back</a>
+    </div>
+</div>

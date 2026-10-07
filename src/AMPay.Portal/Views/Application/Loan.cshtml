@@ -1,0 +1,61 @@
+@model LoanModel
+@{
+    ViewData["Title"] = "The loan you need";
+    var l = (Lender)ViewData["Lender"]!;
+    var r = Model.Range;
+}
+
+<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
+<h1>The loan you need</h1>
+@if (r is not null)
+{
+    <p class="lede">@l.DisplayName lends R @r.MinAmount.ToString("N0") to R @r.MaxAmount.ToString("N0"), repaid over @r.MinTerm to @r.MaxTerm months.</p>
+}
+
+<form method="post" action="/a/@l.PublicCode/application/loan" class="card" novalidate>
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="grid-2">
+        <div class="field">
+            <label asp-for="Amount"></label>
+            <input asp-for="Amount" type="number" inputmode="numeric" min="@r?.MinAmount" max="@r?.MaxAmount" step="100" />
+            <span asp-validation-for="Amount" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Term"></label>
+            <select asp-for="Term">
+                <option value=""></option>
+                @if (r is not null)
+                {
+                    for (var m = r.MinTerm; m <= r.MaxTerm; m++)
+                    {
+                        <option value="@m" selected="@(Model.Term == m)">@m @(m == 1 ? "month" : "months")</option>
+                    }
+                }
+            </select>
+            <span asp-validation-for="Term" class="field-error"></span>
+        </div>
+    </div>
+
+    @if (Model.Estimate is { } e)
+    {
+        <div class="estimate" aria-live="polite">
+            <div class="small muted">Estimated repayment</div>
+            <div class="big">R @e.Instalment.ToString("N2") <span class="small muted">a month</span></div>
+            <dl class="small">
+                <dt>Total to repay</dt><dd>R @e.TotalRepayable.ToString("N2")</dd>
+                <dt>Cost of credit</dt><dd>R @e.CostOfCredit.ToString("N2")</dd>
+            </dl>
+            <p class="small" style="margin:10px 0 0;">
+                <strong>This is an estimate, not an offer.</strong> It includes interest, fees and credit life insurance at
+                @l.DisplayName's standard rates. Your actual offer depends on the affordability assessment and may differ.
+            </p>
+        </div>
+    }
+
+    <div class="actions" style="margin-top:0;">
+        <button type="submit" name="command" value="estimate" class="btn btn-outline">See the estimate</button>
+        <button type="submit" name="command" value="save" class="btn btn-primary">Save and continue</button>
+    </div>
+</form>

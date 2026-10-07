@@ -1,0 +1,29 @@
+@model VerifyModel
+@{
+    ViewData["Title"] = "Enter your code";
+    var l = (Lender)ViewData["Lender"]!;
+}
+
+<div class="card">
+    <h1>Enter your code</h1>
+    <p class="lede">We sent a 6-digit code to @Model.MaskedMobile. It works for 10 minutes.</p>
+
+    @if (Model.TestCode is not null)
+    {
+        <div class="alert alert-warn">Test system - no SMS was sent. Your code is <strong style="letter-spacing:.15em;">@Model.TestCode</strong>.</div>
+    }
+
+    <form method="post" action="/a/@l.PublicCode/verify" novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="ChallengeId" />
+        <input type="hidden" asp-for="MaskedMobile" />
+        <div class="field">
+            <label asp-for="Code"></label>
+            <input asp-for="Code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+            <span asp-validation-for="Code" class="field-error"></span>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Continue</button>
+    </form>
+
+    <p class="small" style="margin-top:16px;"><a href="/a/@l.PublicCode/start">Didn't get it? Send a new code</a></p>
+</div>

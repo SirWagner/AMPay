@@ -1,0 +1,44 @@
+@model AdvisorModel
+@{
+    ViewData["Title"] = "Talk to an advisor";
+    var l = (Lender)ViewBag.Lender;
+}
+
+<div class="card">
+    <h1>Talk to an advisor</h1>
+    <p class="lede">Leave your number and an advisor from @l.DisplayName will phone you back.</p>
+
+    <form method="post" action="/a/@l.PublicCode/advisor" novalidate>
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+        <div class="field">
+            <label asp-for="Name"></label>
+            <input asp-for="Name" autocomplete="name" />
+            <span asp-validation-for="Name" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Mobile"></label>
+            <input asp-for="Mobile" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" />
+            <span asp-validation-for="Mobile" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="PreferredTime"></label>
+            <select asp-for="PreferredTime">
+                <option value="Any time">Any time</option>
+                <option value="Morning (8-12)">Morning (8-12)</option>
+                <option value="Afternoon (12-5)">Afternoon (12-5)</option>
+                <option value="Lunch time">Lunch time</option>
+            </select>
+        </div>
+        <div class="field">
+            <label asp-for="Message"></label>
+            <textarea asp-for="Message" rows="3" maxlength="1000"></textarea>
+        </div>
+        @* Hidden from people; bots fill it in. *@
+        <div style="position:absolute;left:-10000px;" aria-hidden="true">
+            <label for="Website">Website</label>
+            <input id="Website" name="Website" tabindex="-1" autocomplete="off" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Ask for a call back</button>
+    </form>
+</div>

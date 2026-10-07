@@ -1,0 +1,71 @@
+@model DocumentsModel
+@{
+    ViewData["Title"] = "Documents";
+    var l = (Lender)ViewData["Lender"]!;
+    var app = Model.Application;
+    var path = $"/a/{l.PublicCode}/application/documents";
+    var maxMb = Model.MaxFileSizeBytes / (1024 * 1024);
+}
+
+<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
+<h1>Documents</h1>
+<p class="lede">A clear photo from your phone or a PDF, up to @maxMb MB each. Only @l.DisplayName sees these.</p>
+
+@foreach (var kind in DocumentsModel.Kinds)
+{
+    var uploaded = app.Documents.Where(d => d.DocumentType == kind.Type).OrderBy(d => d.UploadedUtc).ToList();
+    <div class="card">
+        <h2>@kind.Label @if (!kind.Required) { <span class="small muted">(optional)</span> }</h2>
+        <p class="small muted" style="margin-top:-6px;">@kind.Hint</p>
+
+        @foreach (var d in uploaded)
+        {
+            <div class="doc-row">
+                <span class="doc-name">&#10003; @d.FileName <span class="small muted">(@((d.SizeBytes / 1024.0).ToString("N0")) KB)</span></span>
+                @if (app.IsEditable)
+                {
+                    <form method="post" action="@path/remove">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="documentId" value="@d.Id" />
+                        <button type="submit" class="btn btn-outline btn-sm">Remove</button>
+                    </form>
+                }
+            </div>
+        }
+
+        @if (app.IsEditable)
+        {
+            <form method="post" action="@path" enctype="multipart/form-data" class="upload-form" style="margin-top:10px;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="documentType" value="@kind.Type" />
+                <label class="dropzone" style="display:block;cursor:pointer;">
+                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,image/*" capture="environment"
+                           style="position:absolute;opacity:0;width:1px;height:1px;" />
+                    <strong>@(uploaded.Count == 0 ? "Choose a file or take a photo" : "Add another page")</strong><br />
+                    <span class="small muted">or drag it here</span>
+                </label>
+                <noscript><button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px;">Upload</button></noscript>
+            </form>
+        }
+    </div>
+}
+
+<div class="actions">
+    <a class="btn btn-primary" href="/a/@l.PublicCode/application/review">Continue</a>
+</div>
+
+@section Scripts {
+<script>
+// Uploads as soon as a file is chosen or dropped: one less button on a phone.
+document.querySelectorAll('.upload-form').forEach(function (form) {
+    var input = form.querySelector('input[type=file]');
+    var zone = form.querySelector('.dropzone');
+    input.addEventListener('change', function () { if (input.files.length) { zone.querySelector('strong').textContent = 'Uploading…'; form.submit(); } });
+    ['dragenter', 'dragover'].forEach(function (e) { zone.addEventListener(e, function (ev) { ev.preventDefault(); zone.classList.add('drag'); }); });
+    ['dragleave', 'drop'].forEach(function (e) { zone.addEventListener(e, function (ev) { ev.preventDefault(); zone.classList.remove('drag'); }); });
+    zone.addEventListener('drop', function (ev) {
+        if (ev.dataTransfer.files.length) { input.files = ev.dataTransfer.files; input.dispatchEvent(new Event('change')); }
+    });
+});
+</script>
+}

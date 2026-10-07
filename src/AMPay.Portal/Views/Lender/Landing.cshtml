@@ -1,0 +1,55 @@
+@model LandingModel
+@{
+    ViewData["Title"] = "Apply for a loan";
+    var l = Model.Lender;
+    var wa = l.WhatsAppNumber is null ? null
+        : $"https://wa.me/{l.WhatsAppNumber}?text={Uri.EscapeDataString($"Hello {l.DisplayName}, I would like to ask about a loan.")}";
+}
+
+<div class="card hero hero-dark">
+    <canvas class="network-bg" data-network="interactive" data-tone="dark" aria-hidden="true"></canvas>
+    <div class="network-glow" aria-hidden="true"></div>
+    <span class="hero-tag"><span class="pulse-dot" aria-hidden="true"></span> Apply online in about 10 minutes</span>
+    <h1>Apply for a loan with @l.DisplayName</h1>
+    <p class="lede">
+        Have your ID and your latest payslip ready - a photo from your phone is fine.
+        @if (Model.Range is { } r)
+        {
+            <br /><text>Loans from R @r.MinAmount.ToString("N0") to R @r.MaxAmount.ToString("N0"), repaid over @r.MinTerm to @r.MaxTerm months.</text>
+        }
+    </p>
+
+    <div class="actions">
+        @if (Model.SignedIn)
+        {
+            <a class="btn btn-primary" href="/a/@l.PublicCode/application">Continue my application</a>
+        }
+        else
+        {
+            <a class="btn btn-primary" href="/a/@l.PublicCode/start">Apply now</a>
+            <a class="btn btn-outline" href="/a/@l.PublicCode/start">Continue an application</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <h2>Rather talk to someone?</h2>
+    <p class="muted">An advisor from @l.DisplayName will phone you back.</p>
+    <div class="actions">
+        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask for a call back</a>
+        @if (wa is not null)
+        {
+            <a class="btn btn-whatsapp" href="@wa" target="_blank" rel="noopener noreferrer">Chat on WhatsApp</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <h2>How it works</h2>
+    <ol class="small" style="padding-left:20px;margin:0;">
+        <li>We send a code to your cell phone to keep your application private.</li>
+        <li>You tell us about yourself, your work and income, and the loan you need.</li>
+        <li>You upload your ID and payslip.</li>
+        <li>@l.DisplayName checks affordability, as the National Credit Act requires, and contacts you with an offer.</li>
+    </ol>
+</div>

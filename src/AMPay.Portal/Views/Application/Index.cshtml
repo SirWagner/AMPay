@@ -1,0 +1,63 @@
+@model LoanApplication
+@{
+    ViewData["Title"] = "Your application";
+    var l = (Lender)ViewData["Lender"]!;
+    var missing = (List<string>)ViewBag.Missing;
+    var basePath = $"/a/{l.PublicCode}/application";
+
+    bool detailsDone = !string.IsNullOrWhiteSpace(Model.IdNumber) && !string.IsNullOrWhiteSpace(Model.AddressLine1);
+    bool incomeDone = Model.NetMonthlyIncome is not null && !string.IsNullOrWhiteSpace(Model.EmployerName);
+    bool loanDone = Model.RequestedAmount is not null && Model.RequestedTerm is not null;
+    bool docsDone = DocumentsModel.Kinds.Where(k => k.Required).All(k => Model.Documents.Any(d => d.DocumentType == k.Type));
+}
+
+@if (Model.Status == PortalApplicationStatus.Draft)
+{
+    <h1>Your application</h1>
+    <p class="lede">Reference <strong>@Model.Reference</strong>. Your answers are saved as you go - you can stop and come back with the same cell number.</p>
+
+    <div class="card">
+        <ul class="steps">
+            <li><a href="@basePath/details"><span><span class="name">1. About you</span><br /><span class="small muted">Name, ID number and address</span></span><span class="pill @(detailsDone ? "pill-done" : "pill-todo")">@(detailsDone ? "Done" : "To do")</span></a></li>
+            <li><a href="@basePath/income"><span><span class="name">2. Work and income</span><br /><span class="small muted">Employer, salary and expenses</span></span><span class="pill @(incomeDone ? "pill-done" : "pill-todo")">@(incomeDone ? "Done" : "To do")</span></a></li>
+            <li><a href="@basePath/loan"><span><span class="name">3. The loan you need</span><br /><span class="small muted">Amount, term and an estimate</span></span><span class="pill @(loanDone ? "pill-done" : "pill-todo")">@(loanDone ? "Done" : "To do")</span></a></li>
+            <li><a href="@basePath/documents"><span><span class="name">4. Documents</span><br /><span class="small muted">ID and latest payslip</span></span><span class="pill @(docsDone ? "pill-done" : "pill-todo")">@(docsDone ? "Done" : "To do")</span></a></li>
+            <li><a href="@basePath/review"><span><span class="name">5. Check and submit</span><br /><span class="small muted">Consent and send to @l.DisplayName</span></span><span class="pill pill-todo">@(missing.Count == 0 ? "Ready" : "Last step")</span></a></li>
+        </ul>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="status-big">
+            @if (Model.Status == PortalApplicationStatus.Submitted)
+            {
+                <text>Submitted - waiting for @l.DisplayName</text>
+            }
+            else if (Model.Status == PortalApplicationStatus.PickedUp)
+            {
+                <text>@l.DisplayName is working on your application</text>
+            }
+            else
+            {
+                <text>Withdrawn</text>
+            }
+        </div>
+        <p class="muted">Reference <strong>@Model.Reference</strong>, sent on @Model.SubmittedUtc?.AddHours(2).ToString("dd MMM yyyy HH:mm").</p>
+        <p>
+            @l.DisplayName will check your documents and your affordability, as the National Credit Act requires,
+            and contact you on your cell phone. You do not need to do anything else for now.
+        </p>
+        @if (Model.RequestedAmount is { } a && Model.EstimatedInstalment is { } i)
+        {
+            <p class="small muted">You asked for R @a.ToString("N0") over @Model.RequestedTerm months (estimated R @i.ToString("N2") a month). The final offer may differ.</p>
+        }
+    </div>
+}
+
+<div class="card">
+    <h2>Questions?</h2>
+    <div class="actions" style="margin-top:0;">
+        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Talk to an advisor</a>
+    </div>
+</div>
