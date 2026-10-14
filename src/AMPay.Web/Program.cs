@@ -192,4 +192,12 @@ for (var attempt = 1; ; attempt++)
     }
 }
 
+// Development only: `dotnet run --project src/AMPay.Web -- --seed-demo` fills a fictional
+// "Demo Lending" business for showing the lender dashboard, then exits.
+if (args.Contains("--seed-demo"))
+{
+    await DemoSeeder.RunAsync(app.Services, startupLog);
+    return;
+}
+
 app.Run();
