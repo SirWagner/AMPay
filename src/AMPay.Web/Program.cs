@@ -93,6 +93,10 @@ builder.Services.AddHttpClient<IPortalApi, PortalClient>();
 builder.Services.AddScoped<PortalImporter>();
 builder.Services.AddScoped<PortalSync>();
 
+// The lender dashboard: one set of aggregate queries per tenant, cached for a minute.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<LenderDashboardService>();
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
