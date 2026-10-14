@@ -1,0 +1,48 @@
+@model List<AMPay.Web.Controllers.ContractRow>
+@{
+    var unsignedOnly = (bool)ViewBag.UnsignedOnly;
+    string When(DateTime? utc) => utc is null ? "-" : AMPay.Domain.Contracts.ContractFormat.SastTime(utc.Value);
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@(unsignedOnly ? "Agreements not signed" : "Open contracts")</h1>
+        <p class="lede">@(unsignedOnly ? "Sent to clients but not yet signed, oldest first." : "Issued, sent or opened, and not yet signed.")</p>
+    </div>
+    @if (unsignedOnly)
+    {
+        <a asp-action="Index" class="btn btn-outline">All open contracts</a>
+    }
+    else
+    {
+        <a asp-action="Index" asp-route-filter="unsigned" class="btn btn-outline">Only sent, not signed</a>
+    }
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="card-body"><p class="empty mb-0">Nothing waiting for a signature.</p></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Agreement</th><th>Client</th><th>Status</th><th>Sent</th><th>Opened by client</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td class="mono"><a asp-action="Details" asp-route-id="@c.Id">@c.Reference</a></td>
+                        <td>@c.ClientName <span class="muted small mono">@c.ClientNumber</span></td>
+                        <td><partial name="_ContractStatus" model="c.Status" /></td>
+                        <td class="small">@When(c.SentUtc)</td>
+                        <td class="small">@When(c.FirstViewedUtc)</td>
+                        <td><a asp-action="Details" asp-route-id="@c.Id" class="btn btn-sm btn-outline">Resend</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -1,0 +1,343 @@
+@model LenderDashboardViewModel
+@{
+    // Owner / customer administrator sees everything; loan officers (capturers) and viewers
+    // see the operational parts - no income, capital or lent-vs-recovered.
+    var showMoney = (bool)ViewBag.ShowFinancials;
+    var reviewerOnly = (bool)ViewBag.ReviewerOnly;
+
+    string R(decimal v) => "R " + v.ToString("N0");
+    string Day(DateTime d) => d.ToString("ddd d MMM");
+    string Plural(int n, string one, string many) => $"{n:N0} {(n == 1 ? one : many)}";
+
+    var c = Model.Collections;
+    var k = Model.Kpis;
+    var dueSoFar = c.Expected - c.StillScheduled;
+    var lentMax = Math.Max(1m, Model.LentByMonth.Max(m => m.Lent));
+    var runTotal = (Debits: Model.UpcomingRuns.Sum(r => r.Debits), Amount: Model.UpcomingRuns.Sum(r => r.Amount),
+                    Ready: Model.UpcomingRuns.Sum(r => r.MandatesReady));
+}
+
+<div class="dash lender-dash">
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@Model.TenantName</h1>
+        <p class="lede">@Model.MonthLabel at a glance &middot; updated @Model.GeneratedUtc.AddHours(2).ToString("HH:mm") SAST, refreshes every minute.</p>
+    </div>
+</div>
+
+@if (!reviewerOnly)
+{
+@* ================================================================ 1. collections *@
+<section class="hero hero-dark lender-hero" aria-labelledby="collectTitle">
+    <canvas class="network-bg" data-network="interactive" data-tone="dark" aria-hidden="true"></canvas>
+    <div class="network-glow" aria-hidden="true"></div>
+
+    @if (!Model.HasAnyLoans)
+    {
+        <div>
+            <div class="hero-label" id="collectTitle"><span class="pulse-dot" aria-hidden="true"></span> @Model.TodaySast.ToString("MMMM") collections</div>
+            <div class="hero-value" style="font-size:1.6rem;">No collections scheduled yet</div>
+            <p class="hero-note">
+                Collections start once loans are paid out.
+                @if (!Model.HasActivePackages) { <text>Set up a <a asp-controller="CreditPackages" asp-action="Index">credit package</a></text> }
+                else { <text>Your <a asp-controller="CreditPackages" asp-action="Index">credit packages</a> are ready</text> }
+                @if (!Model.HasSelfServiceLink) { <text> and share your <a asp-controller="SelfService" asp-action="Index">self-service link</a></text> }
+                else { <text> - share your <a asp-controller="SelfService" asp-action="Index">self-service link</a></text> }
+                so clients can apply.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div>
+            <div class="hero-label" id="collectTitle"><span class="pulse-dot" aria-hidden="true"></span> @Model.TodaySast.ToString("MMMM") collections</div>
+            <div class="hero-value tnum">@R(c.Expected)</div>
+            <p class="hero-note">Expected this month &middot; @Plural(c.ExpectedDebits, "debit", "debits") on loans being collected.</p>
+
+            @if (c.Expected > 0)
+            {
+                <div class="seg-bar" role="img"
+                     aria-label="Of @R(c.Expected) expected: @R(dueSoFar) was due before today, @R(c.StillScheduled) is still scheduled. Collected and failed amounts are not recorded yet.">
+                    <span class="seg seg-due" style="flex-grow:@((double)dueSoFar)"></span>
+                    <span class="seg seg-sched" style="flex-grow:@((double)c.StillScheduled)"></span>
+                </div>
+                <ul class="seg-legend">
+                    <li><span class="key seg-due"></span> Due so far <strong class="tnum">@R(dueSoFar)</strong></li>
+                    <li><span class="key seg-sched"></span> Still scheduled <strong class="tnum">@R(c.StillScheduled)</strong></li>
+                    <li class="not-tracked-inline">Collected and failed: <em>not tracked yet</em></li>
+                </ul>
+            }
+        </div>
+
+        <dl class="hero-facts">
+            <div>
+                <dt>Next collection run</dt>
+                @if (c.NextRun is { } nr)
+                {
+                    <dd class="tnum">@Day(nr.Date)<span class="fact-sub">@Plural(nr.Debits, "debit", "debits") &middot; @R(nr.Amount)</span></dd>
+                }
+                else { <dd>None left this month</dd> }
+            </div>
+            <div>
+                <dt>Largest upcoming run</dt>
+                @if (c.LargestRun is { } lr)
+                {
+                    <dd class="tnum">@Day(lr.Date)<span class="fact-sub">@R(lr.Amount)</span></dd>
+                }
+                else { <dd>-</dd> }
+            </div>
+            <div>
+                <dt>Pay Now this month</dt>
+                <dd class="tnum">@R(c.PayNowCollected) <span class="muted small" style="font-weight:400">&middot; @Plural(c.PayNowCount, "payment", "payments")</span></dd>
+            </div>
+            @if (showMoney)
+            {
+                <div>
+                    <dt>Capital available to lend</dt>
+                    <dd class="not-tracked-dark">Not tracked yet<span class="fact-sub">Needs a lending-capital setting</span></dd>
+                </div>
+            }
+        </dl>
+    }
+</section>
+
+@* ================================================================ 2. KPIs *@
+@if (!Model.HasAnyLoans)
+{
+    <p class="muted" style="margin:-.25rem 0 1.25rem;">
+        Your loan book, income and arrears appear here once the first loan is approved and paid out.
+    </p>
+}
+else
+{
+<section class="stat-grid kpi-row" aria-label="Loan book">
+    <div class="stat">
+        <div class="label">Loan book outstanding</div>
+        <div class="value not-tracked">Not tracked yet</div>
+        <div class="note">@Plural(k.ActiveLoans, "active loan", "active loans") &middot; balances need repayment records</div>
+    </div>
+    <div class="stat">
+        <div class="label">Book in arrears</div>
+        <div class="value not-tracked">Not tracked yet</div>
+        <div class="note">Needs to know which instalments went unpaid</div>
+    </div>
+    <div class="stat">
+        <div class="label">Disbursed this month</div>
+        <div class="value tnum">@R(k.DisbursedPrincipalThisMonth)</div>
+        <div class="note tnum">
+            @Plural(k.DisbursedThisMonth, "loan", "loans")@(k.DisbursedThisMonth > 0 ? $" · avg {R(k.AverageLoanThisMonth)}" : "")<br />
+            On pace for @k.OnPaceFor &middot; last month @k.DisbursedLastMonth
+        </div>
+    </div>
+    @if (showMoney)
+    {
+        <div class="stat">
+            <div class="label">Income this month</div>
+            <div class="value accent tnum">@R(k.Income)</div>
+            <div class="note tnum">
+                Interest @R(k.Interest) &middot; initiation @R(k.InitiationFees)<br />
+                Service fees @R(k.ServiceFees) &middot; credit life @R(k.CreditLife)
+            </div>
+        </div>
+    }
+</section>
+@if (showMoney)
+{
+    <p class="muted small" style="margin-top:-.5rem;">
+        Income is what the schedules charge this month plus initiation fees on loans paid out; it is not yet confirmed as collected.
+    </p>
+}
+}
+}
+
+@* ================================================================ 3. needs action *@
+@{
+    var cards = reviewerOnly ? Model.Actions.Where(a => a.Key == "documents").ToList() : Model.Actions.ToList();
+    var total = cards.Where(a => a.Count.HasValue).Sum(a => a.Count!.Value);
+}
+<section class="card" aria-labelledby="actionTitle">
+    <div class="card-head flex-between">
+        <h3 id="actionTitle">Needs action today</h3>
+        <span class="badge @(total > 0 ? "badge-amber" : "badge-green")">@Plural(total, "item", "items")</span>
+    </div>
+    <div class="card-body action-grid">
+        @foreach (var a in cards)
+        {
+            <div class="action-card @(a.Highlight ? "highlight" : "") @(a.Count is null ? "untracked" : a.Count > 0 ? "has-work" : "")">
+                <div class="action-title">@a.Title</div>
+                @if (a.Count is { } n)
+                {
+                    <div class="action-count tnum">@n</div>
+                }
+                else
+                {
+                    <div class="action-count not-tracked">Not tracked yet</div>
+                }
+                <div class="action-context">@a.Context</div>
+                @if (a.Url is not null && a.Count > 0)
+                {
+                    <a class="action-link" href="@a.Url">@a.LinkText &rarr;</a>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@if (!reviewerOnly)
+{
+@* ================================================================ 4. charts *@
+<div class="chart-grid">
+    @if (showMoney)
+    {
+        <section class="card" aria-labelledby="lentTitle">
+            <div class="card-head"><h3 id="lentTitle">Money lent vs money recovered</h3></div>
+            <div class="card-body">
+                <p class="viz-sub">Principal paid out per month, last six months. Recovered amounts are not tracked yet.</p>
+                @if (Model.LentByMonth.All(m => m.Lent == 0))
+                {
+                    <p class="viz-empty">Nothing paid out in the last six months yet.</p>
+                }
+                else
+                {
+                    <div class="cols">
+                        <div class="cols-plot">
+                            <div class="cols-bars" style="--n:@Model.LentByMonth.Count" role="img"
+                                 aria-label="Money lent per month: @string.Join(", ", Model.LentByMonth.Select(m => $"{m.Label} {R(m.Lent)}"))">
+                                @foreach (var m in Model.LentByMonth)
+                                {
+                                    <div class="col @(m.IsCurrentMonth ? "col-current" : "")" style="--h:@((100m * m.Lent / lentMax).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%"
+                                         data-tip-value="@R(m.Lent) · @Plural(m.Loans, "loan", "loans")" data-tip-label="@m.Label@(m.IsCurrentMonth ? " (to date)" : "")">
+                                        @if (m.Lent > 0) { <span class="col-value tnum">@(m.Lent >= 1000 ? (m.Lent / 1000m).ToString("0.#") + "k" : m.Lent.ToString("N0"))</span> }
+                                        <span class="col-bar"></span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <div class="cols-axis" style="--n:@Model.LentByMonth.Count" aria-hidden="true">
+                            @foreach (var m in Model.LentByMonth) { <span>@m.Label@(m.IsCurrentMonth ? "*" : "")</span> }
+                        </div>
+                    </div>
+                    <p class="muted small mb-0">* month to date</p>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="card" aria-labelledby="ageTitle">
+        <div class="card-head"><h3 id="ageTitle">Arrears ageing</h3></div>
+        <div class="card-body">
+            <p class="viz-sub">1-30, 31-60, 61-90 and 90+ days past due, from each loan's oldest unpaid instalment.</p>
+            <p class="viz-empty">Not tracked yet. Arrears need a record of which instalments were paid - see the proposed repayment records.</p>
+        </div>
+    </section>
+</div>
+
+@* ================================================================ 5. collections detail *@
+<div class="chart-grid">
+    <section class="card" aria-labelledby="runsTitle">
+        <div class="card-head"><h3 id="runsTitle">Upcoming collection runs</h3></div>
+        @if (Model.UpcomingRuns.Count == 0)
+        {
+            <div class="card-body"><p class="viz-empty">No more debits due this month.</p></div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Date</th><th class="num">Debits</th><th class="num">Amount</th><th class="num">Mandates ready</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.UpcomingRuns)
+                    {
+                        <tr>
+                            <td>@Day(r.Date)</td>
+                            <td class="num tnum">@r.Debits</td>
+                            <td class="num tnum">@R(r.Amount)</td>
+                            <td class="num tnum">
+                                @r.MandatesReady / @r.Debits
+                                @if (!r.AllMandatesReady) { <span class="badge badge-amber" title="Some loans in this run have no authenticated DebiCheck mandate">@(r.Debits - r.MandatesReady) pending</span> }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                    <tfoot>
+                    <tr class="total"><td>Rest of month</td><td class="num tnum">@runTotal.Debits</td><td class="num tnum">@R(runTotal.Amount)</td><td class="num tnum">@runTotal.Ready / @runTotal.Debits</td></tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="card" aria-labelledby="whyTitle">
+        <div class="card-head"><h3 id="whyTitle">Why debits failed</h3></div>
+        <div class="card-body">
+            <p class="viz-sub">Insufficient funds, disputed, mandate cancelled, other.</p>
+            <p class="viz-empty">Not tracked yet. Needs the debit results Netcash returns, recorded per collection.</p>
+        </div>
+    </section>
+</div>
+
+@* ================================================================ 6. growth & compliance *@
+<div class="chart-grid">
+    <section class="card" aria-labelledby="growthTitle">
+        <div class="card-head"><h3 id="growthTitle">Growth this month</h3></div>
+        <div class="card-body">
+            <dl class="detail-list">
+                <dt>Approval rate</dt>
+                <dd class="tnum">
+                    @if (Model.Growth.ApprovalRate is { } rate) { <strong>@rate.ToString("P0")</strong> <span class="muted small">(@Model.Growth.Approved approved, @Model.Growth.Declined declined)</span> }
+                    else { <span class="muted">No decisions yet this month</span> }
+                </dd>
+                <dt>New vs repeat clients</dt>
+                <dd class="tnum">@Model.Growth.NewClientLoans new &middot; @Model.Growth.RepeatClientLoans repeat <span class="muted small">(loans paid out)</span></dd>
+                <dt>Self-service link</dt>
+                <dd class="tnum">
+                    @Model.Growth.PortalImported applications imported &rarr; @Model.Growth.PortalDisbursed paid out
+                    <div class="muted small">Link opens and started applications are not tracked yet.</div>
+                </dd>
+            </dl>
+        </div>
+    </section>
+
+    <section class="card" aria-labelledby="compTitle">
+        <div class="card-head"><h3 id="compTitle">Compliance check</h3></div>
+        <div class="card-body">
+            @if (Model.Compliance.ActiveLoans == 0)
+            {
+                <p class="viz-empty">No active loans to check yet.</p>
+            }
+            else
+            {
+                var cpl = Model.Compliance;
+                <ul class="status-list">
+                    <li><span class="what">Affordability assessment on file</span><span class="count tnum @(cpl.WithAffordability < cpl.ActiveLoans ? "warn" : "")">@cpl.WithAffordability / @cpl.ActiveLoans</span></li>
+                    <li><span class="what">Credit bureau check on file</span><span class="count tnum @(cpl.WithCreditCheck < cpl.ActiveLoans ? "warn" : "")">@cpl.WithCreditCheck / @cpl.ActiveLoans</span></li>
+                    <li>
+                        <span class="what">Active loans missing required documents</span>
+                        <span class="count tnum @(cpl.MissingDocuments > 0 ? "warn" : "")">
+                            @if (cpl.MissingDocuments > 0) { <a asp-controller="Documents" asp-action="Index">@cpl.MissingDocuments</a> } else { <text>0</text> }
+                        </span>
+                    </li>
+                </ul>
+            }
+            <p class="muted small mb-0">NCR quarterly return export: not built yet.</p>
+        </div>
+    </section>
+</div>
+}
+
+@* ================================================================ 7. onboarding pipeline *@
+<section class="card" aria-labelledby="pipeTitle">
+    <div class="card-head"><h3 id="pipeTitle">Onboarding pipeline</h3></div>
+    <div class="card-body pipeline-row">
+        @foreach (var s in Model.Pipeline)
+        {
+            <a class="pipeline-tile" asp-controller="Clients" asp-action="Index" asp-route-status="@s.Status">
+                <span class="tnum">@s.Count</span>
+                <span class="small">@s.Label</span>
+            </a>
+        }
+    </div>
+</section>
+
+</div>

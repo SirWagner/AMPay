@@ -14,17 +14,31 @@ public class HomeController : Controller
 {
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
+    private readonly LenderDashboardService _lender;
 
-    public HomeController(AppDbContext db, ICurrentTenant tenant)
+    public HomeController(AppDbContext db, ICurrentTenant tenant, LenderDashboardService lender)
     {
         _db = db;
         _tenant = tenant;
+        _lender = lender;
     }
 
     public async Task<IActionResult> Index()
     {
         ViewData["Title"] = "Dashboard";
         await _tenant.LoadAsync();
+
+        // Inside a business (a lender's own staff, or AM-Pay staff who have chosen one): the
+        // lender dashboard. AM-Pay staff with no business chosen keep the platform overview below.
+        if (_tenant.TenantId is { } lenderId)
+        {
+            var isOwner = User.IsInRole(AMPay.Infrastructure.Identity.AppRoles.SuperAdmin) ||
+                          User.IsInRole(AMPay.Infrastructure.Identity.AppRoles.TenantAdmin);
+            ViewBag.ShowFinancials = isOwner;
+            ViewBag.ReviewerOnly = !isOwner && User.IsInRole(AMPay.Infrastructure.Identity.AppRoles.Reviewer) &&
+                                   !User.IsInRole(AMPay.Infrastructure.Identity.AppRoles.Capturer);
+            return View("Lender", await _lender.GetAsync(lenderId, HttpContext.RequestAborted));
+        }
 
         var model = new DashboardViewModel
         {
