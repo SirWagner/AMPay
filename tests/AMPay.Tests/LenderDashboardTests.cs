@@ -202,8 +202,8 @@ public class LenderDashboardTests
         Assert.False(d.HasSelfServiceLink);
         Assert.Null(d.Collections.NextRun);
         Assert.Null(d.Growth.ApprovalRate);
-        // Debit results are not recorded, so the failed-collections card has no number at all.
-        Assert.Null(d.Actions.Single(a => a.Key == "failed").Count);
+        // Debit results are tracked now: a new lender has none outstanding, not an unknown number.
+        Assert.Equal(0, d.Actions.Single(a => a.Key == "failed").Count);
         Assert.Equal(6, d.LentByMonth.Count);
         Assert.True(d.LentByMonth[^1].IsCurrentMonth);
     }

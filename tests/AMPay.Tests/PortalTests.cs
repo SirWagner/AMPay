@@ -198,6 +198,7 @@ public class PortalTests
         public Task<IReadOnlyList<PortalCallback>> CallbacksAsync(Guid tenantId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<PortalCallback>>(Array.Empty<PortalCallback>());
         public Task MarkCallbackHandledAsync(Guid tenantId, Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<PortalFunnel?> FunnelAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) => Task.FromResult<PortalFunnel?>(null);
     }
 
     private sealed class MemoryStore : IDocumentStore

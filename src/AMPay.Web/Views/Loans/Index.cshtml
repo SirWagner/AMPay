@@ -17,6 +17,14 @@
     </p>
 </div>
 
+@if (ViewBag.Filter is string filter)
+{
+    <div class="alert alert-info">
+        @(filter == "failed" ? "Loans with a failed debit that has not been recovered." : "Loans with an instalment past due and unpaid.")
+        <a asp-action="Index">Show all loans</a>
+    </div>
+}
+
 <div class="filter-pills">
     <a asp-action="Index" class="pill @(current is null ? "active" : "")">All</a>
     @foreach (var s in filters)

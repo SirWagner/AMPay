@@ -37,6 +37,7 @@ public interface IPortalApi
     Task MarkPickedUpAsync(Guid tenantId, Guid id, PortalPickedUp body, CancellationToken ct = default);
     Task<IReadOnlyList<PortalCallback>> CallbacksAsync(Guid tenantId, CancellationToken ct = default);
     Task MarkCallbackHandledAsync(Guid tenantId, Guid id, CancellationToken ct = default);
+    Task<PortalFunnel?> FunnelAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -112,6 +113,9 @@ public class PortalClient : IPortalApi
 
     public Task MarkCallbackHandledAsync(Guid tenantId, Guid id, CancellationToken ct = default) =>
         SendAsync(() => _http.PostAsync($"{PortalApi.CallbacksPath}/{id}/handled?tenantId={tenantId}", null, ct));
+
+    public Task<PortalFunnel?> FunnelAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) =>
+        GetAsync<PortalFunnel>($"{PortalApi.FunnelPath}?tenantId={tenantId}&fromUtc={fromUtc:O}&toUtc={toUtc:O}", ct);
 
     // ---------------------------------------------------------------- plumbing
 

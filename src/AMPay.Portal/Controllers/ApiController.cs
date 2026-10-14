@@ -198,6 +198,25 @@ public class ApiController : ControllerBase
         return NoContent();
     }
 
+    // ---------------------------------------------------------------- funnel
+
+    /// <summary>Counts for the lender's dashboard: link opens, applications started and submitted.</summary>
+    [HttpGet("funnel")]
+    public async Task<PortalFunnel> Funnel(Guid tenantId, DateTime fromUtc, DateTime toUtc)
+    {
+        var lender = await _db.Lenders.AsNoTracking().FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return new PortalFunnel(0, 0, 0);
+
+        var opened = await _db.LinkEvents.CountAsync(e =>
+            e.LenderId == lender.Id && e.Kind == LinkEventKind.Opened && e.OccurredUtc >= fromUtc && e.OccurredUtc < toUtc);
+        var started = await _db.Applications.CountAsync(a =>
+            a.LenderId == lender.Id && a.CreatedUtc >= fromUtc && a.CreatedUtc < toUtc);
+        var submitted = await _db.Applications.CountAsync(a =>
+            a.LenderId == lender.Id && a.SubmittedUtc >= fromUtc && a.SubmittedUtc < toUtc);
+
+        return new PortalFunnel(opened, started, submitted);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /// <summary>Loads an application only through the tenant that owns it: a tenant id is a scope, not a hint.</summary>

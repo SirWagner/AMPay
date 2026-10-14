@@ -27,6 +27,7 @@ public class CheckoutController : Controller
     private readonly INetcashPayNowService _payNow;
     private readonly INetcashSecretStore _secrets;
     private readonly INetcashCapabilityService _capabilities;
+    private readonly LoanLedgerService _ledger;
     private readonly ILogger<CheckoutController> _log;
 
     public CheckoutController(
@@ -35,6 +36,7 @@ public class CheckoutController : Controller
         INetcashPayNowService payNow,
         INetcashSecretStore secrets,
         INetcashCapabilityService capabilities,
+        LoanLedgerService ledger,
         ILogger<CheckoutController> log)
     {
         _db = db;
@@ -42,6 +44,7 @@ public class CheckoutController : Controller
         _payNow = payNow;
         _secrets = secrets;
         _capabilities = capabilities;
+        _ledger = ledger;
         _log = log;
     }
 
@@ -286,6 +289,12 @@ public class CheckoutController : Controller
         }
 
         await _db.SaveChangesAsync();
+
+        // A payment from a client with one loan being collected pays that loan. Otherwise it
+        // waits on the loan page for someone to apply it.
+        if (transaction.Status == PaymentStatus.Complete && await _ledger.TryApplyPayNowAsync(transaction))
+            _log.LogInformation("Pay Now {Reference} applied to the client's loan.", reference);
+
         return Ok();
     }
 

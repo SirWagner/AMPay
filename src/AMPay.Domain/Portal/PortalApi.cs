@@ -22,6 +22,7 @@ public static class PortalApi
     public const string LendersPath = "api/v1/lenders";
     public const string ApplicationsPath = "api/v1/applications";
     public const string CallbacksPath = "api/v1/callbacks";
+    public const string FunnelPath = "api/v1/funnel";
 
     /// <summary>
     /// A lender's short public code: six characters from an alphabet without look-alikes,
@@ -102,6 +103,9 @@ public record PortalPackage(
     int MaxTermMonths);
 
 public record PortalPickedUp(Guid AmpayClientId, string ClientNumber);
+
+/// <summary>The top of a lender's self-service funnel over a period: link opened, application started, submitted.</summary>
+public record PortalFunnel(int LinkOpened, int Started, int Submitted);
 
 // ------------------------------------------------------------------ portal -> AM-Pay (responses)
 

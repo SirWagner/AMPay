@@ -28,6 +28,14 @@ public class LenderController : PortalControllerBase
         var lender = await LenderAsync(code);
         if (lender is null) return NotFoundPage();
 
+        // Counted for the lender's funnel - unless it is a link preview or a crawler fetching
+        // the page, which happens every time the link is pasted into a chat.
+        if (!IsAutomated(Request.Headers.UserAgent.ToString()))
+        {
+            Db.LinkEvents.Add(new LinkEvent { LenderId = lender.Id });
+            await Db.SaveChangesAsync();
+        }
+
         return View(new LandingModel
         {
             Lender = lender,
@@ -35,6 +43,13 @@ public class LenderController : PortalControllerBase
             Range = EstimateService.RangeOf(lender)
         });
     }
+
+    private static readonly string[] AutomatedAgents =
+        { "bot", "crawl", "spider", "preview", "whatsapp", "facebookexternalhit", "slurp", "curl", "wget" };
+
+    public static bool IsAutomated(string? userAgent) =>
+        string.IsNullOrWhiteSpace(userAgent) ||
+        AutomatedAgents.Any(a => userAgent.Contains(a, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The lender's logo for its public pages. Cached: a new logo changes the ?v= in the URL.</summary>
     [HttpGet("logo")]

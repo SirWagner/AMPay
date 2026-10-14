@@ -833,3 +833,23 @@ public class CreditPackageEditModel
     [Display(Name = "Available for new loans")]
     public bool IsActive { get; set; } = true;
 }
+
+/// <summary>A payment recorded against a loan from its page: by hand, or by applying a Pay Now checkout.</summary>
+public class RecordPaymentModel
+{
+    /// <summary>Set to apply one of the client's completed Pay Now payments; amount and date then come from it.</summary>
+    public Guid? PayNowTransactionId { get; set; }
+
+    [Range(0.01, 10_000_000)]
+    public decimal? Amount { get; set; }
+
+    /// <summary>The South African date the money arrived. Today when left empty.</summary>
+    [DataType(DataType.Date)]
+    public DateTime? ReceivedOn { get; set; }
+
+    [StringLength(100)]
+    public string? Reference { get; set; }
+
+    [StringLength(500)]
+    public string? Notes { get; set; }
+}

@@ -1393,8 +1393,10 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
     max-width: 560px;
 }
 .seg-bar .seg { display: block; min-width: 3px; }
+.seg-collected { background: var(--green-accent); }
+.seg-failed { background: #ff7a6b; }
 .seg-due { background: rgba(255, 255, 255, .45); }
-.seg-sched { background: var(--green-accent); }
+.seg-sched { background: rgba(255, 255, 255, .18); }
 .seg-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; font-size: .8rem; color: rgba(255, 255, 255, .78); }
 .seg-legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
 .seg-legend strong { color: #fff; }
@@ -1440,3 +1442,26 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
     .topbar { flex-wrap: wrap; gap: .5rem; }
     .topbar > div:last-child { flex-wrap: wrap; gap: .5rem !important; }
 }
+
+/* Lender dashboard, money in */
+.lender-hero .hero-of { font-size: 1rem; font-weight: 500; color: rgba(255, 255, 255, .7); }
+.lender-hero .hero-split { margin: .6rem 0 0; font-size: .78rem; color: rgba(255, 255, 255, .7); }
+.lender-hero .fact-sub a { color: #fff; text-decoration: underline; }
+.lender-hero .fact-negative { color: #ffb3a8; }
+.lender-dash .stat .value.warn { color: var(--amber); }
+.trend-up { color: var(--green-mid); font-weight: 600; }
+.trend-down { color: var(--red); font-weight: 600; }
+
+/* Lent vs recovered: two bars per month. */
+.lender-dash { --age-0: #f2c46d; --age-1: #e8963f; --age-2: #d8652f; --age-3: #b33a2a; --recovered: #4aaa3c; }
+.col-pair { flex-direction: row; justify-content: center; align-items: flex-end; gap: 3px; }
+.col-pair .col-bar { width: min(14px, 34%); }
+.col-pair .col-bar.recovered { background: var(--recovered); }
+.pair-legend { list-style: none; margin: 0 0 .25rem; padding: 0; display: flex; gap: 1rem; font-size: .78rem; color: var(--text-muted); }
+.pair-legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
+.pair-legend .key-lent { background: var(--viz-series-1); }
+.pair-legend .key-recovered { background: var(--recovered); }
+
+/* Self-service funnel, one line that wraps on phones. */
+.funnel-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem .5rem; }
+.funnel-steps li + li::before { content: "\2192"; color: var(--text-muted); margin-right: .5rem; }

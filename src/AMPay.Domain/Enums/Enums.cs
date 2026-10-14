@@ -317,3 +317,35 @@ public enum BudgetLineKind
     /// </summary>
     DebtInstalment = 2
 }
+
+/// <summary>How money for an instalment arrived, or was attempted.</summary>
+public enum CollectionChannel
+{
+    /// <summary>A DebiCheck debit against the client's mandate.</summary>
+    DebiCheck = 0,
+    /// <summary>A Netcash Pay Now checkout (card, Instant EFT, PayShap and so on).</summary>
+    PayNow = 1,
+    /// <summary>Cash, EFT into the lender's account or anything else recorded by hand.</summary>
+    Manual = 2
+}
+
+public enum CollectionStatus
+{
+    /// <summary>Submitted to the bank; no result yet.</summary>
+    Scheduled = 0,
+    Successful = 1,
+    /// <summary>Returned unpaid.</summary>
+    Failed = 2,
+    /// <summary>Recorded as received, then taken back - a recalled EFT, a payment captured in error.</summary>
+    Reversed = 3
+}
+
+/// <summary>Why a debit came back unpaid, grouped for the dashboard. The bank's code is kept as well.</summary>
+public enum CollectionFailureGroup
+{
+    InsufficientFunds = 0,
+    /// <summary>The client stopped or disputed the debit.</summary>
+    Disputed = 1,
+    MandateCancelled = 2,
+    Other = 3
+}

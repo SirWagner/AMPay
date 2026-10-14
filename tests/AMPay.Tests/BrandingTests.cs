@@ -82,5 +82,6 @@ public class BrandingTests
         public Task MarkPickedUpAsync(Guid tenantId, Guid id, PortalPickedUp body, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<PortalCallback>> CallbacksAsync(Guid tenantId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task MarkCallbackHandledAsync(Guid tenantId, Guid id, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<PortalFunnel?> FunnelAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) => Task.FromResult<PortalFunnel?>(null);
     }
 }

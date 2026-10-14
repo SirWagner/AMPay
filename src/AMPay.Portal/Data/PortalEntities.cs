@@ -171,3 +171,21 @@ public class LenderLogo
     public string ContentType { get; set; } = "image/png";
     public byte[] Data { get; set; } = Array.Empty<byte>();
 }
+
+public enum LinkEventKind
+{
+    /// <summary>Someone opened the lender's public link.</summary>
+    Opened = 0
+}
+
+/// <summary>
+/// One visit to a lender's public link - the top of the self-service funnel. Holds no address,
+/// agent string or cookie: it is a count, not a record of who visited.
+/// </summary>
+public class LinkEvent
+{
+    public long Id { get; set; }
+    public Guid LenderId { get; set; }
+    public DateTime OccurredUtc { get; set; } = DateTime.UtcNow;
+    public LinkEventKind Kind { get; set; } = LinkEventKind.Opened;
+}

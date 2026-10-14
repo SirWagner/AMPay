@@ -56,6 +56,17 @@ public class Tenant
     /// <summary>When the portal last accepted this lender's details and packages.</summary>
     public DateTime? PortalSyncedUtc { get; set; }
 
+    // Lending settings.
+
+    /// <summary>
+    /// The money the lender has set aside for lending. "Capital available" on the dashboard is
+    /// this less the principal still out on loan. Null until the lender says.
+    /// </summary>
+    public decimal? LendingCapital { get; set; }
+
+    /// <summary>Business days after payout during which the client may still cancel. Five is the usual.</summary>
+    public int CoolingOffBusinessDays { get; set; } = 5;
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedUtc { get; set; }
 

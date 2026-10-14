@@ -97,6 +97,14 @@ builder.Services.AddScoped<PortalSync>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<LenderDashboardService>();
 
+// Money in: payments, Pay Now and debit results, applied to each loan's instalments.
+builder.Services.AddScoped<LoanLedgerService>();
+
+// Each lender's book is written down once a day so the dashboard can compare months. The
+// dashboard does it on first open; the nightly job is opt-in because it wakes a paused database.
+if (builder.Configuration.GetValue<bool>(PortfolioSnapshotService.NightlySetting))
+    builder.Services.AddHostedService<PortfolioSnapshotService>();
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
