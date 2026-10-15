@@ -12,3 +12,6 @@ folder/MAXMONEY*.pdf
 folder/Amplifin*.pdf
 folder/*MANDATE*.pdf
 folder/*mandate*.pdf
+
+# Local-only settings with test credentials (Netcash test keys). Never commit.
+appsettings.Local.json
