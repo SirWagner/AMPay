@@ -7,6 +7,12 @@
     <UserSecretsId>3f2b7c1e-6a4d-4e0b-9c35-ampay-portal</UserSecretsId>
   </PropertyGroup>
 
+  <!-- Local-only settings (dev API key, test credentials): never copied into a publish. -->
+  <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
