@@ -34,8 +34,15 @@
 @if (NetcashOptions.Value.UseStubs)
 {
     <div class="stub-banner">
-        Netcash integration is running on stubs &mdash; no live payment calls are being made.
-        Set <span class="mono">Netcash:UseStubs</span> to false once the live clients are implemented.
+        @if (NetcashOptions.Value.Live.Partner)
+        {
+            <text>Netcash: <strong>service-key validation is live</strong>; every other Netcash call is still a stub &mdash; no payments or mandates are sent.</text>
+        }
+        else
+        {
+            <text>Netcash integration is running on stubs &mdash; no live payment calls are being made.
+            Set <span class="mono">Netcash:UseStubs</span> to false once the live clients are implemented.</text>
+        }
     </div>
 }
 
