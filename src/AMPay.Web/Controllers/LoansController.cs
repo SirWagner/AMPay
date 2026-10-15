@@ -1,6 +1,7 @@
 using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
+using AMPay.Domain.Reporting;
 using AMPay.Infrastructure.Contracts;
 using AMPay.Infrastructure.Data;
 using AMPay.Infrastructure.Identity;
@@ -38,6 +39,7 @@ public class LoansController : Controller
     private readonly IAffordabilityService _affordability;
     private readonly UserManager<ApplicationUser> _users;
     private readonly ContractService _contracts;
+    private readonly LoanLedgerService _ledger;
     private readonly ILogger<LoansController> _log;
 
     public LoansController(
@@ -47,6 +49,7 @@ public class LoansController : Controller
         IAffordabilityService affordability,
         UserManager<ApplicationUser> users,
         ContractService contracts,
+        LoanLedgerService ledger,
         ILogger<LoansController> log)
     {
         _db = db;
@@ -55,13 +58,14 @@ public class LoansController : Controller
         _affordability = affordability;
         _users = users;
         _contracts = contracts;
+        _ledger = ledger;
         _log = log;
     }
 
     // ---------------------------------------------------------------- the loan book
 
     [Authorize(Roles = ReadRoles)]
-    public async Task<IActionResult> Index(LoanStatus? status)
+    public async Task<IActionResult> Index(LoanStatus? status, string? filter)
     {
         ViewData["Title"] = "Loans";
         await _tenant.LoadAsync();
@@ -75,6 +79,24 @@ public class LoansController : Controller
 
         if (status is not null) query = query.Where(l => l.Status == status);
         ViewBag.Status = status;
+
+        // The dashboard's "needs action" cards land here.
+        var today = Sast.DateOf(DateTime.UtcNow);
+        switch (filter)
+        {
+            case "failed":
+                query = query.Where(l => l.Status == LoanStatus.Disbursed &&
+                                         l.Collections.Any(c => c.Status == CollectionStatus.Failed && c.RecoveredByCollectionId == null));
+                break;
+            case "arrears":
+                query = query.Where(l => l.Status == LoanStatus.Disbursed &&
+                                         l.Schedule.Any(s => s.DueDate < today && s.PaidAmount < s.InstalmentTotal));
+                break;
+            default:
+                filter = null;
+                break;
+        }
+        ViewBag.Filter = filter;
 
         var rows = await query
             .OrderByDescending(l => l.CreatedUtc)
@@ -295,6 +317,7 @@ public class LoansController : Controller
             .Include(l => l.Mandate)
             .Include(l => l.Schedule.OrderBy(s => s.InstalmentNumber))
             .Include(l => l.Assessments)
+            .Include(l => l.Collections)
             .FirstOrDefaultAsync(l => l.Id == id);
 
         if (loan is null) return NotFound();
@@ -303,6 +326,16 @@ public class LoansController : Controller
         _tenant.EnsureCanAccess(loan.TenantId);
 
         ViewData["Title"] = loan.LoanNumber;
+
+        // Completed Pay Now checkouts from this client that no loan has claimed yet.
+        ViewBag.UnappliedPayNow = loan.Status == LoanStatus.Disbursed
+            ? await _db.PayNowTransactions.AsNoTracking()
+                .Where(p => p.TenantId == loan.TenantId && p.ClientId == loan.ClientId &&
+                            p.Status == PaymentStatus.Complete &&
+                            !_db.LoanCollections.Any(c => c.PayNowTransactionId == p.Id))
+                .OrderByDescending(p => p.CompletedUtc)
+                .ToListAsync()
+            : new List<PayNowTransaction>();
 
         var userIds = new[] { loan.CreatedByUserId, loan.DecidedByUserId }
             .Concat(loan.Assessments.Select(a => a.OverriddenByUserId))
@@ -512,6 +545,81 @@ public class LoansController : Controller
         await _db.SaveChangesAsync();
 
         TempData["Success"] = $"Loan {loan.LoanNumber} cancelled.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    // ---------------------------------------------------------------- money in, and write-off
+
+    /// <summary>
+    /// Records a payment received outside DebiCheck: cash, an EFT into the lender's account, or
+    /// a Pay Now checkout the client made. Owners only - this is money on the books.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = AppPolicies.CanApproveCredit)]
+    public async Task<IActionResult> RecordPayment(Guid id, RecordPaymentModel model)
+    {
+        var loan = await LoadForDecisionAsync(id);
+        if (loan is null) return NotFound();
+
+        var channel = CollectionChannel.Manual;
+        var amount = model.Amount ?? 0m;
+        var reference = model.Reference;
+        DateTime receivedUtc;
+
+        if (model.PayNowTransactionId is { } payNowId)
+        {
+            var payment = await _db.PayNowTransactions.AsNoTracking().FirstOrDefaultAsync(p =>
+                p.Id == payNowId && p.TenantId == loan.TenantId && p.ClientId == loan.ClientId &&
+                p.Status == PaymentStatus.Complete);
+            if (payment is null)
+                return Refuse(id, "That Pay Now payment is not a completed payment from this client.");
+            if (await _db.LoanCollections.AnyAsync(c => c.PayNowTransactionId == payNowId))
+                return Refuse(id, "That Pay Now payment has already been applied to a loan.");
+
+            channel = CollectionChannel.PayNow;
+            amount = payment.Amount;
+            reference = payment.PaymentReference;
+            receivedUtc = payment.CompletedUtc ?? DateTime.UtcNow;
+        }
+        else
+        {
+            var today = Sast.DateOf(DateTime.UtcNow);
+            var date = (model.ReceivedOn ?? today).Date;
+            if (date > today)
+                return Refuse(id, "The date received cannot be in the future.");
+            if (loan.DisbursedUtc is { } paidOut && date < Sast.DateOf(paidOut))
+                return Refuse(id, "The date received is before the loan was paid out.");
+
+            receivedUtc = date == today ? DateTime.UtcNow : Sast.StartUtc(date).AddHours(12);
+        }
+
+        var error = await _ledger.RecordPaymentAsync(loan, channel, amount, receivedUtc, reference, model.Notes,
+            _users.GetUserId(User), model.PayNowTransactionId);
+        if (error is not null) return Refuse(id, error);
+
+        _log.LogInformation("{Channel} payment of {Amount} recorded on loan {LoanNumber}.", channel, amount, loan.LoanNumber);
+
+        TempData["Success"] = loan.Status == LoanStatus.Settled
+            ? $"Payment of R {amount:N2} recorded. {loan.LoanNumber} is paid in full and now settled."
+            : $"Payment of R {amount:N2} recorded on {loan.LoanNumber}.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = AppPolicies.CanApproveCredit)]
+    public async Task<IActionResult> WriteOff(Guid id, string? reason)
+    {
+        var loan = await LoadForDecisionAsync(id);
+        if (loan is null) return NotFound();
+
+        var error = await _ledger.WriteOffAsync(loan, reason, _users.GetUserId(User));
+        if (error is not null) return Refuse(id, error);
+
+        _log.LogInformation("Loan {LoanNumber} written off with {Amount} outstanding.", loan.LoanNumber, loan.WrittenOffAmount);
+
+        TempData["Success"] = $"{loan.LoanNumber} written off with R {loan.WrittenOffAmount:N2} outstanding.";
         return RedirectToAction(nameof(Details), new { id });
     }
 

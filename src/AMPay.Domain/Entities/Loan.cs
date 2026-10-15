@@ -106,11 +106,18 @@ public class Loan
 
     public DateTime? DisbursedUtc { get; set; }
 
+    /// <summary>When the lender stopped expecting the balance back. Set with <see cref="LoanStatus.WrittenOff"/>.</summary>
+    public DateTime? WrittenOffUtc { get; set; }
+
+    /// <summary>What was still owed when the loan was written off.</summary>
+    public decimal? WrittenOffAmount { get; set; }
+
     public Guid? MandateId { get; set; }
     public DebiCheckMandate? Mandate { get; set; }
 
     public ICollection<LoanScheduleEntry> Schedule { get; set; } = new List<LoanScheduleEntry>();
     public ICollection<AffordabilityAssessment> Assessments { get; set; } = new List<AffordabilityAssessment>();
+    public ICollection<LoanCollection> Collections { get; set; } = new List<LoanCollection>();
 
     /// <summary>The assessment the credit decision was actually taken on.</summary>
     public AffordabilityAssessment? LatestAssessment =>
@@ -146,4 +153,13 @@ public class LoanScheduleEntry
     public decimal InstalmentTotal { get; set; }
 
     public decimal ClosingBalance { get; set; }
+
+    /// <summary>
+    /// How much of <see cref="InstalmentTotal"/> has been received, from any channel. Kept
+    /// up to date by the loan ledger, oldest instalment first, so arrears is one query.
+    /// </summary>
+    public decimal PaidAmount { get; set; }
+
+    /// <summary>When the payment that cleared this instalment in full was received.</summary>
+    public DateTime? PaidUtc { get; set; }
 }

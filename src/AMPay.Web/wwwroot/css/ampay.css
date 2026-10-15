@@ -1367,3 +1367,106 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
     justify-content: center;
 }
 .logo-preview img { max-width: 100%; max-height: 120px; object-fit: contain; }
+
+/* ==========================================================================
+   Lender dashboard
+   ========================================================================== */
+
+.tnum { font-variant-numeric: tabular-nums; }
+.lender-dash .chart-grid { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
+.lender-dash .stat-grid { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.lender-dash .status-list li { grid-template-columns: minmax(0, 1fr) auto; }
+.lender-dash .status-list .count.warn { color: var(--amber); }
+
+.not-tracked { color: var(--text-muted) !important; font-size: 1rem !important; font-weight: 600; font-style: italic; }
+.not-tracked-dark { color: rgba(255, 255, 255, .6) !important; font-style: italic; font-weight: 500; }
+.not-tracked-inline { color: rgba(255, 255, 255, .7); }
+
+/* Collections bar in the hero: due so far vs still scheduled. */
+.seg-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, .12);
+    margin: 1rem 0 .6rem;
+    max-width: 560px;
+}
+.seg-bar .seg { display: block; min-width: 3px; }
+.seg-collected { background: var(--green-accent); }
+.seg-failed { background: #ff7a6b; }
+.seg-due { background: rgba(255, 255, 255, .45); }
+.seg-sched { background: rgba(255, 255, 255, .18); }
+.seg-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; font-size: .8rem; color: rgba(255, 255, 255, .78); }
+.seg-legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
+.seg-legend strong { color: #fff; }
+
+/* Needs action today */
+.action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: .85rem; }
+.action-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    background: var(--surface);
+}
+.action-card.has-work { border-color: #ecd9a4; background: #fffcf3; }
+.action-card.highlight { border-left: 4px solid var(--red); }
+.action-card.untracked { background: var(--surface-2); }
+.action-title { font-size: .8rem; color: var(--text-muted); font-weight: 600; }
+.action-count { font-size: 1.6rem; font-weight: 700; color: var(--navy-deeper); line-height: 1.1; }
+.action-context { font-size: .78rem; color: var(--text-muted); }
+.action-link { margin-top: .35rem; font-size: .82rem; font-weight: 600; }
+
+/* The current month's bar is lighter: it is still filling up. */
+.col-current .col-bar { opacity: .45; }
+
+/* Onboarding pipeline, compact */
+.pipeline-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: .6rem; }
+.pipeline-tile {
+    display: flex; flex-direction: column; gap: .1rem;
+    padding: .6rem .8rem; border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text-body); text-decoration: none;
+}
+.pipeline-tile:hover { border-color: var(--navy); text-decoration: none; }
+.pipeline-tile .tnum { font-size: 1.3rem; font-weight: 700; color: var(--navy-deeper); }
+.lender-hero .hero-facts dd { font-size: 1.05rem; }
+.lender-hero .fact-sub { display: block; font-size: .78rem; font-weight: 500; color: rgba(255, 255, 255, .7); font-style: normal; margin-top: .1rem; }
+.lender-dash .not-tracked-dark { font-size: .95rem !important; }
+.lender-dash table.data td, .lender-dash table.data th { white-space: nowrap; }
+
+/* Top bar on phones: the user's name and buttons wrap instead of running off the edge. */
+@media (max-width: 760px) {
+    .topbar { flex-wrap: wrap; gap: .5rem; }
+    .topbar > div:last-child { flex-wrap: wrap; gap: .5rem !important; }
+}
+
+/* Lender dashboard, money in */
+.lender-hero .hero-of { font-size: 1rem; font-weight: 500; color: rgba(255, 255, 255, .7); }
+.lender-hero .hero-split { margin: .6rem 0 0; font-size: .78rem; color: rgba(255, 255, 255, .7); }
+.lender-hero .fact-sub a { color: #fff; text-decoration: underline; }
+.lender-hero .fact-negative { color: #ffb3a8; }
+.lender-dash .stat .value.warn { color: var(--amber); }
+.trend-up { color: var(--green-mid); font-weight: 600; }
+.trend-down { color: var(--red); font-weight: 600; }
+
+/* Lent vs recovered: two bars per month. */
+.lender-dash { --age-0: #f2c46d; --age-1: #e8963f; --age-2: #d8652f; --age-3: #b33a2a; --recovered: #4aaa3c; }
+.col-pair { flex-direction: row; justify-content: center; align-items: flex-end; gap: 3px; }
+.col-pair .col-bar { width: min(14px, 34%); }
+.col-pair .col-bar.recovered { background: var(--recovered); }
+.pair-legend { list-style: none; margin: 0 0 .25rem; padding: 0; display: flex; gap: 1rem; font-size: .78rem; color: var(--text-muted); }
+.pair-legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
+.pair-legend .key-lent { background: var(--viz-series-1); }
+.pair-legend .key-recovered { background: var(--recovered); }
+
+/* Self-service funnel, one line that wraps on phones. */
+.funnel-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem .5rem; }
+.funnel-steps li + li::before { content: "\2192"; color: var(--text-muted); margin-right: .5rem; }
+
+/* Loan page: payments */
+.stat .value.warn { color: var(--amber); }
+.plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.decision-grid h4 { margin: 0; font-size: .95rem; color: var(--text-heading); }

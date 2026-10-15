@@ -79,6 +79,35 @@ public class ContractsController : Controller
 
     // ---------------------------------------------------------------- read
 
+    /// <summary>Contracts still open, for the current business. "unsigned" = sent or opened, not yet signed.</summary>
+    [Authorize(Roles = ReadRoles)]
+    public async Task<IActionResult> Index(string? filter)
+    {
+        ViewData["Title"] = "Contracts";
+        await _tenant.LoadAsync();
+        if (_tenant.TenantId is null)
+        {
+            TempData["Info"] = "Choose a customer account to see its contracts.";
+            return RedirectToAction("Index", "Tenants");
+        }
+
+        var unsignedOnly = string.Equals(filter, "unsigned", StringComparison.OrdinalIgnoreCase);
+        var query = _db.LoanContracts.AsNoTracking().Where(c => c.TenantId == _tenant.TenantId);
+        query = unsignedOnly
+            ? query.Where(c => c.Status == Domain.Enums.ContractStatus.Sent || c.Status == Domain.Enums.ContractStatus.Viewed)
+            : query.Where(c => c.Status != Domain.Enums.ContractStatus.Signed && c.Status != Domain.Enums.ContractStatus.Voided);
+
+        var rows = await query
+            .OrderBy(c => c.SentUtc ?? c.CreatedUtc)
+            .Join(_db.Clients, c => c.ClientId, cl => cl.Id, (c, cl) => new ContractRow(
+                c.Id, c.Reference, c.Status, cl.FirstName + " " + cl.Surname, cl.ClientNumber, c.CreatedUtc, c.SentUtc, c.FirstViewedUtc))
+            .Take(500)
+            .ToListAsync();
+
+        ViewBag.UnsignedOnly = unsignedOnly;
+        return View(rows);
+    }
+
     [Authorize(Roles = ReadRoles)]
     public async Task<IActionResult> Details(Guid id)
     {
@@ -264,3 +293,7 @@ public class ContractsController : Controller
             ? $"{Request.Scheme}://{Request.Host}"
             : _messaging.PublicBaseUrl;
 }
+
+public record ContractRow(
+    Guid Id, string Reference, Domain.Enums.ContractStatus Status, string ClientName, string ClientNumber,
+    DateTime CreatedUtc, DateTime? SentUtc, DateTime? FirstViewedUtc);

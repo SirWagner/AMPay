@@ -223,6 +223,30 @@ namespace AMPay.Portal.Data.Migrations
                     b.ToTable("LenderLogos");
                 });
 
+            modelBuilder.Entity("AMPay.Portal.Data.LinkEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("LenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("OccurredUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LenderId", "OccurredUtc");
+
+                    b.ToTable("LinkEvents");
+                });
+
             modelBuilder.Entity("AMPay.Portal.Data.LoanApplication", b =>
                 {
                     b.Property<Guid>("Id")
@@ -471,6 +495,15 @@ namespace AMPay.Portal.Data.Migrations
                     b.HasOne("AMPay.Portal.Data.Lender", null)
                         .WithOne()
                         .HasForeignKey("AMPay.Portal.Data.LenderLogo", "LenderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AMPay.Portal.Data.LinkEvent", b =>
+                {
+                    b.HasOne("AMPay.Portal.Data.Lender", null)
+                        .WithMany()
+                        .HasForeignKey("LenderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -32,6 +32,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<Loan> Loans => Set<Loan>();
     public DbSet<LoanScheduleEntry> LoanScheduleEntries => Set<LoanScheduleEntry>();
     public DbSet<AffordabilityAssessment> AffordabilityAssessments => Set<AffordabilityAssessment>();
+    public DbSet<LoanCollection> LoanCollections => Set<LoanCollection>();
+    public DbSet<PortfolioSnapshot> PortfolioSnapshots => Set<PortfolioSnapshot>();
 
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
     public DbSet<LoanContract> LoanContracts => Set<LoanContract>();
@@ -81,6 +83,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
             e.HasIndex(x => x.Reference).IsUnique();
             e.HasIndex(x => new { x.LoanId, x.Issue }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Status });
 
             // The token arrives in a public URL; finding the contract by it must be an index
             // seek, and two contracts can never share one.
@@ -252,6 +255,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.HasIndex(x => new { x.TenantId, x.Status });
             e.HasIndex(x => x.ClientId);
 
+            // The dashboard's month windows: payouts, decisions and write-offs per lender.
+            e.HasIndex(x => new { x.TenantId, x.DisbursedUtc });
+            e.HasIndex(x => new { x.TenantId, x.DecidedUtc });
+
             e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
 
@@ -269,8 +276,47 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         b.Entity<LoanScheduleEntry>(e =>
         {
             e.HasIndex(x => new { x.LoanId, x.InstalmentNumber }).IsUnique();
+
+            // Month totals, upcoming runs and arrears all range over due dates.
+            e.HasIndex(x => x.DueDate)
+                .IncludeProperties(x => new { x.LoanId, x.InstalmentTotal, x.PaidAmount });
+
             e.HasOne(x => x.Loan).WithMany(l => l.Schedule)
                 .HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<LoanCollection>(e =>
+        {
+            e.Property(x => x.FailureCode).HasMaxLength(10);
+            e.Property(x => x.ExternalReference).HasMaxLength(100);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.CreatedByUserId).HasMaxLength(64);
+
+            e.HasIndex(x => new { x.TenantId, x.ActionDate });
+            e.HasIndex(x => new { x.TenantId, x.Status, x.ActionDate });
+            e.HasIndex(x => new { x.LoanId, x.ActionDate });
+
+            // A Pay Now checkout pays one loan, once.
+            e.HasIndex(x => x.PayNowTransactionId).IsUnique().HasFilter("[PayNowTransactionId] IS NOT NULL");
+
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Loan).WithMany(l => l.Collections).HasForeignKey(x => x.LoanId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // NoAction: the loan's cascade already reaches both rows (SQL Server refuses two paths).
+            e.HasOne(x => x.ScheduleEntry).WithMany().HasForeignKey(x => x.ScheduleEntryId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.NetcashBatch).WithMany().HasForeignKey(x => x.NetcashBatchId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.PayNowTransaction).WithMany().HasForeignKey(x => x.PayNowTransactionId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        b.Entity<PortfolioSnapshot>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.SnapshotDate }).IsUnique();
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<AffordabilityAssessment>(e =>
@@ -318,6 +364,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.Currency).HasMaxLength(3);
             e.HasIndex(x => x.PaymentReference).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.Status, x.CompletedUtc });
             e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Client).WithMany().HasForeignKey(x => x.ClientId)

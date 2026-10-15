@@ -93,6 +93,18 @@ builder.Services.AddHttpClient<IPortalApi, PortalClient>();
 builder.Services.AddScoped<PortalImporter>();
 builder.Services.AddScoped<PortalSync>();
 
+// The lender dashboard: one set of aggregate queries per tenant, cached for a minute.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<LenderDashboardService>();
+
+// Money in: payments, Pay Now and debit results, applied to each loan's instalments.
+builder.Services.AddScoped<LoanLedgerService>();
+
+// Each lender's book is written down once a day so the dashboard can compare months. The
+// dashboard does it on first open; the nightly job is opt-in because it wakes a paused database.
+if (builder.Configuration.GetValue<bool>(PortfolioSnapshotService.NightlySetting))
+    builder.Services.AddHostedService<PortfolioSnapshotService>();
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -186,6 +198,14 @@ for (var attempt = 1; ; attempt++)
             attempt, ex.GetBaseException().Message);
         await Task.Delay(TimeSpan.FromSeconds(30));
     }
+}
+
+// Development only: `dotnet run --project src/AMPay.Web -- --seed-demo` fills a fictional
+// "Demo Lending" business for showing the lender dashboard, then exits.
+if (args.Contains("--seed-demo"))
+{
+    await DemoSeeder.RunAsync(app.Services, startupLog);
+    return;
 }
 
 app.Run();

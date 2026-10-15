@@ -14,6 +14,7 @@ public class PortalDbContext : DbContext
     public DbSet<CallbackRequest> Callbacks => Set<CallbackRequest>();
     public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
     public DbSet<LenderLogo> LenderLogos => Set<LenderLogo>();
+    public DbSet<LinkEvent> LinkEvents => Set<LinkEvent>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -99,6 +100,12 @@ public class PortalDbContext : DbContext
             e.HasOne<Lender>().WithOne().HasForeignKey<LenderLogo>(x => x.LenderId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
             e.Property(x => x.Data).IsRequired();
+        });
+
+        b.Entity<LinkEvent>(e =>
+        {
+            e.HasIndex(x => new { x.LenderId, x.OccurredUtc });
+            e.HasOne<Lender>().WithMany().HasForeignKey(x => x.LenderId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<OtpChallenge>(e =>
