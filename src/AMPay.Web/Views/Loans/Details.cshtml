@@ -6,6 +6,7 @@
     var assessment = Model.Assessments.OrderByDescending(a => a.AssessedUtc).FirstOrDefault();
 
     // A mandate that failed or was rejected collects nothing, so it counts as no mandate.
+    var collecting = Model.Status is LoanStatus.Disbursed or LoanStatus.Settled or LoanStatus.WrittenOff;
     var hasLiveMandate = Model.Mandate is not null &&
                          !AMPay.Web.Controllers.MandatesController.IsDeadMandate(Model.Mandate.Status);
 
@@ -266,6 +267,11 @@ else if (Model.Status is LoanStatus.Disbursed)
     </form>
 }
 
+@if (Model.Status is LoanStatus.Disbursed or LoanStatus.Settled or LoanStatus.WrittenOff)
+{
+    <partial name="_LoanPayments" model="Model" />
+}
+
 <div class="card">
     <div class="card-head"><h3>Repayment schedule</h3></div>
     <div class="table-wrap">
@@ -281,6 +287,7 @@ else if (Model.Status is LoanStatus.Disbursed)
                 <th class="num">Credit life</th>
                 <th class="num">Instalment</th>
                 <th class="num">Closing balance</th>
+                @if (collecting) { <th class="num">Paid</th> }
             </tr>
             </thead>
             <tbody>
@@ -296,6 +303,17 @@ else if (Model.Status is LoanStatus.Disbursed)
                     <td class="num">@R(r.CreditLifePremium)</td>
                     <td class="num"><strong>@R(r.InstalmentTotal)</strong></td>
                     <td class="num">@R(r.ClosingBalance)</td>
+                    @if (collecting)
+                    {
+                        var today = AMPay.Domain.Reporting.Sast.DateOf(DateTime.UtcNow);
+                        var overdue = r.PaidAmount < r.InstalmentTotal && r.DueDate.Date < today;
+                        <td class="num">
+                            @if (r.PaidAmount >= r.InstalmentTotal) { <span class="badge badge-green">Paid</span> }
+                            else if (r.PaidAmount > 0) { <span class="@(overdue ? "badge badge-red" : "")">@R(r.PaidAmount)</span> }
+                            else if (overdue) { <span class="badge badge-red">Overdue</span> }
+                            else { <span class="muted">-</span> }
+                        </td>
+                    }
                 </tr>
             }
             </tbody>
@@ -308,6 +326,7 @@ else if (Model.Status is LoanStatus.Disbursed)
                 <td class="num">@R(Model.TotalCreditLife)</td>
                 <td class="num"><strong>@R(Model.TotalRepayable)</strong></td>
                 <td></td>
+                @if (collecting) { <td class="num">@R(Model.Schedule.Sum(s => s.PaidAmount))</td> }
             </tr>
             </tfoot>
         </table>

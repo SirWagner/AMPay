@@ -1,0 +1,145 @@
+@model Loan
+@using AMPay.Domain.Credit
+@{
+    var canDecide = (bool)ViewBag.CanDecide;
+    var unapplied = (List<PayNowTransaction>)ViewBag.UnappliedPayNow;
+    var today = AMPay.Domain.Reporting.Sast.DateOf(DateTime.UtcNow);
+
+    string R(decimal v) => "R " + v.ToString("N2");
+
+    var paid = Model.Schedule.Sum(s => s.PaidAmount);
+    var outstanding = LoanLedger.Outstanding(Model.Schedule);
+    var overdue = Model.Schedule.Where(s => s.PaidAmount < s.InstalmentTotal && s.DueDate.Date < today).ToList();
+    var oldest = overdue.OrderBy(s => s.DueDate).FirstOrDefault();
+    var ledger = Model.Collections.OrderByDescending(c => c.ReceivedUtc ?? c.ActionDate).ThenByDescending(c => c.CreatedUtc).ToList();
+}
+
+<div class="card">
+    <div class="card-head"><h3>Payments</h3></div>
+    <div class="card-body">
+        <div class="stat-grid">
+            <div class="stat">
+                <div class="label">Received</div>
+                <div class="value tnum">@R(paid)</div>
+                <div class="note">of @R(Model.TotalRepayable) repayable</div>
+            </div>
+            <div class="stat">
+                <div class="label">@(Model.Status == LoanStatus.WrittenOff ? "Written off" : "Still owed")</div>
+                <div class="value tnum">@R(Model.Status == LoanStatus.WrittenOff ? Model.WrittenOffAmount ?? 0m : outstanding)</div>
+                <div class="note">
+                    @if (Model.Status == LoanStatus.WrittenOff) { <text>on @Model.WrittenOffUtc?.AddHours(2).ToString("dd MMM yyyy")</text> }
+                    else if (Model.Status == LoanStatus.Settled) { <text>Paid in full</text> }
+                    else { <text>across the remaining instalments</text> }
+                </div>
+            </div>
+            <div class="stat">
+                <div class="label">Overdue</div>
+                <div class="value tnum @(overdue.Count > 0 && Model.Status == LoanStatus.Disbursed ? "warn" : "")">@R(overdue.Sum(s => s.InstalmentTotal - s.PaidAmount))</div>
+                <div class="note">
+                    @if (oldest is null) { <text>Nothing past due</text> }
+                    else { <text>@overdue.Count instalment@(overdue.Count == 1 ? "" : "s") &middot; oldest @((today - oldest.DueDate.Date).Days) days</text> }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (ledger.Count > 0)
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr><th>Date</th><th>Channel</th><th class="num">Amount</th><th>Result</th><th>Reference</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var c in ledger)
+                {
+                    <tr>
+                        <td>@((c.ReceivedUtc?.AddHours(2) ?? c.ActionDate).ToString("dd MMM yyyy"))</td>
+                        <td>@(c.Channel switch { CollectionChannel.DebiCheck => "DebiCheck", CollectionChannel.PayNow => "Pay Now", _ => "Manual / EFT" })</td>
+                        <td class="num">@R(c.Amount)</td>
+                        <td>
+                            @switch (c.Status)
+                            {
+                                case CollectionStatus.Successful: <span class="badge badge-green">Received</span> break;
+                                case CollectionStatus.Scheduled: <span class="badge">With the bank</span> break;
+                                case CollectionStatus.Reversed: <span class="badge badge-amber">Reversed</span> break;
+                                default:
+                                    <span class="badge badge-red">Failed</span>
+                                    <span class="muted small">@UnpaidCodes.Label(c.FailureGroup ?? CollectionFailureGroup.Other)@(c.FailureCode is null ? "" : $" ({c.FailureCode})")</span>
+                                    if (c.RecoveredByCollectionId is not null) { <span class="badge badge-green">Recovered</span> }
+                                    break;
+                            }
+                        </td>
+                        <td class="small">@c.ExternalReference@(c.Notes is null ? "" : " - " + c.Notes)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="card-body"><p class="muted mb-0">No payments or debit results recorded yet.</p></div>
+    }
+
+    @if (canDecide && Model.Status == LoanStatus.Disbursed)
+    {
+        <div class="card-body decision-grid">
+            <form asp-action="RecordPayment" asp-route-id="@Model.Id" method="post">
+                @Html.AntiForgeryToken()
+                <h4>Record a payment</h4>
+                <p class="muted small">Cash or an EFT into your account. DebiCheck results arrive from Netcash on their own.</p>
+                <div class="field">
+                    <label for="Amount">Amount received (R)</label>
+                    <input id="Amount" name="Amount" type="number" step="0.01" min="0.01" max="@outstanding.ToString(System.Globalization.CultureInfo.InvariantCulture)" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                    <label for="ReceivedOn">Date received</label>
+                    <input id="ReceivedOn" name="ReceivedOn" type="date" value="@today.ToString("yyyy-MM-dd")" max="@today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="field">
+                    <label for="Reference">Reference</label>
+                    <input id="Reference" name="Reference" maxlength="100" placeholder="EFT reference or receipt number" />
+                </div>
+                <div class="field">
+                    <label for="Notes">Notes</label>
+                    <input id="Notes" name="Notes" maxlength="500" />
+                </div>
+                <button type="submit" class="btn btn-primary">Record payment</button>
+            </form>
+
+            <div>
+                @if (unapplied.Count > 0)
+                {
+                    <h4>Pay Now payments from this client</h4>
+                    <p class="muted small">Completed but not yet applied to a loan.</p>
+                    <ul class="plain-list">
+                        @foreach (var p in unapplied)
+                        {
+                            <li>
+                                <form asp-action="RecordPayment" asp-route-id="@Model.Id" method="post" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="PayNowTransactionId" value="@p.Id" />
+                                    <span class="tnum">@R(p.Amount) &middot; @p.CompletedUtc?.AddHours(2).ToString("dd MMM yyyy") &middot; <span class="mono small">@p.PaymentReference</span></span>
+                                    <button type="submit" class="btn btn-outline btn-sm">Apply to this loan</button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <form asp-action="WriteOff" asp-route-id="@Model.Id" method="post" style="margin-top:1rem;">
+                    @Html.AntiForgeryToken()
+                    <h4>Write off</h4>
+                    <p class="muted small">Stop expecting the @R(outstanding) still owed. The loan leaves your active book; this cannot be undone.</p>
+                    <div class="field">
+                        <label for="woReason">Reason</label>
+                        <textarea id="woReason" name="reason" required placeholder="Why this balance will not be recovered."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger"
+                            onclick="return confirm('Write off @Model.LoanNumber with @R(outstanding) outstanding? This cannot be undone.');">Write off loan</button>
+                </form>
+            </div>
+        </div>
+    }
+</div>

@@ -1,0 +1,37 @@
+@model AMPay.Web.Controllers.LendingSettingsModel
+
+<div class="page-head">
+    <h1>Lending settings</h1>
+    <p class="lede">Figures only @ViewBag.TenantName knows. They drive the capital and cooling-off figures on your dashboard.</p>
+</div>
+
+<div class="card" style="max-width:40rem;">
+    <div class="card-body">
+        <form asp-action="Index" method="post">
+            <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
+
+            <div class="field">
+                <label asp-for="LendingCapital"></label>
+                <input asp-for="LendingCapital" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Not set" />
+                <span asp-validation-for="LendingCapital" class="field-error"></span>
+                <span class="hint">
+                    The money you have available for loans. The dashboard shows this less the principal still out on loan
+                    as <strong>capital available to lend</strong>. Leave empty if you would rather not say.
+                </span>
+            </div>
+
+            <div class="field">
+                <label asp-for="CoolingOffBusinessDays"></label>
+                <input asp-for="CoolingOffBusinessDays" type="number" min="0" max="30" inputmode="numeric" />
+                <span asp-validation-for="CoolingOffBusinessDays" class="field-error"></span>
+                <span class="hint">
+                    Business days after payout during which a client may still cancel. Five is usual. Weekends are skipped;
+                    public holidays are not.
+                </span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-controller="Home" asp-action="Index" class="btn btn-outline">Back to dashboard</a>
+        </form>
+    </div>
+</div>
