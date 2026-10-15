@@ -95,7 +95,9 @@ foreach ($t in $targets) {
         $rel -match '(^|\\)App_Data(\\|$)' -or
         $rel -match '(^|\\)folder(\\|$)' -or
         $_.Extension -in '.mdf', '.ldf', '.bak' -or
-        $_.Name -eq 'secrets.json'
+        $_.Name -eq 'secrets.json' -or
+        $_.Name -eq 'appsettings.Local.json' -or
+        $_.Name -eq 'appsettings.Development.json'
     }
     if ($forbidden) {
         $forbidden | ForEach-Object { Write-Host "  $($_.FullName.Substring($publish.Length + 1))" }

@@ -19,6 +19,11 @@ System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = appCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Development only: a git-ignored appsettings.Local.json for test credentials such as a
+// Netcash test account's keys. Never read outside Development, never committed.
+if (builder.Environment.IsDevelopment())
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
 // ---------------------------------------------------------------------------------------
 // GAP - production configuration.
 // Add Azure Key Vault as a configuration source here so Netcash service keys and the

@@ -12,6 +12,12 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Local-only settings hold test credentials: never copied into a build or a publish. -->
+  <ItemGroup>
+    <Content Update="appsettings.Local.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>

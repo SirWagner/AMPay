@@ -66,7 +66,11 @@ public static class DependencyInjection
         {
             // No Netcash credentials required. Every call is answered locally and logged
             // at Warning so a stubbed response is never mistaken for a real one.
-            services.AddScoped<INetcashPartnerService, StubNetcashPartnerService>();
+            // Switched live one service at a time (Netcash:Live:*), the rest stay stubbed.
+            if (netcash.Live.Partner)
+                services.AddScoped<INetcashPartnerService, LiveNetcashPartnerService>();
+            else
+                services.AddScoped<INetcashPartnerService, StubNetcashPartnerService>();
             services.AddScoped<INetcashDebiCheckService, StubNetcashDebiCheckService>();
             services.AddScoped<INetcashDebitOrderService, StubNetcashDebitOrderService>();
             services.AddScoped<INetcashValidationService, StubNetcashValidationService>();

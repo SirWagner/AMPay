@@ -19,7 +19,7 @@ public class NetcashOptions
     public string ValidationEndpoint { get; set; } = "https://ws.netcash.co.za/NIWS/NIWS_Validation.svc";
 
     /// <summary>ISV surface: ValidateServiceKey, account status. SOAP 1.2.</summary>
-    public string PartnerEndpoint { get; set; } = "https://ws.netcash.co.za/NIWS/niws_partner.svc";
+    public string PartnerEndpoint { get; set; } = "https://ws.netcash.co.za/NIWS/NIWS_Partner.svc";
 
     /// <summary>Pay Now service operations.</summary>
     public string PayNowEndpoint { get; set; } = "https://ws.netcash.co.za/PayNow/PayNow.svc";
@@ -42,9 +42,24 @@ public class NetcashOptions
     /// </summary>
     public bool UseStubs { get; set; } = true;
 
+    /// <summary>
+    /// Services switched to the real Netcash one at a time while <see cref="UseStubs"/> stays
+    /// true for the rest - so a test account can be proved service by service.
+    /// </summary>
+    public NetcashLiveServices Live { get; set; } = new();
+
     /// <summary>Base URL Netcash posts callbacks back to. Must be publicly reachable over HTTPS.</summary>
     public string? CallbackBaseUrl { get; set; }
 
     /// <summary>Secret-store name holding the AM-Pay ISV software vendor key.</summary>
     public string SoftwareVendorKeySecretName { get; set; } = "Netcash:SoftwareVendorKey";
+}
+
+/// <summary>Per-service live switches (configuration <c>Netcash:Live:*</c>). All off by default.</summary>
+public class NetcashLiveServices
+{
+    /// <summary>NIWS_Partner: ValidateServiceKey. Read-only - the safe first live call.</summary>
+    public bool Partner { get; set; }
+
+    public bool Any => Partner;
 }

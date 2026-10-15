@@ -126,7 +126,7 @@ public class NetcashCapabilityService : INetcashCapabilityService
                 ServiceId = serviceId,
                 State = CapabilityState.Stubbed,
                 ServiceKey = slot is not null
-                    ? await _secrets.GetServiceKeyAsync(slot.SecretName, ct) ?? PlaceholderKey(serviceId)
+                    ? await _secrets.ResolveServiceKeyAsync(slot.SecretName, tenant?.NetcashAccountNumber, serviceId, ct) ?? PlaceholderKey(serviceId)
                     : PlaceholderKey(serviceId),
                 Message = "Running on stubs - this will complete locally, but nothing reaches Netcash.",
                 Remedy = null
@@ -156,7 +156,7 @@ public class NetcashCapabilityService : INetcashCapabilityService
                 $"The {Friendly(serviceId)} service key for {tenant.Name} is deactivated.",
                 "Reactivate it on the Netcash service keys screen.");
 
-        var value = await _secrets.GetServiceKeyAsync(slot.SecretName, ct);
+        var value = await _secrets.ResolveServiceKeyAsync(slot.SecretName, tenant.NetcashAccountNumber, serviceId, ct);
 
         if (string.IsNullOrWhiteSpace(value))
             return Fail(serviceId, CapabilityState.SecretMissing,

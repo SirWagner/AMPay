@@ -18,7 +18,7 @@ namespace AMPay.Infrastructure.Netcash;
 //        dotnet tool install --global dotnet-svcutil
 //        dotnet-svcutil https://ws.netcash.co.za/NIWS/NIWS_NIF.svc?wsdl        -n "*,AMPay.Infrastructure.Netcash.Nif"
 //        dotnet-svcutil https://ws.netcash.co.za/NIWS/NIWS_Validation.svc?wsdl -n "*,AMPay.Infrastructure.Netcash.Validation"
-//        dotnet-svcutil https://ws.netcash.co.za/NIWS/niws_partner.svc?wsdl    -n "*,AMPay.Infrastructure.Netcash.Partner"
+//        dotnet-svcutil https://ws.netcash.co.za/NIWS/NIWS_Partner.svc?wsdl    -n "*,AMPay.Infrastructure.Netcash.Partner"
 //   2. Add a live implementation of each interface beside its stub.
 //   3. Flip Netcash:UseStubs to false. Registration in ServiceCollectionExtensions switches over.
 //

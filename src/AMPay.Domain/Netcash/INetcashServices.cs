@@ -189,3 +189,23 @@ public interface ICreditBureauClient
     Task<NetcashResult<string>> RequestReportAsync(
         string idNumber, string reportType, CancellationToken ct = default);
 }
+
+public static class NetcashSecretStoreExtensions
+{
+    /// <summary>
+    /// The secret name keyed by Netcash account number rather than AM-Pay's internal tenant id:
+    /// <c>Netcash:ServiceKeys:51234567890:1</c>. The same on every machine and in Key Vault, so a
+    /// key loaded locally moves to Azure under the same name.
+    /// </summary>
+    public static string AccountSecretName(string netcashAccountNumber, NetcashServiceId serviceId) =>
+        $"Netcash:ServiceKeys:{netcashAccountNumber.Trim()}:{(int)serviceId}";
+
+    /// <summary>A tenant's key for one service: its slot's own secret name first, then the account-number name.</summary>
+    public static async Task<string?> ResolveServiceKeyAsync(
+        this INetcashSecretStore secrets, string slotSecretName, string? netcashAccountNumber, NetcashServiceId serviceId,
+        CancellationToken ct = default) =>
+        await secrets.GetServiceKeyAsync(slotSecretName, ct)
+        ?? (string.IsNullOrWhiteSpace(netcashAccountNumber)
+            ? null
+            : await secrets.GetServiceKeyAsync(AccountSecretName(netcashAccountNumber, serviceId), ct));
+}

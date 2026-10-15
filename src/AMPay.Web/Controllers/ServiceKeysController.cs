@@ -69,7 +69,7 @@ public class ServiceKeysController : Controller
         // Show whether each secret actually resolves, without ever showing the value.
         var resolved = new Dictionary<Guid, bool>();
         foreach (var key in tenant.ServiceKeys)
-            resolved[key.Id] = await _secrets.GetServiceKeyAsync(key.SecretName) is not null;
+            resolved[key.Id] = await _secrets.ResolveServiceKeyAsync(key.SecretName, tenant.NetcashAccountNumber, key.ServiceId) is not null;
 
         ViewBag.Resolved = resolved;
 
@@ -109,7 +109,7 @@ public class ServiceKeysController : Controller
         var keys = new Dictionary<NetcashServiceId, string>();
         foreach (var k in tenant.ServiceKeys.Where(k => k.IsActive))
         {
-            var value = await _secrets.GetServiceKeyAsync(k.SecretName);
+            var value = await _secrets.ResolveServiceKeyAsync(k.SecretName, tenant.NetcashAccountNumber, k.ServiceId);
             if (value is not null) keys[k.ServiceId] = value;
         }
 
