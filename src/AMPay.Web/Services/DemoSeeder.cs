@@ -1,6 +1,7 @@
 using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
+using AMPay.Domain.Reporting;
 using AMPay.Infrastructure.Data;
 using AMPay.Infrastructure.Identity;
 using AMPay.Web.Controllers;
@@ -152,6 +153,7 @@ public static class DemoSeeder
 
                 db.Loans.Add(loan);
                 db.LoanScheduleEntries.AddRange(schedule);
+                SeedCollections(db, loan, schedule, today, rnd);
 
                 if (rnd.NextDouble() < 0.92) db.AffordabilityAssessments.Add(Assessment(loan, quote.FirstInstalment));
             }
@@ -209,8 +211,101 @@ public static class DemoSeeder
             });
         }
 
+        tenant.LendingCapital = 1_500_000m;
         await db.SaveChangesAsync();
+
+        // A start-of-month snapshot so the month-on-month figures have something to compare with.
+        // Demo only: it is today's book measured as at the 1st, not a true record of that day.
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+        if (monthStart < today)
+        {
+            var then = await PortfolioMetrics.PositionAsync(db, tenant.Id, monthStart);
+            db.PortfolioSnapshots.Add(PortfolioMetrics.ToSnapshot(tenant.Id, monthStart, then));
+            await db.SaveChangesAsync();
+        }
+
         log.LogInformation("Demo Lending seeded: {Clients} clients, {Loans} loans.", clientNo, loanNo);
+    }
+
+    private static readonly string[] DemoUnpaidCodes = { "02", "02", "02", "02", "22", "04", "30", "34", "99" };
+
+    /// <summary>
+    /// Debit results for every instalment already due: most collected, some returned unpaid,
+    /// some of those made good later by Pay Now or EFT. Then the instalments are marked paid
+    /// from that ledger exactly as the live app does.
+    /// </summary>
+    private static void SeedCollections(AppDbContext db, Loan loan, IReadOnlyList<LoanScheduleEntry> schedule, DateTime today, Random rnd)
+    {
+        var collections = new List<LoanCollection>();
+        var writtenOff = loan.Status == LoanStatus.WrittenOff;
+        var settled = loan.Status == LoanStatus.Settled;
+        // A written-off loan stopped paying part-way; a struggling active loan misses more often.
+        var stopAfter = writtenOff ? rnd.Next(0, schedule.Count) : int.MaxValue;
+        var failRate = rnd.NextDouble() < 0.15 ? 0.6 : 0.08;
+
+        foreach (var e in schedule.OrderBy(s => s.InstalmentNumber).Where(s => s.DueDate < today))
+        {
+            var fails = !settled && (e.InstalmentNumber > stopAfter || rnd.NextDouble() < failRate);
+            var debit = new LoanCollection
+            {
+                TenantId = loan.TenantId,
+                LoanId = loan.Id,
+                ScheduleEntryId = e.Id,
+                Channel = CollectionChannel.DebiCheck,
+                ActionDate = e.DueDate,
+                Amount = e.InstalmentTotal,
+                Status = fails ? CollectionStatus.Failed : CollectionStatus.Successful,
+                ReceivedUtc = fails ? null : Sast.StartUtc(e.DueDate).AddHours(8),
+                CreatedUtc = Sast.StartUtc(e.DueDate)
+            };
+            if (fails)
+            {
+                debit.FailureCode = DemoUnpaidCodes[rnd.Next(DemoUnpaidCodes.Length)];
+                debit.FailureGroup = UnpaidCodes.GroupOf(debit.FailureCode);
+            }
+            collections.Add(debit);
+
+            // Some failures are recovered a few days later, by Pay Now or an EFT.
+            var recoverOn = e.DueDate.AddDays(rnd.Next(2, 12));
+            if (fails && !writtenOff && rnd.NextDouble() < 0.45 && recoverOn < today)
+            {
+                var byPayNow = rnd.NextDouble() < 0.5;
+                var received = Sast.StartUtc(recoverOn).AddHours(11);
+                var payment = new LoanCollection
+                {
+                    TenantId = loan.TenantId,
+                    LoanId = loan.Id,
+                    Channel = byPayNow ? CollectionChannel.PayNow : CollectionChannel.Manual,
+                    ActionDate = recoverOn,
+                    Amount = e.InstalmentTotal,
+                    Status = CollectionStatus.Successful,
+                    ReceivedUtc = received,
+                    CreatedUtc = received,
+                    ExternalReference = byPayNow ? $"DEMO-PNR-{loan.LoanNumber}-{e.InstalmentNumber}" : "EFT"
+                };
+                if (byPayNow)
+                {
+                    var tx = new PayNowTransaction
+                    {
+                        TenantId = loan.TenantId, ClientId = loan.ClientId, PaymentReference = payment.ExternalReference!,
+                        Amount = payment.Amount, Status = PaymentStatus.Complete, CreatedUtc = received.AddMinutes(-5), CompletedUtc = received
+                    };
+                    db.PayNowTransactions.Add(tx);
+                    payment.PayNowTransactionId = tx.Id;
+                }
+                collections.Add(payment);
+            }
+        }
+
+        LoanLedger.Allocate(schedule, collections);
+        db.LoanCollections.AddRange(collections);
+
+        if (writtenOff)
+        {
+            loan.WrittenOffUtc = Sast.StartUtc(schedule.Max(s => s.DueDate).AddDays(rnd.Next(20, 60)));
+            if (loan.WrittenOffUtc > DateTime.UtcNow) loan.WrittenOffUtc = DateTime.UtcNow.AddDays(-1);
+            loan.WrittenOffAmount = LoanLedger.Outstanding(schedule);
+        }
     }
 
     private static Client NewClient(Guid tenantId, int number, Random rnd, DateTime utcNow, bool onboarded = true)
