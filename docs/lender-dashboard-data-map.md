@@ -2,6 +2,11 @@
 
 Status key: ✅ available now · ⚠️ derivable with a new query · ❌ needs new data
 
+> **Update 15 Oct 2026:** M1-M6 and the indexes were approved and are built. Every ❌ below is
+> now ✅ except "Open complaints / disputes" and the NCR quarterly return, which are still
+> omitted. The tables are kept as the record of where each figure comes from; see
+> [What was built](#what-was-built) at the end.
+
 **The one gap that matters most:** AM-Pay records each loan's *repayment schedule*
 (`LoanScheduleEntries`), Pay Now payments (`PayNowTransactions`, not linked to a loan) and Netcash
 batch files (`NetcashBatches`, totals only). It records **nothing about each debit's outcome** -
@@ -94,7 +99,7 @@ Existing client status counts. ✅
 
 A super admin with **no** customer selected keeps the platform overview (all customers).
 
-## Proposed schema changes - awaiting approval, nothing migrated
+## Schema changes - approved and built (migration `LoanCollectionsAndPortfolio`, portal `LinkEvents`)
 
 **M1 - `LoanCollections`: one row per collection attempt or payment** (unlocks collected, failed,
 outstanding, arrears, recovered, failure reasons, Pay Now/manual per loan)
@@ -133,8 +138,50 @@ resource). Only meaningful once M1 exists.
 **M6 - portal `LinkEvents`** (portal database: LenderId, OccurredUtc, Kind = Opened) - the top of
 the self-service funnel; aggregated counts exposed on the portal API.
 
-**Indexes for the new queries** (also a migration, so also awaiting approval):
+**Indexes for the new queries** (in the same migration):
 `Loans (TenantId, DisbursedUtc)`, `Loans (TenantId, DecidedUtc)`, `LoanScheduleEntries (DueDate)`
 include `LoanId, InstalmentTotal`, `PayNowTransactions (TenantId, Status, CompletedUtc)`,
 `LoanContracts (TenantId, Status)`. At today's data sizes the existing `(TenantId, Status)`
 indexes keep every query fast; these matter at thousands of loans.
+
+## What was built
+
+**Writers of money in** (all through `LoanLedgerService`, which re-marks the loan's instalments
+from its whole ledger after every change - oldest instalment first; a debit raised for one
+instalment pays that one first; a fully paid loan is settled):
+
+- *Netcash debit results* - `ImportDebitResultsAsync(tenantId, results)`, matched on the mandate's
+  account reference and the action date. A later result for the same debit replaces the first.
+  Lines that match no loan are returned, not guessed. Nothing calls it yet: it is the entry point
+  for the live Netcash result fetch, which is still a stub (`Netcash:UseStubs` is unchanged).
+- *Pay Now* - the notify callback applies a completed payment to the client's loan when they have
+  exactly one being collected; otherwise it waits on the loan page under "Pay Now payments from
+  this client".
+- *Record a payment* (loan page, owners only) - cash or EFT, with the South African date received.
+- *Write off* (loan page, owners only) - records the outstanding amount and a reason (as a client note).
+
+**Unpaid codes** - `UnpaidCodes` maps only the bank codes whose meaning is settled (02, 22 →
+insufficient funds; 04, 30, 32, 36 → disputed; 34 → mandate cancelled). Anything else is
+"Other", with the raw code kept. **Check against Netcash's unpaid-code list before go-live.**
+
+**Arrears** - an instalment is overdue when its due date has passed and it is not fully paid,
+unless its debit is still with the bank (`Status = Scheduled`). Loans are bucketed by their
+oldest overdue instalment; the bucket amount is the loan's whole balance. PAR = book in arrears ÷
+book outstanding.
+
+**Capital available** = `Tenants.LendingCapital` − principal still out (each unpaid instalment's
+capital, scaled from the capitalised amount back to the cash paid out). Set on *Lending settings*.
+
+**Snapshots** - written the first time the dashboard is opened each SAST day, when the database
+is awake anyway. The nightly `PortfolioSnapshotService` exists but is off unless
+`PortfolioSnapshots:Nightly=true`: on the free serverless Azure SQL database a nightly wake costs
+roughly an hour of compute a day. Month-on-month compares with the first snapshot of the month.
+
+**Portal funnel** - the portal records a `LinkEvent` per landing-page view (no IP, agent string or
+cookie; link previews and crawlers are skipped) and serves `GET api/v1/funnel`. The dashboard
+waits 3 seconds for it and otherwise shows the figures it has.
+
+**Known limits** - loans paid out before this change have no payment history, so their past
+instalments show as unpaid until payments are recorded or imported. Early settlement (paying
+less than the full schedule because future interest falls away) is not modelled. A settled loan's
+DebiCheck mandate is not cancelled automatically.
