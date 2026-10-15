@@ -4,6 +4,7 @@ using AMPay.Domain.Enums;
 using AMPay.Domain.Reporting;
 using AMPay.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AMPay.Web.Services;
 
@@ -32,11 +33,20 @@ public class LoanLedgerService
 {
     private readonly AppDbContext _db;
     private readonly ILogger<LoanLedgerService> _log;
+    private readonly IMemoryCache? _cache;
 
-    public LoanLedgerService(AppDbContext db, ILogger<LoanLedgerService> log)
+    public LoanLedgerService(AppDbContext db, ILogger<LoanLedgerService> log, IMemoryCache? cache = null)
     {
         _db = db;
         _log = log;
+        _cache = cache;
+    }
+
+    /// <summary>Saves, then drops the lender's cached dashboard so the change shows at once.</summary>
+    private async Task SaveAsync(Guid tenantId, CancellationToken ct)
+    {
+        await _db.SaveChangesAsync(ct);
+        _cache?.Remove(LenderDashboardService.CacheKey(tenantId));
     }
 
     /// <summary>
@@ -76,7 +86,7 @@ public class LoanLedgerService
 
         // Allocate over the ledger including the new row: it is tracked, so it is in Collections.
         Reallocate(loan);
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(loan.TenantId, ct);
         return null;
     }
 
@@ -203,7 +213,7 @@ public class LoanLedgerService
         }
 
         foreach (var loan in touched) Reallocate(loan);
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(tenantId, ct);
 
         _log.LogInformation("Debit results for tenant {TenantId}: {Recorded} recorded, {Updated} updated, {Unmatched} unmatched.",
             tenantId, recorded, updated, unmatched.Count);
@@ -233,7 +243,7 @@ public class LoanLedgerService
             CreatedByUserId = userId
         });
 
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(loan.TenantId, ct);
         return null;
     }
 

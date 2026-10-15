@@ -67,7 +67,7 @@ public class LendingSettingsController : Controller
         await _db.SaveChangesAsync();
 
         // Show the change straight away rather than after the dashboard's minute is up.
-        _cache.Remove($"lender-dashboard:{t.Id}");
+        _cache.Remove(LenderDashboardService.CacheKey(t.Id));
 
         TempData["Success"] = "Lending settings saved.";
         return RedirectToAction(nameof(Index));

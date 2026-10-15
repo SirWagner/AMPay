@@ -23,6 +23,9 @@ public class LenderDashboardService
 {
     public static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(60);
 
+    /// <summary>The cache entry for one lender's dashboard; removed by anything that changes its money.</summary>
+    public static string CacheKey(Guid tenantId) => $"lender-dashboard:{tenantId}";
+
     /// <summary>How long the dashboard waits for the portal's funnel counts before showing without them.</summary>
     public static readonly TimeSpan PortalWait = TimeSpan.FromSeconds(3);
 
@@ -40,7 +43,7 @@ public class LenderDashboardService
     }
 
     public async Task<LenderDashboardViewModel> GetAsync(Guid tenantId, CancellationToken ct = default) =>
-        (await _cache.GetOrCreateAsync($"lender-dashboard:{tenantId}", entry =>
+        (await _cache.GetOrCreateAsync(CacheKey(tenantId), entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheFor;
             return BuildAsync(tenantId, DateTime.UtcNow, ct);

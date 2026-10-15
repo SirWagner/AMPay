@@ -145,7 +145,14 @@ var thenLabel = k.ComparedToDate is { } td ? td.ToString("d MMM") : null;
             @if (k.BookOutstandingThen is { } bookThen)
             {
                 var diff = k.BookOutstanding - bookThen;
-                <br /><span class="@(diff >= 0 ? "trend-up" : "trend-down")">@(diff >= 0 ? "▲" : "▼") @R(Math.Abs(diff))</span> <text>since @thenLabel</text>
+                if (Math.Round(diff, 0) == 0)
+                {
+                    <br /><text>No change since @thenLabel</text>
+                }
+                else
+                {
+                    <br /><span class="@(diff > 0 ? "trend-up" : "trend-down")">@(diff > 0 ? "▲" : "▼") @R(Math.Abs(diff))</span> <text>since @thenLabel</text>
+                }
             }
         </div>
     </div>
