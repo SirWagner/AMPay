@@ -78,7 +78,13 @@ public class NetcashLiveServices
     /// <summary>NIWS_NIF.AVSRealtimeQuery: asks the bank whether an account exists and matches. Read-only, but each query may be billed.</summary>
     public bool Avs { get; set; }
 
-    public bool Any => Partner || Validation || Avs;
+    /// <summary>
+    /// NIWS_NIF DebiCheck: real-time (TT1) authentication, status and cancel. NOT read-only: TT1
+    /// asks the debtor's bank to prompt the account holder, so use accounts whose holder expects it.
+    /// </summary>
+    public bool DebiCheck { get; set; }
+
+    public bool Any => Partner || Validation || Avs || DebiCheck;
 
     /// <summary>Names of the live services, for the banner.</summary>
     public IEnumerable<string> Names()
@@ -86,5 +92,6 @@ public class NetcashLiveServices
         if (Partner) yield return "service-key validation";
         if (Validation) yield return "bank and ID checks";
         if (Avs) yield return "bank account verification (AVS)";
+        if (DebiCheck) yield return "DebiCheck real-time mandates (TT1)";
     }
 }

@@ -168,7 +168,7 @@ public class LiveNetcashValidationTests
 
         Assert.True(r.Success);
         Assert.Equal(new[] { "ABSA", "CAPITEC BANK", "TYMEBANK" }, r.Data!.Select(b => b.Name));
-        Assert.All(r.Data, b => Assert.True(b.SupportsDebiCheck));
+        Assert.All(r.Data!, b => Assert.True(b.SupportsDebiCheck));
         Assert.All(r.Data, b => Assert.Null(b.DefaultBranchCode));
     }
 
@@ -237,4 +237,112 @@ public class LiveNetcashValidationTests
         "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><AVSRealtimeQueryResponse xmlns=\"http://tempuri.org/\">" +
         $"<AVSRealtimeQueryResult xmlns:b=\"http://schemas.datacontract.org/2004/07/NC.DG.TMS.C.WCF.NIWS\">{inner}</AVSRealtimeQueryResult>" +
         "</AVSRealtimeQueryResponse></s:Body></s:Envelope>";
+}
+
+/// <summary>The live DebiCheck calls, without the network: what TT1 sends and how answers are read.</summary>
+public class LiveNetcashDebiCheckTests
+{
+    private const string Tempuri = "http://tempuri.org/";
+
+    private static DebiCheckAuthenticateRequest Request() => new()
+    {
+        AccountReference = "C000014",
+        MandateTemplateId = " NCDCT000000001 ",
+        IsIdNumber = true,
+        DebtorIdentification = "8506155009085",
+        AccountName = "Thandi Testperson",
+        BankAccountName = "T TESTPERSON",
+        BranchCode = "632005",
+        BankAccountNumber = "4012345678",
+        BankAccountType = BankAccountType.Savings,
+        MobileNumber = "0820000000",
+        CollectionAmount = 1554.5m,
+        FirstCollectionDate = new DateTime(2026, 11, 25)
+    };
+
+    [Fact]
+    public void TheTt1Request_HasNetcashsFieldsInOrder_AndItsFormats()
+    {
+        var xml = XDocument.Parse(LiveNetcashDebiCheckService.BuildAuthenticate("key", Request()));
+        var names = xml.Root!.Elements().Select(e => e.Name.LocalName).ToList();
+
+        Assert.Equal(new[]
+        {
+            "ServiceKey", "AccountReference", "DebiCheckMandateTemplateId", "IsIdNumber", "DebtorIdentification", "AccountName",
+            "BankAccountName", "BranchCode", "BankAccountNumber", "BankAccountType", "MobileNumber", "EmailAddress",
+            "CollectionAmount", "FirstCollectionDiffers", "FirstCollectionDate", "collectionDayCode", "DebtorIdentificationCode"
+        }, names);
+
+        string V(string n) => xml.Root!.Element(XName.Get(n, Tempuri))!.Value;
+        Assert.Equal("NCDCT000000001", V("DebiCheckMandateTemplateId"));
+        Assert.Equal("Savings", V("BankAccountType"));
+        Assert.Equal("1554.50", V("CollectionAmount"));
+        Assert.Equal("20261125", V("FirstCollectionDate"));
+        Assert.Equal("MNTH_25", V("collectionDayCode"));
+        Assert.Equal("I", V("DebtorIdentificationCode"));
+    }
+
+    [Theory]
+    [InlineData("MNTH_05", null, "MNTH_05")]
+    [InlineData("mnth_31", null, "MNTH_31")]
+    [InlineData("25", null, "MNTH_25")]
+    [InlineData(null, "2026-11-07", "MNTH_07")]
+    [InlineData("rubbish", null, null)]
+    public void DayCodes_AreNormalised(string? code, string? first, string? expected) =>
+        Assert.Equal(expected, LiveNetcashDebiCheckService.DayCode(code, first is null ? null : DateTime.Parse(first)));
+
+    [Fact]
+    public void AnAcceptedTt1_IsReadWithItsCodes()
+    {
+        var r = LiveNetcashDebiCheckService.ParseAuthenticate(Answer("DebiCheckAuthenticateResult",
+            "<b:BankResponseCode>900000</b:BankResponseCode><b:BankservResponseCode>ACCP</b:BankservResponseCode>" +
+            "<b:ClientResponseCode>TRUE</b:ClientResponseCode><b:ContractReference>REF123</b:ContractReference><b:Status>Accepted</b:Status>"));
+
+        Assert.True(r.Success);
+        Assert.True(r.Data!.IsAccepted);
+        Assert.Equal("REF123", r.Data.ContractReference);
+    }
+
+    [Fact]
+    public void ARejectedTt1_IsAnAnswer_NotAFailure()
+    {
+        var r = LiveNetcashDebiCheckService.ParseAuthenticate(Answer("DebiCheckAuthenticateResult",
+            "<b:BankResponseCode>900001</b:BankResponseCode><b:BankservResponseCode>RJCT</b:BankservResponseCode><b:ContractReference>REF9</b:ContractReference><b:Status>Rejected</b:Status>"));
+        Assert.True(r.Success);
+        Assert.False(r.Data!.IsAccepted);
+    }
+
+    [Fact]
+    public void ATt1RefusedByNetcash_CarriesItsMessagesAndCode()
+    {
+        var r = LiveNetcashDebiCheckService.ParseAuthenticate(Answer("DebiCheckAuthenticateResult",
+            "<b:Messages xmlns:c=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\"><c:string>325 - Template not real-time</c:string></b:Messages>"));
+        Assert.False(r.Success);
+        Assert.Equal("325", r.Code);
+        Assert.Contains("Template not real-time", r.Message);
+    }
+
+    [Fact]
+    public void TheStatus_IsReadWithTheBankCodesAndCancellation()
+    {
+        var r = LiveNetcashDebiCheckService.ParseStatus(Answer("DebiCheckAuthenticationCurrentStatusResult",
+            "<b:CancellationReason>CUST</b:CancellationReason><b:ContractReference>REF1</b:ContractReference><b:DateCancelled>20261101</b:DateCancelled>" +
+            "<b:Status>Cancelled</b:Status><b:BankservResponse>ACCP</b:BankservResponse>"));
+        Assert.True(r.Success);
+        Assert.Equal("Cancelled", r.Data);
+        Assert.Contains("cancelled 20261101 (CUST)", r.Message);
+    }
+
+    [Fact]
+    public void AnUnknownTemplate_IsNotOffered()
+    {
+        Assert.Null(LiveNetcashDebiCheckService.TemplateDetail(Answer("DebiCheckRetrieveMandateTemplateDetailResult", "<b:TemplateId></b:TemplateId>")));
+        Assert.Equal(("Monthly loans", "REALTIME"), LiveNetcashDebiCheckService.TemplateDetail(Answer("DebiCheckRetrieveMandateTemplateDetailResult",
+            "<b:AuthenticationType>REALTIME</b:AuthenticationType><b:TemplateId>NCDCT000000001</b:TemplateId><b:TemplateName>Monthly loans</b:TemplateName>")));
+    }
+
+    private static string Answer(string result, string inner) =>
+        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><Response xmlns=\"http://tempuri.org/\">" +
+        $"<{result} xmlns:b=\"http://schemas.datacontract.org/2004/07/NC.DG.TMS.C.WCF.NIWS\">{inner}</{result}>" +
+        "</Response></s:Body></s:Envelope>";
 }

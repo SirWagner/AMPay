@@ -16,7 +16,7 @@
         <form asp-action="Cancel" method="post"
               onsubmit="return confirm('Cancel this mandate with the debtor bank?');">
             <input type="hidden" name="id" value="@Model.Id" />
-            <input type="hidden" name="reasonCode" value="01" />
+            <input type="hidden" name="reasonCode" value="CUST" />
             <button type="submit" class="btn btn-danger">Cancel mandate</button>
         </form>
     }
