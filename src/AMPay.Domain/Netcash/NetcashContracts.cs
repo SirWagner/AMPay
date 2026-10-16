@@ -123,6 +123,9 @@ public class AddMandateResponse
 /// <summary>Real-time account verification.</summary>
 public class AvsRequest
 {
+    /// <summary>Our reference for the enquiry (the client number), echoed in Netcash's records.</summary>
+    public string? AccountReference { get; set; }
+
     public string AccountNumber { get; set; } = string.Empty;
     public string BranchCode { get; set; } = string.Empty;
     public BankAccountType AccountType { get; set; } = BankAccountType.Cheque;
@@ -145,7 +148,14 @@ public class AvsResponse
     public bool? SurnameMatches { get; set; }
     public bool? AccountAcceptsDebits { get; set; }
     public bool? AccountAcceptsCredits { get; set; }
+    public bool? AccountActive { get; set; }
     public string? Reference { get; set; }
+
+    /// <summary>The bank could not answer in real time; Netcash will have the result later under <see cref="Reference"/>.</summary>
+    public bool AnswerPending { get; set; }
+
+    /// <summary>Notes Netcash returned with the answer.</summary>
+    public List<string> Messages { get; set; } = new();
 }
 
 /// <summary>Result of ValidateServiceKey on the NIWS_Partner endpoint.</summary>

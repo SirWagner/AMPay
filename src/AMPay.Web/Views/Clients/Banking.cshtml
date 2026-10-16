@@ -114,6 +114,7 @@
                                 }
                             </select>
                             <span asp-validation-for="BankName" class="field-error"></span>
+                            @if (ViewBag.BankListNote is string bankNote) { <span class="hint">@bankNote</span> }
                         </div>
 
                         <div class="field">

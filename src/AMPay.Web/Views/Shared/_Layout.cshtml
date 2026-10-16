@@ -34,9 +34,9 @@
 @if (NetcashOptions.Value.UseStubs)
 {
     <div class="stub-banner">
-        @if (NetcashOptions.Value.Live.Partner)
+        @if (NetcashOptions.Value.Live.Any)
         {
-            <text>Netcash: <strong>service-key validation is live</strong>; every other Netcash call is still a stub &mdash; no payments or mandates are sent.</text>
+            <text>Netcash live: <strong>@string.Join(", ", NetcashOptions.Value.Live.Names())</strong>. Everything else is still a stub &mdash; no payments or mandates are sent.</text>
         }
         else
         {
