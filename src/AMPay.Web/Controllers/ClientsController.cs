@@ -659,6 +659,7 @@ public class ClientsController : Controller
             serviceKey: string.Empty, // resolved inside the live client from the tenant key
             new AvsRequest
             {
+                AccountReference = client.ClientNumber,
                 AccountNumber = account.AccountNumber,
                 BranchCode = account.BranchCode,
                 AccountType = account.AccountType,
@@ -675,9 +676,28 @@ public class ClientsController : Controller
 
             await _db.SaveChangesAsync();
 
-            TempData[account.AvsVerified ? "Success" : "Error"] = account.AvsVerified
-                ? "Account verified against the bank."
-                : "The bank did not confirm this account.";
+            var avs = result.Data;
+            if (avs.AnswerPending)
+            {
+                TempData["Info"] = $"The bank could not answer straight away; Netcash will have the result later (reference {avs.Reference}).";
+            }
+            else
+            {
+                // Say which checks failed, not just that something did.
+                var misses = new List<string>();
+                if (avs.AccountExists == false) misses.Add("the account number is not valid at the bank");
+                if (avs.AccountActive == false) misses.Add("the account is not active");
+                if (avs.IdNumberMatches == false) misses.Add("the ID number does not match the account holder");
+                if (avs.SurnameMatches == false) misses.Add("the surname does not match");
+                if (avs.InitialsMatch == false) misses.Add("the initials do not match");
+                if (avs.AccountAcceptsDebits == false) misses.Add("the account does not accept debit orders");
+
+                TempData[account.AvsVerified && misses.Count == 0 ? "Success" : "Error"] = account.AvsVerified && misses.Count == 0
+                    ? "Account verified against the bank: it exists, matches the client and accepts debit orders."
+                    : misses.Count > 0
+                        ? "The bank's answer: " + string.Join("; ", misses) + "."
+                        : "The bank did not confirm this account.";
+            }
         }
         else
         {
@@ -1041,7 +1061,10 @@ public class ClientsController : Controller
         var result = await _validation.ValidateIdNumberAsync(model.IdNumber);
         if (!result.Success)
             ModelState.AddModelError(nameof(model.IdNumber),
-                "That is not a valid South African ID number. Clear the checkbox if this is a passport.");
+                result.Code is "1" or NetcashCodes.ParameterError
+                    ? "That is not a valid South African ID number. Clear the checkbox if this is a passport."
+                    // Netcash could not check it (down, key refused): say so, rather than blame the number.
+                    : result.Message ?? "The ID number could not be checked just now.");
     }
 
     private async Task PopulateWizardAsync(Guid clientId, OnboardingStep? step = null)
@@ -1087,6 +1110,7 @@ public class ClientsController : Controller
     {
         var banks = await _validation.GetDebiCheckParticipatingBanksAsync();
         ViewBag.Banks = banks.Data ?? new List<BankInfo>();
+        ViewBag.BankListNote = banks.Success ? banks.Message : banks.Message ?? "The bank list could not be loaded.";
     }
 
     private Task<string> NextClientNumberAsync(Guid tenantId) => ClientNumbers.NextAsync(_db, tenantId);

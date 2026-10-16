@@ -73,7 +73,13 @@ public static class DependencyInjection
                 services.AddScoped<INetcashPartnerService, StubNetcashPartnerService>();
             services.AddScoped<INetcashDebiCheckService, StubNetcashDebiCheckService>();
             services.AddScoped<INetcashDebitOrderService, StubNetcashDebitOrderService>();
-            services.AddScoped<INetcashValidationService, StubNetcashValidationService>();
+            // Bank, ID and AVS checks: the live client answers its switched-on half and hands the
+            // rest to the stub. It needs INetcashKeyProvider, which the web app registers.
+            services.AddScoped<StubNetcashValidationService>();
+            if (netcash.Live.Validation || netcash.Live.Avs)
+                services.AddScoped<INetcashValidationService, LiveNetcashValidationService>();
+            else
+                services.AddScoped<INetcashValidationService>(sp => sp.GetRequiredService<StubNetcashValidationService>());
             services.AddScoped<INetcashPayNowService, StubNetcashPayNowService>();
         }
         else

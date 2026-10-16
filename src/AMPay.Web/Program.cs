@@ -91,6 +91,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
 builder.Services.AddScoped<INetcashCapabilityService, NetcashCapabilityService>();
+builder.Services.AddScoped<AMPay.Domain.Netcash.INetcashKeyProvider, CurrentTenantNetcashKeys>();
 
 // The self-service portal: a separate app with its own database. AM-Pay calls it; it never calls AM-Pay.
 builder.Services.Configure<PortalOptions>(builder.Configuration.GetSection(PortalOptions.SectionName));

@@ -209,3 +209,13 @@ public static class NetcashSecretStoreExtensions
             ? null
             : await secrets.GetServiceKeyAsync(AccountSecretName(netcashAccountNumber, serviceId), ct));
 }
+
+/// <summary>
+/// The current business's Netcash key for a service, for live clients whose callers do not pass
+/// one (validation, AVS). Null when the key is not loaded - never a placeholder, because a bad
+/// key sent to Netcash counts towards the account lockout.
+/// </summary>
+public interface INetcashKeyProvider
+{
+    Task<string?> KeyAsync(NetcashServiceId serviceId, CancellationToken ct = default);
+}

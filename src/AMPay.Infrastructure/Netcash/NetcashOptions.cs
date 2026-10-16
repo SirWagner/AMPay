@@ -1,3 +1,5 @@
+using AMPay.Domain.Enums;
+
 namespace AMPay.Infrastructure.Netcash;
 
 /// <summary>
@@ -48,6 +50,15 @@ public class NetcashOptions
     /// </summary>
     public NetcashLiveServices Live { get; set; } = new();
 
+    /// <summary>
+    /// Which of the business's keys the validation service (bank account, ID, bank lists) is
+    /// called with. Netcash ties it to the Account service.
+    /// </summary>
+    public NetcashServiceId ValidationKeyService { get; set; } = NetcashServiceId.Account;
+
+    /// <summary>Which key AVS (on the NIF debit-order endpoint) is called with.</summary>
+    public NetcashServiceId AvsKeyService { get; set; } = NetcashServiceId.DebitOrders;
+
     /// <summary>Base URL Netcash posts callbacks back to. Must be publicly reachable over HTTPS.</summary>
     public string? CallbackBaseUrl { get; set; }
 
@@ -61,5 +72,19 @@ public class NetcashLiveServices
     /// <summary>NIWS_Partner: ValidateServiceKey. Read-only - the safe first live call.</summary>
     public bool Partner { get; set; }
 
-    public bool Any => Partner;
+    /// <summary>NIWS_Validation: bank account format, ID number, bank lists. Read-only.</summary>
+    public bool Validation { get; set; }
+
+    /// <summary>NIWS_NIF.AVSRealtimeQuery: asks the bank whether an account exists and matches. Read-only, but each query may be billed.</summary>
+    public bool Avs { get; set; }
+
+    public bool Any => Partner || Validation || Avs;
+
+    /// <summary>Names of the live services, for the banner.</summary>
+    public IEnumerable<string> Names()
+    {
+        if (Partner) yield return "service-key validation";
+        if (Validation) yield return "bank and ID checks";
+        if (Avs) yield return "bank account verification (AVS)";
+    }
 }
