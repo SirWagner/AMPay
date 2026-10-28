@@ -49,7 +49,9 @@
     <div class="card-foot contract-actions">
         @if (configured)
         {
-            <form asp-action="Generate" method="post">
+            @* One press only: the portal can take up to a minute to wake, and a second press would
+               race the first and leave AM-Pay and the portal holding different links. *@
+            <form asp-action="Generate" method="post" data-once="Working - the portal can take up to a minute to wake up. Please wait.">
                 @if (link is null)
                 {
                     <button type="submit" class="btn btn-primary">Create self-service link</button>
@@ -62,10 +64,21 @@
             </form>
             @if (link is not null)
             {
-                <form asp-action="Sync" method="post">
+                <form asp-action="Sync" method="post" data-once="Sending - the portal can take up to a minute to wake up. Please wait.">
                     <button type="submit" class="btn btn-outline">Send current packages to the portal</button>
                 </form>
             }
+            <p class="muted small" data-once-note hidden></p>
+            <script>
+                document.querySelectorAll('form[data-once]').forEach(function (f) {
+                    f.addEventListener('submit', function () {
+                        document.querySelectorAll('form[data-once] button').forEach(function (b) { b.disabled = true; });
+                        var note = document.querySelector('[data-once-note]');
+                        note.textContent = f.getAttribute('data-once');
+                        note.hidden = false;
+                    });
+                });
+            </script>
         }
     </div>
 </div>

@@ -83,7 +83,10 @@ public static class DependencyInjection
                 services.AddScoped<INetcashValidationService, LiveNetcashValidationService>();
             else
                 services.AddScoped<INetcashValidationService>(sp => sp.GetRequiredService<StubNetcashValidationService>());
-            services.AddScoped<INetcashPayNowService, StubNetcashPayNowService>();
+            if (netcash.Live.PayNow)
+                services.AddScoped<INetcashPayNowService, LiveNetcashPayNowService>();
+            else
+                services.AddScoped<INetcashPayNowService, StubNetcashPayNowService>();
         }
         else
         {

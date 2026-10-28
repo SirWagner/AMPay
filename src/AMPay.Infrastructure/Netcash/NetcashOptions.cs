@@ -84,7 +84,10 @@ public class NetcashLiveServices
     /// </summary>
     public bool DebiCheck { get; set; }
 
-    public bool Any => Partner || Validation || Avs || DebiCheck;
+    /// <summary>Pay Now hosted checkout and its notify. Real money on a live account; needs Netcash:PayNowCallbackSecret.</summary>
+    public bool PayNow { get; set; }
+
+    public bool Any => Partner || Validation || Avs || DebiCheck || PayNow;
 
     /// <summary>Names of the live services, for the banner.</summary>
     public IEnumerable<string> Names()
@@ -93,5 +96,6 @@ public class NetcashLiveServices
         if (Validation) yield return "bank and ID checks";
         if (Avs) yield return "bank account verification (AVS)";
         if (DebiCheck) yield return "DebiCheck real-time mandates (TT1)";
+        if (PayNow) yield return "Pay Now payments";
     }
 }

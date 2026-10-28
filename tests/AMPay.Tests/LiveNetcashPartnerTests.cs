@@ -346,3 +346,50 @@ public class LiveNetcashDebiCheckTests
         $"<{result} xmlns:b=\"http://schemas.datacontract.org/2004/07/NC.DG.TMS.C.WCF.NIWS\">{inner}</{result}>" +
         "</Response></s:Body></s:Envelope>";
 }
+
+/// <summary>Pay Now's notify must prove it belongs to a checkout AM-Pay created.</summary>
+public class LivePayNowCallbackTests
+{
+    private const string Secret = "test-secret-0123456789-abcdefghijklmnop";
+
+    private static Dictionary<string, string> Notify(string reference, string amount, string? check) => new()
+    {
+        ["TransactionAccepted"] = "true",
+        ["Reference"] = reference,
+        ["Amount"] = amount,
+        ["RequestTrace"] = "TRACE-1",
+        ["Method"] = "1",
+        ["Extra3"] = check ?? ""
+    };
+
+    [Fact]
+    public void ANotifyWithTheRightCheckValue_IsAccepted()
+    {
+        var check = LiveNetcashPayNowService.CheckValue(Secret, "AMP-1", "150.00");
+        var r = LiveNetcashPayNowService.Parse(Secret, Notify("AMP-1", "150.00", check));
+
+        Assert.True(r.Success);
+        Assert.True(r.Data!.IsAccepted);
+        Assert.Equal(150m, r.Data.Amount);
+        Assert.Equal("TRACE-1", r.Data.NetcashTransactionId);
+    }
+
+    [Fact]
+    public void AnAmountWrittenDifferently_StillVerifies() =>
+        Assert.True(LiveNetcashPayNowService.Parse(Secret,
+            Notify("AMP-1", "150", LiveNetcashPayNowService.CheckValue(Secret, "AMP-1", "150.00"))).Success);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0000000000000000000000000000000")]
+    public void AForgedOrMissingCheckValue_IsRefused(string? check) =>
+        Assert.False(LiveNetcashPayNowService.Parse(Secret, Notify("AMP-1", "150.00", check)).Success);
+
+    [Fact]
+    public void ACheckValueForAnotherAmount_IsRefused()
+    {
+        // Someone reuses a genuine check value but claims a bigger payment.
+        var check = LiveNetcashPayNowService.CheckValue(Secret, "AMP-1", "15.00");
+        Assert.False(LiveNetcashPayNowService.Parse(Secret, Notify("AMP-1", "150.00", check)).Success);
+    }
+}

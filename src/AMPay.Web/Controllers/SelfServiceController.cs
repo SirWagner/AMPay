@@ -22,6 +22,11 @@ public class SelfServiceController : Controller
     private readonly PortalSync _sync;
     private readonly ILogger<SelfServiceController> _log;
 
+    // One portal push per business at a time. Two overlapping "create link" presses each issue a
+    // code; whichever the portal stores last need not be the one AM-Pay saved last, and the link
+    // shown would then not open. (One app instance, so an in-process lock is enough.)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> Busy = new();
+
     public SelfServiceController(AppDbContext db, ICurrentTenant tenant, IPortalApi portal, PortalSync sync, ILogger<SelfServiceController> log)
     {
         _db = db;
@@ -55,13 +60,31 @@ public class SelfServiceController : Controller
         var t = await CurrentTenantAsync();
         if (t is null) return RedirectToAction(nameof(Index));
 
+        var gate = Busy.GetOrAdd(t.Id, _ => new SemaphoreSlim(1, 1));
+        if (!await gate.WaitAsync(0))
+        {
+            TempData["Info"] = "Your link is already being created - give it a moment, then refresh this page.";
+            return RedirectToAction(nameof(Index));
+        }
+        try
+        {
+            return await GenerateLockedAsync(t);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<IActionResult> GenerateLockedAsync(Domain.Entities.Tenant t)
+    {
         var replacing = t.SelfServiceCode is not null;
         string code;
         do code = PortalApi.NewLenderCode();
         while (await _db.Tenants.AnyAsync(x => x.SelfServiceCode == code));
 
         // Portal first: if it cannot take the new code, the old link keeps working.
-        if (!await SyncAsync(t, code)) return RedirectToAction(nameof(Index));
+        if (!await SyncAsync(t, code, alreadyLocked: true)) return RedirectToAction(nameof(Index));
 
         t.SelfServiceCode = code;
         t.PortalSyncedUtc = DateTime.UtcNow;
@@ -118,8 +141,21 @@ public class SelfServiceController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task<bool> SyncAsync(Domain.Entities.Tenant t, string code)
+    private async Task<bool> SyncAsync(Domain.Entities.Tenant t, string code, bool alreadyLocked = false)
     {
+        // Generate already holds the gate. Anything else waits its turn rather than pushing an
+        // old code over the new one a link creation is about to save.
+        var gate = Busy.GetOrAdd(t.Id, _ => new SemaphoreSlim(1, 1));
+        var mine = false;
+        if (!alreadyLocked)
+        {
+            if (!await gate.WaitAsync(0))
+            {
+                TempData["Info"] = "The portal is busy with your link right now - try again in a minute.";
+                return false;
+            }
+            mine = true;
+        }
         try
         {
             await _sync.PushAsync(t, code);
@@ -129,6 +165,10 @@ public class SelfServiceController : Controller
         {
             TempData["Error"] = ex.Message;
             return false;
+        }
+        finally
+        {
+            if (mine) gate.Release();
         }
     }
 
