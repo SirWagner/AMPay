@@ -40,4 +40,15 @@ public class CurrentTenantNetcashKeys : INetcashKeyProvider
 
         return await _secrets.ResolveServiceKeyAsync(tenant.Slot?.SecretName ?? "", tenant.NetcashAccountNumber, serviceId, ct);
     }
+
+    public async Task<string?> AccountNumberAsync(CancellationToken ct = default)
+    {
+        await _tenant.LoadAsync();
+        if (_tenant.TenantId is not { } tenantId) return null;
+
+        return await _db.Tenants.AsNoTracking()
+            .Where(t => t.Id == tenantId)
+            .Select(t => t.NetcashAccountNumber)
+            .FirstOrDefaultAsync(ct);
+    }
 }

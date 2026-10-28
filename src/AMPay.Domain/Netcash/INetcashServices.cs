@@ -218,4 +218,7 @@ public static class NetcashSecretStoreExtensions
 public interface INetcashKeyProvider
 {
     Task<string?> KeyAsync(NetcashServiceId serviceId, CancellationToken ct = default);
+
+    /// <summary>The business's Netcash account number, or null.</summary>
+    Task<string?> AccountNumberAsync(CancellationToken ct = default);
 }
