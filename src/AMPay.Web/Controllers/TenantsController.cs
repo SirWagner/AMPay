@@ -8,6 +8,7 @@ using AMPay.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace AMPay.Web.Controllers;
 
@@ -23,11 +24,13 @@ public class TenantsController : Controller
 {
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
+    private readonly PortalSync _sync;
 
-    public TenantsController(AppDbContext db, ICurrentTenant tenant)
+    public TenantsController(AppDbContext db, ICurrentTenant tenant, PortalSync sync)
     {
         _db = db;
         _tenant = tenant;
+        _sync = sync;
     }
 
     public async Task<IActionResult> Index()
@@ -74,7 +77,8 @@ public class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(TenantModel model)
+    [RequestSizeLimit(1024 * 1024)]
+    public async Task<IActionResult> Create(TenantModel model, IFormFile? logo)
     {
         ViewData["Title"] = "New customer";
 
@@ -84,6 +88,9 @@ public class TenantsController : Controller
             ModelState.AddModelError(nameof(model.NetcashAccountNumber),
                 "Another customer is already using that Netcash account number.");
         }
+
+        var (logoBytes, logoType, logoError) = await ReadLogoAsync(logo);
+        if (logoError is not null) ModelState.AddModelError("logo", logoError);
 
         if (!ModelState.IsValid) return View(model);
 
@@ -105,6 +112,13 @@ public class TenantsController : Controller
         };
 
         _db.Tenants.Add(tenant);
+
+        if (logoBytes is not null)
+            _db.TenantLogos.Add(new TenantLogo
+            {
+                TenantId = tenant.Id, ContentType = logoType!, Data = logoBytes,
+                UpdatedUtc = DateTime.UtcNow, UpdatedByUserId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)
+            });
 
         // Pre-create the service key slots so the operator has somewhere to put the keys
         // when Netcash issues them. The secret name is fixed now; the value comes later.
@@ -142,6 +156,8 @@ public class TenantsController : Controller
         var tenant = await _db.Tenants.FindAsync(id);
         if (tenant is null) return NotFound();
 
+        ViewBag.HasLogo = await _db.TenantLogos.AnyAsync(l => l.TenantId == id);
+
         return View(new TenantModel
         {
             Id = tenant.Id,
@@ -163,13 +179,36 @@ public class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(TenantModel model)
+    [RequestSizeLimit(1024 * 1024)]
+    public async Task<IActionResult> Edit(TenantModel model, IFormFile? logo)
     {
         ViewData["Title"] = "Customer";
-        if (!ModelState.IsValid) return View(model);
+
+        var (logoBytes, logoType, logoError) = await ReadLogoAsync(logo);
+        if (logoError is not null) ModelState.AddModelError("logo", logoError);
+
+        if (!ModelState.IsValid)
+        {
+            ViewBag.HasLogo = await _db.TenantLogos.AnyAsync(l => l.TenantId == model.Id);
+            return View(model);
+        }
 
         var tenant = await _db.Tenants.FindAsync(model.Id);
         if (tenant is null) return NotFound();
+
+        if (logoBytes is not null)
+        {
+            var existing = await _db.TenantLogos.FirstOrDefaultAsync(l => l.TenantId == tenant.Id);
+            if (existing is null)
+            {
+                existing = new TenantLogo { TenantId = tenant.Id };
+                _db.TenantLogos.Add(existing);
+            }
+            existing.ContentType = logoType!;
+            existing.Data = logoBytes;
+            existing.UpdatedUtc = DateTime.UtcNow;
+            existing.UpdatedByUserId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        }
 
         tenant.Name = model.Name.Trim();
         tenant.TradingName = model.TradingName?.Trim();
@@ -188,7 +227,30 @@ public class TenantsController : Controller
 
         await _db.SaveChangesAsync();
 
-        TempData["Success"] = "Customer updated.";
+        TempData["Success"] = logoBytes is null ? "Customer updated." : "Customer updated, with the new logo.";
+        // A business with a self-service link shows its logo there too.
+        if (logoBytes is not null && await _sync.RefreshAsync(tenant.Id) is { } warning) TempData["Info"] = warning;
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Reads an optional logo upload. The bytes decide what it is, not the file name, so a renamed
+    /// SVG or script is refused. Returns nulls when nothing was uploaded.
+    /// </summary>
+    private static async Task<(byte[]? Bytes, string? ContentType, string? Error)> ReadLogoAsync(IFormFile? file)
+    {
+        if (file is null || file.Length == 0) return (null, null, null);
+        if (file.Length > TenantLogo.MaxBytes)
+            return (null, null, $"The logo is {file.Length / 1024} KB. Use a file of {TenantLogo.MaxBytes / 1024} KB or less - a PNG about 400 pixels wide is plenty.");
+
+        await using var s = file.OpenReadStream();
+        using var ms = new MemoryStream();
+        await s.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+
+        var type = TenantLogo.SniffContentType(bytes);
+        return type is null
+            ? (null, null, "Upload the logo as a PNG, JPG or WebP image.")
+            : (bytes, type, null);
     }
 }

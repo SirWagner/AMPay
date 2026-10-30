@@ -11,8 +11,9 @@
     </p>
 </div>
 
-<form asp-action="Create" method="post">
+<form asp-action="Create" method="post" enctype="multipart/form-data">
     <partial name="_TenantForm" model="Model" />
+    <partial name="_LogoField" model="Guid.Empty" />
     <div class="card">
         <div class="card-foot">
             <button type="submit" class="btn btn-primary">Create customer</button>
