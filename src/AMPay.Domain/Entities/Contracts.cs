@@ -157,3 +157,89 @@ public class OutboundMessage
 
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>
+/// The quote for one loan: the cost of credit the client accepts before the agreement is
+/// issued (National Credit Act s92). Binding on the lender for five business days.
+/// <para>
+/// Like a contract pack it is frozen at issue - <see cref="SnapshotJson"/> holds the figures
+/// the client sees and <see cref="SnapshotHash"/> fingerprints them. <see cref="TermsHash"/>
+/// fingerprints only the money and the schedule, so the agreement issued later can prove it
+/// carries the terms the client accepted.
+/// </para>
+/// </summary>
+public class CreditQuote
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
+
+    public Guid LoanId { get; set; }
+    public Loan? Loan { get; set; }
+
+    public Guid ClientId { get; set; }
+    public Client? Client { get; set; }
+
+    /// <summary>Loan number plus issue: "LN-000003/Q1", "/Q2" after a re-issue.</summary>
+    public string Reference { get; set; } = string.Empty;
+
+    public int Issue { get; set; } = 1;
+
+    public QuoteStatus Status { get; set; } = QuoteStatus.Issued;
+
+    public string SnapshotJson { get; set; } = string.Empty;
+    public string SnapshotHash { get; set; } = string.Empty;
+
+    /// <summary>Fingerprint of the cost of credit and the schedule; see <see cref="Contracts.ContractSnapshot.TermsFingerprint"/>.</summary>
+    public string TermsHash { get; set; } = string.Empty;
+
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public string? CreatedByUserId { get; set; }
+
+    /// <summary>The end of the fifth business day after issue, South African time. The link dies with it.</summary>
+    public DateTime ValidUntilUtc { get; set; }
+
+    // ---- Sending ----
+    public DateTime? SentUtc { get; set; }
+    public string? SentByUserId { get; set; }
+    public string? SentChannels { get; set; }
+
+    /// <summary>SHA-256 of the link token. The token itself is never stored.</summary>
+    public string? AccessTokenHash { get; set; }
+    public DateTime? FirstViewedUtc { get; set; }
+
+    // ---- The acceptance PIN ----
+    public string? OtpHash { get; set; }
+    public DateTime? OtpExpiresUtc { get; set; }
+    public DateTime? OtpSentUtc { get; set; }
+    public int OtpFailedAttempts { get; set; }
+
+    /// <summary>Start of the hour in which <see cref="OtpSendsInWindow"/> PINs were sent.</summary>
+    public DateTime? OtpWindowStartUtc { get; set; }
+    public int OtpSendsInWindow { get; set; }
+
+    // ---- The answer ----
+    public DateTime? AcceptedUtc { get; set; }
+    public QuoteAcceptanceMethod AcceptanceMethod { get; set; }
+
+    /// <summary>The consents the client ticked, word for word, as JSON.</summary>
+    public string? ConsentsJson { get; set; }
+
+    public string? AcceptedMobile { get; set; }
+    public string? AcceptedIp { get; set; }
+    public string? AcceptedUserAgent { get; set; }
+
+    /// <summary>Staff member who recorded an in-branch acceptance.</summary>
+    public string? AcceptedByUserId { get; set; }
+
+    public DateTime? DeclinedUtc { get; set; }
+    public string? DeclineReason { get; set; }
+
+    public DateTime? VoidedUtc { get; set; }
+    public string? VoidedByUserId { get; set; }
+    public string? VoidReason { get; set; }
+
+    /// <summary>Still waiting for the client's answer.</summary>
+    public bool IsOpen => Status is QuoteStatus.Issued or QuoteStatus.Sent or QuoteStatus.Viewed;
+}

@@ -879,6 +879,152 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("CreditPackages");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.CreditQuote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AcceptanceMethod")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AcceptedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AcceptedIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("AcceptedMobile")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("AcceptedUserAgent")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<DateTime?>("AcceptedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AccessTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ConsentsJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeclineReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("DeclinedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FirstViewedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Issue")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("OtpExpiresUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OtpFailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OtpHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("OtpSendsInWindow")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("OtpSentUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OtpWindowStartUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("SentByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SentChannels")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("SentUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TermsHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("ValidUntilUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("VoidedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("VoidedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessTokenHash")
+                        .IsUnique()
+                        .HasFilter("[AccessTokenHash] IS NOT NULL");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
+
+                    b.HasIndex("LoanId", "Issue")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("CreditQuotes");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.DebiCheckMandate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2395,6 +2541,33 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.CreditQuote", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.Loan", "Loan")
+                        .WithMany()
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Loan");
 
                     b.Navigation("Tenant");
                 });

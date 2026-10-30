@@ -38,6 +38,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
     public DbSet<LoanContract> LoanContracts => Set<LoanContract>();
+    public DbSet<CreditQuote> CreditQuotes => Set<CreditQuote>();
     public DbSet<OutboundMessage> OutboundMessages => Set<OutboundMessage>();
 
     public DbSet<DebiCheckMandate> Mandates => Set<DebiCheckMandate>();
@@ -57,6 +58,36 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         b.Entity<TenantServiceKey>().Ignore(x => x.NeedsRevalidation);
         b.Entity<DebiCheckMandate>().Ignore(x => x.IsCollectable);
         b.Entity<LoanContract>().Ignore(x => x.IsOpen);
+        b.Entity<CreditQuote>().Ignore(x => x.IsOpen);
+
+        b.Entity<CreditQuote>(e =>
+        {
+            e.Property(x => x.Reference).HasMaxLength(40).IsRequired();
+            e.Property(x => x.SnapshotJson).IsRequired();
+            e.Property(x => x.SnapshotHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.TermsHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.SentChannels).HasMaxLength(20);
+            e.Property(x => x.AccessTokenHash).HasMaxLength(64);
+            e.Property(x => x.OtpHash).HasMaxLength(64);
+            e.Property(x => x.AcceptedMobile).HasMaxLength(20);
+            e.Property(x => x.AcceptedIp).HasMaxLength(64);
+            e.Property(x => x.AcceptedUserAgent).HasMaxLength(400);
+            e.Property(x => x.ConsentsJson).HasMaxLength(4000);
+            e.Property(x => x.DeclineReason).HasMaxLength(500);
+            e.Property(x => x.VoidReason).HasMaxLength(500);
+
+            e.HasIndex(x => x.Reference).IsUnique();
+            e.HasIndex(x => new { x.LoanId, x.Issue }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasIndex(x => x.AccessTokenHash).IsUnique().HasFilter("[AccessTokenHash] IS NOT NULL");
+
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Loan).WithMany().HasForeignKey(x => x.LoanId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Client).WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         b.Entity<ContractTemplate>(e =>
         {

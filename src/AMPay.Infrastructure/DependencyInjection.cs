@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IMessageSender, OutboxMessageSender>();
         services.AddSingleton<IContractRenderer, MigraDocContractRenderer>();
         services.AddScoped<ContractService>();
+        services.AddScoped<QuoteService>();
 
         services.AddSingleton<INetcashSecretStore, ConfigurationSecretStore>();
 

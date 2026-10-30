@@ -1,0 +1,27 @@
+@using static AMPay.Domain.Contracts.ContractFormat
+@model IReadOnlyList<AMPay.Domain.Contracts.ScheduleLine>
+
+<div class="table-wrap">
+    <table class="data">
+        <thead>
+        <tr>
+            <th>#</th><th>Due</th><th class="num">Instalment</th><th class="num">Interest</th>
+            <th class="num">Capital</th><th class="num">Service fee</th><th class="num">Credit life</th><th class="num">Balance</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var l in Model)
+        {
+            <tr>
+                <td>@l.Number</td><td>@Date(l.DueDate)</td>
+                <td class="num"><strong>@l.Instalment.ToString("N2")</strong></td>
+                <td class="num">@l.Interest.ToString("N2")</td>
+                <td class="num">@l.Capital.ToString("N2")</td>
+                <td class="num">@l.ServiceFee.ToString("N2")</td>
+                <td class="num">@l.CreditLife.ToString("N2")</td>
+                <td class="num">@l.ClosingBalance.ToString("N2")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
