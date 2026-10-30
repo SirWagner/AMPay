@@ -1,0 +1,161 @@
+@model Client
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var missing = (List<string>)ViewBag.Missing;
+    var netOfNet = ViewBag.NetOfNet as NetOfNetView;
+    var address = Model.Addresses.FirstOrDefault();
+    var mobile = Model.Addresses.Select(a => a.MobileNumber).FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+    var email = Model.Addresses.Select(a => a.EmailAddress).FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+    var bank = Model.BankAccounts.FirstOrDefault(a => a.IsPrimary) ?? Model.BankAccounts.FirstOrDefault();
+    string R(decimal? v) => v is null ? "-" : "R " + v.Value.ToString("N2");
+    string Blank(string? s) => string.IsNullOrWhiteSpace(s) ? "-" : s;
+    bool Done(OnboardingStep s) => wizard.CompletedSteps.Contains(s);
+    var steps = OnboardingSteps.All.Where(s => s.Step != OnboardingStep.Summary).ToList();
+    var canOnboard = missing.Count == 0 && Model.Status is ClientStatus.Draft or ClientStatus.Captured;
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">@OnboardingSteps.Caption(OnboardingStep.Summary) &mdash; check everything before onboarding.</p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <div class="card summary-head">
+            <div class="card-body client-head">
+                <a asp-action="Photo" asp-route-id="@Model.Id" class="client-avatar large @(Model.Photo is null ? "empty" : "")">
+                    @if (Model.Photo is not null)
+                    {
+                        <img src="@Url.Action("PhotoImage", new { id = Model.Id, v = Model.Photo.CapturedUtc.Ticks })" alt="Photograph of @Model.FullName" />
+                    }
+                    else
+                    {
+                        <span aria-hidden="true">@(Model.FirstName.Length > 0 ? Model.FirstName[..1] : "")@(Model.Surname.Length > 0 ? Model.Surname[..1] : "")</span>
+                        <span class="client-avatar-add">Add photo</span>
+                    }
+                </a>
+                <div>
+                    <h2 style="margin:0;">@Model.FullName</h2>
+                    <p class="muted mb-0">
+                        Client <span class="mono">@Model.ClientNumber</span> &middot;
+                        ID <span class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(Model.IdNumber)</span> &middot;
+                        <partial name="_ClientStatus" model="Model.Status" />
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        @if (missing.Count > 0)
+        {
+            <div class="alert alert-warn">
+                <strong>Not ready to onboard yet.</strong> Still needed: @string.Join(", ", missing).
+            </div>
+        }
+        else if (Model.Status is ClientStatus.Draft or ClientStatus.Captured)
+        {
+            <div class="alert alert-success">Everything required is in. Onboard the client to start lending.</div>
+        }
+
+        <div class="card">
+            <div class="card-head"><h3>Steps</h3></div>
+            <div class="card-body">
+                <ul class="summary-steps">
+                    @foreach (var (step, label, _) in steps)
+                    {
+                        var done = Done(step);
+                        <li class="@(done ? "done" : "")">
+                            <span class="badge @(done ? "badge-green" : "badge-amber")">@(done ? "Done" : "Open")</span>
+                            <span>@OnboardingSteps.Position(step). @label</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="card">
+                <div class="card-head flex-between"><h3>Personal</h3><a asp-action="General" asp-route-id="@Model.Id" class="small">Edit</a></div>
+                <div class="card-body">
+                    <dl class="detail-list">
+                        <dt>Date of birth</dt><dd>@(Model.DateOfBirth?.ToString("d MMM yyyy") ?? "-")</dd>
+                        <dt>Language</dt><dd>@Blank(Model.PreferredLanguage)</dd>
+                        <dt>Mobile</dt><dd>@Blank(mobile)</dd>
+                        <dt>Email</dt><dd>@Blank(email)</dd>
+                        <dt>Address</dt><dd>@(address is null ? "-" : string.Join(", ", new[] { address.Line1, address.Suburb, address.City, address.PostalCode }.Where(x => !string.IsNullOrWhiteSpace(x))))</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head flex-between"><h3>Work and money</h3><a asp-action="Financial" asp-route-id="@Model.Id" class="small">Edit</a></div>
+                <div class="card-body">
+                    <dl class="detail-list">
+                        <dt>Employer</dt><dd>@Blank(Model.Employment?.EmployerName)</dd>
+                        <dt>Salary day</dt><dd>@(Model.Employment?.SalaryDay?.ToString() ?? "-")</dd>
+                        <dt>Gross / net income</dt><dd class="tnum">@R(Model.Financial?.GrossMonthlyIncome) / @R(Model.Financial?.NetMonthlyIncome)</dd>
+                        <dt>Left after expenses and debt</dt>
+                        <dd class="tnum">@(netOfNet is null ? "-" : R(netOfNet.NetOfNet))</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head flex-between"><h3>Bank</h3><a asp-action="Banking" asp-route-id="@Model.Id" class="small">Edit</a></div>
+                <div class="card-body">
+                    @if (bank is null)
+                    {
+                        <p class="muted mb-0">No bank account yet.</p>
+                    }
+                    else
+                    {
+                        <dl class="detail-list">
+                            <dt>Account</dt><dd>@bank.BankName <span class="mono">@bank.MaskedAccountNumber</span></dd>
+                            <dt>Verified (AVS)</dt><dd>@(bank.AvsVerified ? "Yes" : "Not yet")</dd>
+                        </dl>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head flex-between"><h3>Documents</h3><a asp-controller="Documents" asp-action="Client" asp-route-id="@Model.Id" class="small">Open</a></div>
+                <div class="card-body">
+                    @if (Model.Documents.Count == 0)
+                    {
+                        <p class="muted mb-0">No documents uploaded.</p>
+                    }
+                    else
+                    {
+                        <ul class="plain-list">
+                            @foreach (var d in Model.Documents.OrderBy(d => d.DocumentType))
+                            {
+                                <li>
+                                    @AMPay.Web.Controllers.DocumentsController.Describe(d.DocumentType)
+                                    <span class="badge @(d.ReviewStatus == DocumentReviewStatus.Approved ? "badge-green" : d.ReviewStatus == DocumentReviewStatus.Rejected ? "badge-red" : "badge-amber")">@d.ReviewStatus</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-foot">
+                @if (canOnboard)
+                {
+                    <form asp-action="Activate" method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button type="submit" class="btn btn-primary">Onboard client</button>
+                    </form>
+                }
+                <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline">Client file</a>
+                @if (Model.Photo is null)
+                {
+                    <a asp-action="Photo" asp-route-id="@Model.Id" class="btn btn-outline">Add photograph</a>
+                }
+            </div>
+        </div>
+    </div>
+</div>

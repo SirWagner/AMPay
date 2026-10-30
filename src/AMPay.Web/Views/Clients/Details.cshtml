@@ -17,12 +17,26 @@
 }
 
 <div class="page-head flex-between">
-    <div>
+    <div class="client-head">
+        <a asp-action="Photo" asp-route-id="@Model.Id" class="client-avatar @(Model.Photo is null ? "empty" : "")"
+           title="@(Model.Photo is null ? "Add the client's photograph" : "Change the photograph")">
+            @if (Model.Photo is not null)
+            {
+                <img src="@Url.Action("PhotoImage", new { id = Model.Id, v = Model.Photo.CapturedUtc.Ticks })" alt="Photograph of @Model.FullName" />
+            }
+            else
+            {
+                <span aria-hidden="true">@(Model.FirstName.Length > 0 ? Model.FirstName[..1] : "")@(Model.Surname.Length > 0 ? Model.Surname[..1] : "")</span>
+                <span class="client-avatar-add">Add photo</span>
+            }
+        </a>
+        <div>
         <h1>@Model.FullName</h1>
         <p class="lede">
             Client <span class="mono">@Model.ClientNumber</span> &middot;
             <partial name="_ClientStatus" model="Model.Status" />
         </p>
+        </div>
     </div>
     <div class="row-actions">
         @if (Model.Status is ClientStatus.Draft or ClientStatus.Captured)

@@ -1,0 +1,122 @@
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var client = (Client)ViewBag.Client;
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">@OnboardingSteps.Caption(OnboardingStep.Photo) &mdash; photograph.</p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <div class="card">
+            <div class="card-head"><h2>Photograph</h2></div>
+            <div class="card-body photo-step">
+                <div class="photo-stage">
+                    <video id="cam" playsinline muted hidden></video>
+                    <canvas id="shot" hidden></canvas>
+                    @if (client.Photo is not null)
+                    {
+                        <img id="current" src="@Url.Action("PhotoImage", new { id = client.Id, v = client.Photo.CapturedUtc.Ticks })" alt="Current photograph" />
+                    }
+                    else
+                    {
+                        <div id="current" class="photo-empty">No photograph yet</div>
+                    }
+                </div>
+
+                <form asp-action="Photo" asp-route-id="@client.Id" method="post" enctype="multipart/form-data" id="photoForm">
+                    <input type="hidden" name="captured" id="captured" />
+
+                    <div class="photo-actions">
+                        <button type="button" class="btn btn-primary" id="startCam">Use the camera</button>
+                        <button type="button" class="btn btn-primary" id="takeShot" hidden>Take photo</button>
+                        <button type="button" class="btn btn-outline" id="retake" hidden>Retake</button>
+                        <button type="submit" class="btn btn-primary" id="saveShot" hidden>Save photograph</button>
+                    </div>
+
+                    <div class="field" id="uploadField">
+                        <label for="file">Or upload a photo</label>
+                        <input type="file" id="file" name="file" accept="image/jpeg,image/png,image/webp" capture="user" />
+                        <span class="hint">A clear, front-facing photo of the client's face. JPG, PNG or WebP. On a phone this opens the camera.</span>
+                    </div>
+                    <p class="muted small" id="camError" hidden></p>
+                </form>
+                <p class="muted small mb-0">
+                    The photograph is stored privately with the client's documents and is shown only to your staff.
+                </p>
+            </div>
+            <div class="card-foot">
+                <a asp-action="Summary" asp-route-id="@client.Id" class="btn btn-outline">
+                    @(client.Photo is null ? "Skip for now" : "Next: summary") &rarr;
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var video = document.getElementById('cam'), canvas = document.getElementById('shot');
+    var current = document.getElementById('current'), captured = document.getElementById('captured');
+    var start = document.getElementById('startCam'), take = document.getElementById('takeShot');
+    var retake = document.getElementById('retake'), save = document.getElementById('saveShot');
+    var upload = document.getElementById('uploadField'), error = document.getElementById('camError');
+    var file = document.getElementById('file'), stream = null;
+    var MAX = 900; // longest side in pixels: plenty for a face, small to store
+
+    function show(el, on) { el.hidden = !on; }
+    function stop() { if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; } }
+
+    start.addEventListener('click', function () {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            error.textContent = 'This browser cannot use the camera here. Upload a photo instead.';
+            show(error, true); return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+            .then(function (s) {
+                stream = s; video.srcObject = s; video.play();
+                show(video, true); show(current, false); show(canvas, false);
+                show(start, false); show(take, true); show(upload, false); show(error, false);
+            })
+            .catch(function () {
+                error.textContent = 'The camera could not be opened (permission refused or no camera). Upload a photo instead.';
+                show(error, true);
+            });
+    });
+
+    take.addEventListener('click', function () {
+        var w = video.videoWidth, h = video.videoHeight, scale = Math.min(1, MAX / Math.max(w, h));
+        canvas.width = Math.round(w * scale); canvas.height = Math.round(h * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        captured.value = canvas.toDataURL('image/jpeg', 0.85);
+        stop();
+        show(video, false); show(canvas, true); show(take, false); show(retake, true); show(save, true);
+    });
+
+    retake.addEventListener('click', function () {
+        captured.value = ''; show(retake, false); show(save, false); start.click();
+    });
+
+    // An uploaded file is shrunk the same way before sending, so a 10 MB phone photo goes up small.
+    file.addEventListener('change', function () {
+        var f = file.files[0];
+        if (!f) return;
+        var img = new Image();
+        img.onload = function () {
+            var scale = Math.min(1, MAX / Math.max(img.width, img.height));
+            canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            captured.value = canvas.toDataURL('image/jpeg', 0.85);
+            file.value = '';
+            show(current, false); show(canvas, true); show(save, true); show(start, false);
+        };
+        img.src = URL.createObjectURL(f);
+    });
+
+    window.addEventListener('pagehide', stop);
+})();
+</script>

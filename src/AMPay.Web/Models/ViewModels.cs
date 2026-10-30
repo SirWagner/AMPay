@@ -108,7 +108,9 @@ public enum OnboardingStep
     CreditCheck = 10,
     Notes = 11,
     Documents = 12,
-    Photo = 13
+    Photo = 13,
+    /// <summary>The last step: everything captured, on one page, before the client is onboarded.</summary>
+    Summary = 14
 }
 
 public static class OnboardingSteps
@@ -134,7 +136,8 @@ public static class OnboardingSteps
         (OnboardingStep.CreditCheck,  "Credit check",  "CreditCheck"),
         (OnboardingStep.Notes,        "Notes",         "Notes"),
         (OnboardingStep.Documents,    "Documents",     "Documents"),
-        (OnboardingStep.Photo,        "Photograph",    "Photo")
+        (OnboardingStep.Photo,        "Photograph",    "Photo"),
+        (OnboardingStep.Summary,      "Summary",       "Summary")
     };
 
     /// <summary>
