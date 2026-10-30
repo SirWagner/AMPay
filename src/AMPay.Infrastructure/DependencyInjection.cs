@@ -31,7 +31,6 @@ public static class DependencyInjection
         // Credit origination. The statutory ceilings and the Regulation 23A expense norms
         // bind from configuration so that a gazetted rate change is a settings edit rather
         // than a code change and a release.
-        services.Configure<NcaCreditLimits>(configuration.GetSection(NcaCreditLimits.SectionName));
         services.Configure<AffordabilityNorms>(configuration.GetSection(AffordabilityNorms.SectionName));
 
         services.AddScoped<ILoanPricingService, LoanPricingService>();

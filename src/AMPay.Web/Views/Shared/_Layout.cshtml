@@ -85,6 +85,7 @@
             <div class="sidebar-section">AM-Pay Platform</div>
             <a class="nav-link @Active("Tenants")" asp-controller="Tenants" asp-action="Index">Customers</a>
             <a class="nav-link @Active("ServiceKeys")" asp-controller="ServiceKeys" asp-action="Index">Netcash service keys</a>
+            <a class="nav-link @Active("RegulatoryCaps")" asp-controller="RegulatoryCaps" asp-action="Index">Regulatory caps</a>
         }
 
         <div class="sidebar-section">@(isPlatform ? $"Loan Flow · {CurrentTenant.TenantName ?? "no customer selected"}" : "Loan Flow")</div>

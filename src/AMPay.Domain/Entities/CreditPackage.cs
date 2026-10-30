@@ -66,3 +66,29 @@ public class CreditPackage
 
     public ICollection<Loan> Loans { get; set; } = new List<Loan>();
 }
+
+/// <summary>
+/// One statutory ceiling, effective from a date. The platform admin adds a row when the
+/// regulations change; the row in force on a loan's date is the one its pricing is checked
+/// against, so older loans keep the caps of their day. Values exclude VAT.
+/// </summary>
+public class RegulatoryCap
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public AMPay.Domain.Credit.CapType Type { get; set; }
+
+    public decimal Value { get; set; }
+
+    /// <summary>First SAST date this value applies.</summary>
+    public DateTime EffectiveFrom { get; set; }
+
+    /// <summary>The day after the last date it applies; null while current.</summary>
+    public DateTime? EffectiveTo { get; set; }
+
+    /// <summary>Where the figure comes from, e.g. the gazette or notice.</summary>
+    public string? Source { get; set; }
+
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public string? CreatedByUserId { get; set; }
+}

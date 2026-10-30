@@ -1,7 +1,7 @@
 @model List<CreditPackage>
 @{
     ViewData["Title"] = "Credit packages";
-    var limits = (AMPay.Domain.Credit.NcaCreditLimits)ViewBag.Limits;
+    var limits = (AMPay.Domain.Credit.RegulatoryCaps)ViewBag.Limits;
     var canManage = (bool)ViewBag.CanManage;
     var missing = (List<string>)ViewBag.MissingTiers;
     var customer = ViewBag.CustomerName as string;
@@ -99,19 +99,19 @@ else if (canManage && missing.Count > 0)
     <div class="card-head"><h3>Statutory maximums applied at quote time</h3></div>
     <div class="card-body">
         <p class="muted small">
-            Whatever a package says, no quote exceeds these. They come from configuration and
-            must be checked against the current National Credit Act regulations before go-live.
+            Whatever a package says, no quote exceeds these. The AM-Pay platform admin keeps them
+            current under Regulatory caps; confirm them against the National Credit Act regulations.
         </p>
         <dl class="detail-list">
-            <dt>Interest</dt><dd>@Pct(limits.MonthlyInterestCeiling) per month</dd>
-            <dt>Service fee</dt><dd>R @limits.MonthlyServiceFeeCeiling.ToString("N2") per month</dd>
+            <dt>Interest</dt><dd>Short-term (up to R @limits.ShortTermMaxPrincipal.ToString("N0") over @limits.ShortTermMaxMonths months): @Pct(limits.ShortTermFirstLoanMonthlyRate) per month on the client's first loan in a year, @Pct(limits.ShortTermRepeatLoanMonthlyRate) on later ones. Larger or longer loans: @(limits.UnsecuredAnnualRateMax is { } u ? Pct(u) + " per year" : "the unsecured cap, not set yet").</dd>
+            <dt>Service fee</dt><dd>R @limits.MonthlyServiceFeeMax.ToString("N2") per month</dd>
             <dt>Initiation fee</dt>
             <dd>
                 R @limits.InitiationFeeBase.ToString("N2") + @Pct(limits.InitiationFeeMarginalRate, 0) of the amount
-                above R @limits.InitiationFeeThreshold.ToString("N0"), never more than R @limits.InitiationFeeCeiling.ToString("N2")
+                above R @limits.InitiationFeeThreshold.ToString("N0"), never more than R @limits.InitiationFeeMax.ToString("N2")
             </dd>
-            <dt>Credit life</dt><dd>@Pct(limits.CreditLifeCeilingRate) of the balance per month</dd>
+            <dt>Credit life</dt><dd>@Pct(limits.CreditLifeMonthlyRateMax) of the balance per month</dd>
         </dl>
-        <p class="muted small mb-0">All amounts include VAT.</p>
+        <p class="muted small mb-0">All amounts exclude VAT. A VAT-registered lender adds 15% on the initiation and service fees.</p>
     </div>
 </div>

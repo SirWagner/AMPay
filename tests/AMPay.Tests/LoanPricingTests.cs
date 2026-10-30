@@ -1,8 +1,6 @@
 using AMPay.Domain.Credit;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
-using AMPay.Infrastructure.Credit;
-using Microsoft.Extensions.Options;
 
 namespace AMPay.Tests;
 
@@ -10,8 +8,22 @@ public class LoanPricingTests
 {
     private static readonly DateTime FirstCollection = new(2026, 10, 25);
 
-    private static LoanPricingService Service(NcaCreditLimits? limits = null) =>
-        new(Options.Create(limits ?? new NcaCreditLimits()));
+    /// <summary>Caps with an unsecured interest ceiling set, for loans above the short-term limits.</summary>
+    private static readonly RegulatoryCaps WithUnsecured = RegulatoryCaps.Statutory with { UnsecuredAnnualRateMax = 0.60m };
+
+    private static LoanPricingService Service() => new();
+
+    private static LoanQuoteRequest Request(decimal principal, int term, bool vat = false, int prior = 0,
+        RegulatoryCaps? caps = null, FeeOverride? fee = null, decimal funeral = 0m, decimal thirdParty = 0m) =>
+        new(principal, term, FirstCollection)
+        {
+            Caps = caps ?? WithUnsecured,
+            VatRegistered = vat,
+            PriorShortTermLoansThisYear = prior,
+            Override = fee,
+            FuneralCover = funeral,
+            ThirdPartyPayment = thirdParty
+        };
 
     private static CreditPackage Package(
         decimal interest = 0.05m,
@@ -35,13 +47,13 @@ public class LoanPricingTests
             MaxTermMonths = maxTerm
         };
 
-    // ----------------------------------------------------------------- initiation fee
+    // ----------------------------------------------------------------- initiation fee (excl. VAT)
 
     [Fact]
     public void InitiationFee_BelowStatutoryMaximum_IsChargedInFull()
     {
-        // 15% of R1 000 is R150, under the R189.75 flat cap, so it stands.
-        var quote = Service().Quote(new LoanQuoteRequest(1_000m, 1, FirstCollection), Package());
+        // 15% of R1 000 is R150, under the R165 flat cap.
+        var quote = Service().Quote(Request(1_000m, 1), Package());
 
         Assert.Equal(150m, quote.InitiationFee);
         Assert.Empty(quote.Notices);
@@ -50,43 +62,36 @@ public class LoanPricingTests
     [Fact]
     public void InitiationFee_AboveStatutoryMaximum_IsClampedAndReported()
     {
-        // 15% of R10 000 is R1 500. The cap is R189.75 + 10% of R9 000 = R1 089.75.
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+        // 15% of R2 000 is R300. The cap is R165 + 10% of R1 000 = R265.
+        var quote = Service().Quote(Request(2_000m, 2), Package());
 
-        Assert.Equal(1_089.75m, quote.InitiationFee);
-        Assert.Contains(quote.Notices, n => n.Contains("Initiation fee reduced"));
-    }
-
-    [Fact]
-    public void Notices_StateAmountsInRands_InTheAppWideFormat()
-    {
-        // Shown on screen beside figures formatted "R 1,089.75", so they must match -
-        // not a bare "1089.75" and not the en-ZA "R1 089,75".
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
-
+        Assert.Equal(265m, quote.InitiationFee);
         var notice = Assert.Single(quote.Notices);
-        Assert.Contains("from R 1,500.00", notice);
-        Assert.Contains("maximum of R 1,089.75", notice);
-        Assert.Contains("principal of R 10,000.00", notice);
+        Assert.Contains("from R 300.00", notice);
+        Assert.Contains("maximum of R 265.00", notice);
+        Assert.Contains("principal of R 2,000.00", notice);
     }
 
     [Fact]
-    public void InitiationFee_NeverExceedsTheAbsoluteCeiling()
-    {
-        // The marginal formula would give R2 089.75 on R20 000; the ceiling is R1 207.50.
-        var quote = Service().Quote(new LoanQuoteRequest(20_000m, 12, FirstCollection), Package());
+    public void InitiationFee_NeverExceedsTheAbsoluteCeiling() =>
+        Assert.Equal(1_050m, Service().Quote(Request(20_000m, 12), Package()).InitiationFee);
 
-        Assert.Equal(1_207.50m, quote.InitiationFee);
-    }
+    [Theory]
+    [InlineData(500, 165)]
+    [InlineData(1_000, 165)]
+    [InlineData(2_000, 265)]
+    [InlineData(9_000, 965)]
+    [InlineData(10_000, 1_050)] // 165 + 900 = 1 065, held at the R1 050 ceiling
+    public void MaximumInitiationFee_FollowsTheGazettedFormula(decimal principal, decimal expected) =>
+        Assert.Equal(expected, RegulatoryCaps.Statutory.MaximumInitiationFee(principal));
 
     [Fact]
     public void InitiationFee_IsCapitalised_NotDeductedFromThePayout()
     {
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+        var quote = Service().Quote(Request(5_000m, 6), Package());
 
-        // The client receives the full principal and repays principal plus fee.
-        Assert.Equal(10_000m, quote.Principal);
-        Assert.Equal(10_000m + quote.InitiationFee, quote.CapitalisedAmount);
+        Assert.Equal(5_000m, quote.Principal);
+        Assert.Equal(5_000m + quote.InitiationFee, quote.CapitalisedAmount);
         Assert.Equal(quote.CapitalisedAmount, quote.Schedule[0].OpeningBalance);
     }
 
@@ -95,201 +100,207 @@ public class LoanPricingTests
     [Fact]
     public void SingleInstalment_ProducesTheExpectedRands()
     {
-        // R1 000 over one month. Fee R150, capitalised R1 150.
+        // R1 000 over one month, no VAT. Fee R150, capitalised R1 150.
         //   interest     1 150 x 5%     =   57.50
         //   credit life  1 150 x 0.45%  =    5.18  (5.175, rounded away from zero)
         //   service fee                 =   16.00
-        //   capital                     = 1150.00
-        var quote = Service().Quote(new LoanQuoteRequest(1_000m, 1, FirstCollection), Package());
+        var quote = Service().Quote(Request(1_000m, 1), Package());
 
         var row = Assert.Single(quote.Schedule);
-
-        Assert.Equal(1_150m, row.OpeningBalance);
         Assert.Equal(57.50m, row.InterestPortion);
         Assert.Equal(5.18m, row.CreditLifePremium);
-        Assert.Equal(16m, row.ServiceFee);
         Assert.Equal(1_150m, row.CapitalPortion);
-        Assert.Equal(0m, row.ClosingBalance);
         Assert.Equal(1_228.68m, row.InstalmentTotal);
-
         Assert.Equal(1_228.68m, quote.TotalRepayable);
         Assert.Equal(228.68m, quote.TotalCostOfCredit);
     }
 
-    // ----------------------------------------------------------------- schedule integrity
+    // ----------------------------------------------------------------- VAT (f.5)
 
-    [Theory]
-    [InlineData(2_500, 3)]
-    [InlineData(10_000, 6)]
-    [InlineData(15_000, 12)]
-    [InlineData(50_000, 36)]
-    public void Schedule_AmortisesExactlyToZero(decimal principal, int term)
+    [Fact]
+    public void AVatRegisteredLender_AddsVatOnTheInitiationAndServiceFees_NotOnCreditLife()
     {
-        var quote = Service().Quote(new LoanQuoteRequest(principal, term, FirstCollection), Package());
+        // Fee R150 (VAT R22.50) and R16 a month for 3 months (VAT R2.40 each): 15% of R198.
+        var quote = Service().Quote(Request(1_000m, 3, vat: true), Package());
 
-        Assert.Equal(term, quote.Schedule.Count);
-        Assert.Equal(0m, quote.Schedule[^1].ClosingBalance);
-
-        // Capital repaid must equal what was advanced. Rounding lands in the last instalment.
-        Assert.Equal(quote.CapitalisedAmount, quote.Schedule.Sum(r => r.CapitalPortion));
-    }
-
-    [Theory]
-    [InlineData(2_500, 3)]
-    [InlineData(10_000, 6)]
-    [InlineData(50_000, 36)]
-    public void Totals_ReconcileWithTheSchedule(decimal principal, int term)
-    {
-        var quote = Service().Quote(new LoanQuoteRequest(principal, term, FirstCollection), Package());
-
-        Assert.Equal(quote.Schedule.Sum(r => r.InterestPortion), quote.TotalInterest);
-        Assert.Equal(quote.Schedule.Sum(r => r.ServiceFee), quote.TotalServiceFees);
-        Assert.Equal(quote.Schedule.Sum(r => r.CreditLifePremium), quote.TotalCreditLife);
-        Assert.Equal(quote.Schedule.Sum(r => r.InstalmentTotal), quote.TotalRepayable);
-        Assert.Equal(quote.TotalRepayable - quote.Principal, quote.TotalCostOfCredit);
+        Assert.Equal(29.70m, quote.TotalVat);
+        Assert.Equal(0.15m, quote.VatRate);
+        Assert.All(quote.Schedule, r => Assert.Equal(2.40m, r.VatPortion));
+        Assert.Equal(1_000m + 150m + 22.50m, quote.CapitalisedAmount); // the fee's VAT is financed with it
     }
 
     [Fact]
-    public void Schedule_ChainsOpeningAndClosingBalances()
+    public void ALenderNotRegisteredForVat_ChargesNone()
     {
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+        var quote = Service().Quote(Request(1_000m, 3), Package());
+        Assert.Equal(0m, quote.TotalVat);
+        Assert.All(quote.Schedule, r => Assert.Equal(0m, r.VatPortion));
+    }
 
-        for (var i = 1; i < quote.Schedule.Count; i++)
-            Assert.Equal(quote.Schedule[i - 1].ClosingBalance, quote.Schedule[i].OpeningBalance);
+    // ----------------------------------------------------------------- a-l arithmetic
+
+    [Theory]
+    [InlineData(2_000, 2, true)]
+    [InlineData(2_500, 3, false)]
+    [InlineData(8_000, 6, true)]
+    [InlineData(15_000, 12, true)]
+    [InlineData(50_000, 36, false)]
+    public void TheCostElementsAddUp_GEqualsDPlusE_ToTheCent(decimal principal, int term, bool vat)
+    {
+        var q = Service().Quote(Request(principal, term, vat), Package());
+
+        Assert.Equal(q.TotalLoanAmount, principal);
+        Assert.Equal(q.TotalCreditLife + q.InitiationFee + q.TotalServiceFees + q.TotalInterest + q.TotalVat, q.TotalCostOfCredit);
+        Assert.Equal(q.TotalLoanAmount + q.TotalCostOfCredit, q.TotalRepayable);
+        Assert.Equal(q.Schedule.Sum(r => r.InstalmentTotal), q.TotalRepayable);
+        Assert.Equal(Math.Round(q.TotalRepayable / q.TotalLoanAmount, 2, MidpointRounding.AwayFromZero), q.CreditCostMultiple);
+        Assert.Equal(q.MonthlyInterestRate, q.PenaltyMonthlyRate);
     }
 
     [Fact]
-    public void Schedule_FallsDueMonthlyFromTheFirstCollectionDate()
+    public void FuneralCoverAndAThirdPartyPayment_AreFinanced_InTheTotalLoanAmount()
     {
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+        var q = Service().Quote(Request(2_000m, 2, funeral: 150m, thirdParty: 250m), Package());
 
-        Assert.Equal(FirstCollection, quote.Schedule[0].DueDate);
-        Assert.Equal(FirstCollection.AddMonths(5), quote.Schedule[^1].DueDate);
+        Assert.Equal(2_400m, q.TotalLoanAmount);                       // d = a + b + c
+        Assert.Equal(2_400m + q.InitiationFee, q.CapitalisedAmount);
+        Assert.Equal(265m, q.InitiationFee);                           // the fee cap is on the principal (a)
+        Assert.Equal(q.TotalLoanAmount + q.TotalCostOfCredit, q.TotalRepayable);
+    }
+
+    // ----------------------------------------------------------------- level instalments
+
+    [Theory]
+    [InlineData(2_500, 3)]
+    [InlineData(8_000, 6)]
+    [InlineData(50_000, 36)]
+    public void Instalments_AreLevel_TheLastAbsorbingTheRounding(decimal principal, int term)
+    {
+        var q = Service().Quote(Request(principal, term, vat: true), Package());
+
+        Assert.All(q.Schedule.Take(term - 1), r => Assert.Equal(q.BaseInstalment, r.InstalmentTotal));
+        Assert.True(Math.Abs(q.FinalInstalment - q.BaseInstalment) < 1m,
+            $"Final instalment {q.FinalInstalment} strays from {q.BaseInstalment}.");
+        Assert.Equal(0m, q.Schedule[^1].ClosingBalance);
+        Assert.Equal(q.CapitalisedAmount, q.Schedule.Sum(r => r.CapitalPortion));
+    }
+
+    [Fact]
+    public void Schedule_ChainsBalances_AndFallsDueMonthly()
+    {
+        var q = Service().Quote(Request(8_000m, 6), Package());
+
+        for (var i = 1; i < q.Schedule.Count; i++)
+            Assert.Equal(q.Schedule[i - 1].ClosingBalance, q.Schedule[i].OpeningBalance);
+        Assert.Equal(FirstCollection, q.Schedule[0].DueDate);
+        Assert.Equal(FirstCollection.AddMonths(5), q.Schedule[^1].DueDate);
     }
 
     // ----------------------------------------------------------------- credit life
 
     [Fact]
-    public void CreditLife_IsChargedOnTheDecliningBalance_SoItFallsEachMonth()
+    public void CreditLife_IsChargedOnTheDecliningBalance_WithinTheCap()
     {
-        // This is the compliance point: the cap is per R1 000 of the deferred amount at the
-        // time. Levelling the premium would overcharge in later months.
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+        var q = Service().Quote(Request(8_000m, 6), Package());
 
-        for (var i = 1; i < quote.Schedule.Count; i++)
-            Assert.True(quote.Schedule[i].CreditLifePremium < quote.Schedule[i - 1].CreditLifePremium,
-                $"Credit life did not decline at instalment {i + 1}.");
+        for (var i = 1; i < q.Schedule.Count; i++)
+            Assert.True(q.Schedule[i].CreditLifePremium < q.Schedule[i - 1].CreditLifePremium);
+        Assert.All(q.Schedule, r => Assert.True(r.CreditLifePremium <=
+            Math.Round(r.OpeningBalance * RegulatoryCaps.Statutory.CreditLifeMonthlyRateMax, 2, MidpointRounding.AwayFromZero)));
+    }
+
+    // ----------------------------------------------------------------- interest ceilings
+
+    [Fact]
+    public void AShortTermLoan_IsCappedAtFivePercent_OnTheFirstLoanOfTheYear()
+    {
+        var q = Service().Quote(Request(2_000m, 2), Package(interest: 0.12m));
+        Assert.Equal(0.05m, q.MonthlyInterestRate);
+        Assert.Equal("Short-term Credit Transaction", q.ProductType);
+        Assert.Contains(q.Notices, n => n.Contains("Interest reduced"));
     }
 
     [Fact]
-    public void CreditLife_NeverExceedsTheStatutoryRateOnTheOpeningBalance()
+    public void ALaterShortTermLoanInTheSameYear_IsCappedAtThreePercent()
     {
-        var limits = new NcaCreditLimits();
-        var quote = Service(limits).Quote(new LoanQuoteRequest(10_000m, 12, FirstCollection), Package());
-
-        foreach (var row in quote.Schedule)
-        {
-            var ceiling = Math.Round(row.OpeningBalance * limits.CreditLifeCeilingRate, 2,
-                MidpointRounding.AwayFromZero);
-            Assert.True(row.CreditLifePremium <= ceiling,
-                $"Instalment {row.InstalmentNumber} charged {row.CreditLifePremium}, cap was {ceiling}.");
-        }
+        var q = Service().Quote(Request(2_000m, 2, prior: 1), Package(interest: 0.05m));
+        Assert.Equal(0.03m, q.MonthlyInterestRate);
+        Assert.Contains(q.Notices, n => n.Contains("later short-term loan this calendar year"));
     }
 
     [Fact]
-    public void FirstInstalment_IsTheLargest_AndIsWhatTheMandateIsRaisedFor()
+    public void AnUnsecuredLoan_UsesTheAnnualCap_AndIsRefusedWhileItIsNotSet()
     {
-        var quote = Service().Quote(new LoanQuoteRequest(10_000m, 6, FirstCollection), Package());
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            Service().Quote(Request(10_000m, 6, caps: RegulatoryCaps.Statutory), Package()));
+        Assert.Contains("unsecured interest cap is not set", ex.Message);
 
-        Assert.Equal(quote.Schedule.Max(r => r.InstalmentTotal), quote.FirstInstalment);
-        Assert.True(quote.FirstInstalment >= quote.FinalInstalment);
-    }
-
-    // ----------------------------------------------------------------- rate ceilings
-
-    [Fact]
-    public void InterestAboveTheStatutoryCeiling_IsClampedAndReported()
-    {
-        var quote = Service().Quote(
-            new LoanQuoteRequest(10_000m, 6, FirstCollection),
-            Package(interest: 0.12m));
-
-        Assert.Equal(0.05m, quote.MonthlyInterestRate);
-        Assert.Contains(quote.Notices, n => n.Contains("Interest reduced"));
+        var q = Service().Quote(Request(10_000m, 6, caps: RegulatoryCaps.Statutory with { UnsecuredAnnualRateMax = 0.28m }),
+            Package(interest: 0.05m));
+        Assert.Equal("Unsecured Credit Transaction", q.ProductType);
+        Assert.Equal(0.28m / 12m, q.MonthlyInterestRate);
     }
 
     [Fact]
-    public void ServiceFeeAboveTheStatutoryCeiling_IsClampedAndReported()
+    public void ServiceFeeAndCreditLife_AboveTheirCaps_AreClampedAndReported()
     {
-        var quote = Service().Quote(
-            new LoanQuoteRequest(10_000m, 6, FirstCollection),
-            Package(serviceFee: 250m));
+        var q = Service().Quote(Request(2_000m, 2), Package(serviceFee: 250m, creditLife: 0.02m));
+        Assert.Equal(60m, q.MonthlyServiceFee);
+        Assert.Equal(0.0045m, q.CreditLifeRate);
+        Assert.Contains(q.Notices, n => n.Contains("Service fee reduced"));
+        Assert.Contains(q.Notices, n => n.Contains("Credit life reduced"));
+    }
 
-        Assert.Equal(69m, quote.MonthlyServiceFee);
-        Assert.Contains(quote.Notices, n => n.Contains("Service fee reduced"));
+    // ----------------------------------------------------------------- fee overrides
+
+    [Fact]
+    public void AnOverrideUpToTheCap_IsApplied_AndRecorded()
+    {
+        var fee = new FeeOverride(InitiationFee: 200m, MonthlyServiceFee: 50m, MonthlyInterestRate: 0.04m, Reason: "Loyal client");
+        var q = Service().Quote(Request(2_000m, 2, fee: fee), Package());
+
+        Assert.Equal(200m, q.InitiationFee);
+        Assert.Equal(50m, q.MonthlyServiceFee);
+        Assert.Equal(0.04m, q.MonthlyInterestRate);
+        Assert.Same(fee, q.AppliedOverride);
+        Assert.Empty(q.Notices);
     }
 
     [Fact]
-    public void CreditLifeAboveTheStatutoryCeiling_IsClampedAndReported()
-    {
-        var quote = Service().Quote(
-            new LoanQuoteRequest(10_000m, 6, FirstCollection),
-            Package(creditLife: 0.02m));
-
-        Assert.Equal(0.0045m, quote.CreditLifeRate);
-        Assert.Contains(quote.Notices, n => n.Contains("Credit life reduced"));
-    }
-
-    [Fact]
-    public void AZeroInterestPackage_StillAmortises()
-    {
-        var quote = Service().Quote(
-            new LoanQuoteRequest(6_000m, 6, FirstCollection),
-            Package(interest: 0m, initiationRate: 0m));
-
-        Assert.Equal(0m, quote.TotalInterest);
-        Assert.Equal(1_000m, quote.Schedule[0].CapitalPortion);
-        Assert.Equal(0m, quote.Schedule[^1].ClosingBalance);
-    }
-
-    // ----------------------------------------------------------------- package limits
-
-    [Fact]
-    public void APrincipalOutsideThePackageLimits_IsRefused()
+    public void AnOverrideAboveTheCap_IsRefused_ButACentOfRoundingIsTolerated()
     {
         var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Service().Quote(new LoanQuoteRequest(250_000m, 6, FirstCollection), Package()));
+            Service().Quote(Request(2_000m, 2, fee: new FeeOverride(265.02m, null, null, "x")), Package()));
+        Assert.Contains("above the statutory maximum", ex.Message);
 
-        Assert.Contains("lends between", ex.Message);
+        Assert.Equal(265.01m, Service().Quote(Request(2_000m, 2, fee: new FeeOverride(265.01m, null, null, "x")), Package()).InitiationFee);
     }
 
+    // ----------------------------------------------------------------- odd cases and limits
+
     [Fact]
-    public void ATermOutsideThePackageLimits_IsRefused()
+    public void AZeroChargePackage_AmortisesEvenly()
     {
-        var ex = Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Service().Quote(new LoanQuoteRequest(10_000m, 120, FirstCollection), Package()));
+        var q = Service().Quote(Request(6_000m, 6), Package(interest: 0m, serviceFee: 0m, initiationRate: 0m, creditLife: 0m));
 
-        Assert.Contains("runs over", ex.Message);
+        Assert.Equal(0m, q.TotalCostOfCredit);
+        Assert.All(q.Schedule, r => Assert.Equal(1_000m, r.InstalmentTotal));
     }
 
     [Fact]
-    public void ANonPositivePrincipal_IsRefused() =>
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Service().Quote(new LoanQuoteRequest(0m, 6, FirstCollection), Package()));
+    public void APrincipalOutsideThePackageLimits_IsRefused() =>
+        Assert.Contains("lends between", Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Service().Quote(Request(250_000m, 6), Package())).Message);
 
     [Fact]
-    public void AZeroTerm_IsRefused() =>
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Service().Quote(new LoanQuoteRequest(10_000m, 0, FirstCollection), Package()));
+    public void ATermOutsideThePackageLimits_IsRefused() =>
+        Assert.Contains("runs over", Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Service().Quote(Request(10_000m, 120), Package())).Message);
 
-    // ----------------------------------------------------------------- statutory helper
-
-    [Theory]
-    [InlineData(500, 189.75)]      // below the threshold: flat component only
-    [InlineData(1_000, 189.75)]    // exactly at the threshold
-    [InlineData(2_000, 289.75)]    // 189.75 + 10% of 1 000
-    [InlineData(10_000, 1_089.75)] // 189.75 + 10% of 9 000
-    [InlineData(20_000, 1_207.50)] // ceiling
-    public void MaximumInitiationFee_FollowsTheGazettedFormula(decimal principal, decimal expected) =>
-        Assert.Equal(expected, new NcaCreditLimits().MaximumInitiationFee(principal));
+    [Fact]
+    public void ANonPositivePrincipal_OrAZeroTerm_IsRefused()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => Service().Quote(Request(0m, 6), Package()));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Service().Quote(Request(10_000m, 0), Package()));
+    }
 }

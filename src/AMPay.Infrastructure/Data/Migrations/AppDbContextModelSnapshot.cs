@@ -1014,6 +1014,10 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal>("CreditCostMultiple")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("CreditLifeRate")
                         .HasPrecision(9, 6)
                         .HasColumnType("decimal(9,6)");
@@ -1034,6 +1038,14 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("DisbursedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FeeOverrideByUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("FeeOverrideReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<decimal>("FinalInstalment")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1047,6 +1059,10 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.Property<int>("Frequency")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("FuneralCover")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("InitiationFee")
                         .HasPrecision(18, 2)
@@ -1075,11 +1091,19 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("ProductType")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ThirdPartyPayment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("TotalCostOfCredit")
                         .HasPrecision(18, 2)
@@ -1101,8 +1125,16 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("TotalVat")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("TrackingDays")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("VatRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
 
                     b.Property<decimal?>("WrittenOffAmount")
                         .HasPrecision(18, 2)
@@ -1399,6 +1431,10 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("ServiceFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("VatPortion")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
@@ -1730,6 +1766,43 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("PortfolioSnapshots");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.RegulatoryCap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Type", "EffectiveFrom");
+
+                    b.ToTable("RegulatoryCaps");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.Tenant", b =>

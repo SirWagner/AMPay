@@ -102,6 +102,8 @@ builder.Services.AddScoped<PortalSync>();
 // The lender dashboard: one set of aggregate queries per tenant, cached for a minute.
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<LenderDashboardService>();
+builder.Services.AddScoped<RegulatoryCapsProvider>();
+builder.Services.AddScoped<PricingContext>();
 
 // Money in: payments, Pay Now and debit results, applied to each loan's instalments.
 builder.Services.AddScoped<LoanLedgerService>();

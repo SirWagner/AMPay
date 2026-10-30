@@ -28,7 +28,6 @@ builder.Services.AddDbContext<PortalDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("Portal"), sql => sql.EnableRetryOnFailure()));
 
 // The same pricing engine AM-Pay uses, and the same statutory limits.
-builder.Services.Configure<NcaCreditLimits>(builder.Configuration.GetSection(NcaCreditLimits.SectionName));
 builder.Services.AddScoped<ILoanPricingService, LoanPricingService>();
 
 builder.Services.AddScoped<OtpService>();

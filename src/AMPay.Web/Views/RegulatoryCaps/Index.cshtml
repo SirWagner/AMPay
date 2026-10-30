@@ -1,0 +1,76 @@
+@using AMPay.Domain.Credit
+@{
+    var current = (RegulatoryCaps)ViewBag.Current;
+    var history = (List<AMPay.Domain.Entities.RegulatoryCap>)ViewBag.History;
+    var today = (DateTime)ViewBag.Today;
+    string Show(CapType t, decimal? v) => v is null ? "Not set" : RegulatoryCaps.IsRate(t) ? (v.Value * 100m).ToString("0.####") + "%" : t == CapType.ShortTermMaxMonths ? v.Value.ToString("0") + " months" : "R " + v.Value.ToString("N2");
+}
+
+<div class="page-head">
+    <h1>Regulatory caps</h1>
+    <p class="lede">
+        The National Credit Act ceilings every quote is checked against, for every lender. All amounts exclude VAT.
+        A change is recorded from a date; loans priced earlier keep the caps of their day.
+    </p>
+</div>
+
+@if (current.UnsecuredAnnualRateMax is null)
+{
+    <div class="alert alert-warn">
+        The unsecured credit interest cap is not set, so loans above R @current.ShortTermMaxPrincipal.ToString("N0") or longer than
+        @current.ShortTermMaxMonths months cannot be quoted. It is the repo rate plus 21% a year - set it below.
+    </div>
+}
+
+<div class="card">
+    <div class="card-head"><h3>In force today (@today.ToString("d MMM yyyy"))</h3></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead><tr><th>Cap</th><th class="num">Value</th><th>Change from a date</th></tr></thead>
+            <tbody>
+            @foreach (var type in Enum.GetValues<CapType>())
+            {
+                var v = current.Get(type);
+                <tr>
+                    <td>@RegulatoryCaps.Label(type)</td>
+                    <td class="num">@Show(type, v)</td>
+                    <td>
+                        <form asp-action="Set" method="post" style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="type" value="@type" />
+                            <input name="value" type="number" step="any" min="0" required style="width:7.5rem;"
+                                   placeholder="@(RegulatoryCaps.IsRate(type) ? "%" : type == CapType.ShortTermMaxMonths ? "months" : "R")"
+                                   aria-label="New value for @RegulatoryCaps.Label(type)" />
+                            <input name="effectiveFrom" type="date" value="@today.ToString("yyyy-MM-dd")" aria-label="Effective from" />
+                            <input name="source" type="text" maxlength="300" placeholder="Source (gazette, notice)" style="width:12rem;" aria-label="Source" />
+                            <button type="submit" class="btn btn-outline btn-sm">Set</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-body"><p class="muted small mb-0">Rates are entered as percentages (5 for 5%). Confirm every figure with a compliance officer.</p></div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h3>History</h3></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead><tr><th>Cap</th><th class="num">Value</th><th>From</th><th>Until</th><th>Source</th></tr></thead>
+            <tbody>
+            @foreach (var c in history)
+            {
+                <tr>
+                    <td>@RegulatoryCaps.Label(c.Type)</td>
+                    <td class="num">@Show(c.Type, c.Value)</td>
+                    <td>@c.EffectiveFrom.ToString("d MMM yyyy")</td>
+                    <td>@(c.EffectiveTo?.AddDays(-1).ToString("d MMM yyyy") ?? "current")</td>
+                    <td class="small">@c.Source</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

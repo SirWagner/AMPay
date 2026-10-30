@@ -10,8 +10,8 @@ public class LoanOriginationTests
 {
     private static readonly DateTime FirstCollection = new(2026, 10, 25);
 
-    private static LoanQuote Quote(decimal principal = 10_000m, int term = 6) =>
-        new LoanPricingService(Options.Create(new NcaCreditLimits())).Quote(
+    private static LoanQuote Quote(decimal principal = 8_000m, int term = 6) =>
+        new LoanPricingService().Quote(
             new LoanQuoteRequest(principal, term, FirstCollection),
             new CreditPackage
             {
@@ -56,8 +56,8 @@ public class LoanOriginationTests
     {
         // A package priced above the ceiling is clamped. The loan must record what was
         // charged, or the agreement on file would overstate the client's cost.
-        var quote = new LoanPricingService(Options.Create(new NcaCreditLimits())).Quote(
-            new LoanQuoteRequest(10_000m, 6, FirstCollection),
+        var quote = new LoanPricingService().Quote(
+            new LoanQuoteRequest(8_000m, 6, FirstCollection),
             new CreditPackage
             {
                 Name = "Overpriced", MonthlyInterestRate = 0.09m, MonthlyServiceFee = 120m,
@@ -69,7 +69,7 @@ public class LoanOriginationTests
         LoanOrigination.ApplyQuote(loan, quote);
 
         Assert.Equal(0.05m, loan.MonthlyInterestRate);
-        Assert.Equal(69m, loan.MonthlyServiceFee);
+        Assert.Equal(60m, loan.MonthlyServiceFee); // R60 excluding VAT
         Assert.Equal(0.0045m, loan.CreditLifeRate);
     }
 

@@ -29,6 +29,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ClientPhoto> ClientPhotos => Set<ClientPhoto>();
 
     public DbSet<CreditPackage> CreditPackages => Set<CreditPackage>();
+    public DbSet<RegulatoryCap> RegulatoryCaps => Set<RegulatoryCap>();
     public DbSet<Loan> Loans => Set<Loan>();
     public DbSet<LoanScheduleEntry> LoanScheduleEntries => Set<LoanScheduleEntry>();
     public DbSet<AffordabilityAssessment> AffordabilityAssessments => Set<AffordabilityAssessment>();
@@ -219,6 +220,15 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
                 .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        b.Entity<RegulatoryCap>(e =>
+        {
+            // Rates need more than 2 decimal places (0.0045 credit life).
+            e.Property(x => x.Value).HasPrecision(18, 6);
+            e.Property(x => x.Source).HasMaxLength(300);
+            e.Property(x => x.CreatedByUserId).HasMaxLength(64);
+            e.HasIndex(x => new { x.Type, x.EffectiveFrom });
+        });
+
         b.Entity<CreditPackage>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
@@ -247,6 +257,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.CollectionDay).HasMaxLength(4);
             e.Property(x => x.CollectionDayCode).HasMaxLength(7);
             e.Property(x => x.DecisionNotes).HasMaxLength(2000);
+            e.Property(x => x.ProductType).HasMaxLength(60);
+            e.Property(x => x.FeeOverrideReason).HasMaxLength(500);
+            e.Property(x => x.FeeOverrideByUserId).HasMaxLength(64);
+            e.Property(x => x.VatRate).HasPrecision(9, 6);
 
             e.Property(x => x.MonthlyInterestRate).HasPrecision(9, 6);
             e.Property(x => x.CreditLifeRate).HasPrecision(9, 6);

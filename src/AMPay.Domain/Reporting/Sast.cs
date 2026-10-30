@@ -25,19 +25,9 @@ public static class Sast
     public static DateTime MonthStart(DateTime sastDate) => new(sastDate.Year, sastDate.Month, 1);
 
     /// <summary>
-    /// The date <paramref name="businessDays"/> business days before <paramref name="sastDate"/>,
-    /// counting Monday to Friday only. Public holidays are not excluded - a conservative window
-    /// (it ends a day early around a holiday rather than late).
+    /// The date <paramref name="businessDays"/> business days before <paramref name="sastDate"/>:
+    /// weekdays that are not South African public holidays.
     /// </summary>
-    public static DateTime BusinessDaysBefore(DateTime sastDate, int businessDays)
-    {
-        var d = sastDate.Date;
-        var counted = 0;
-        while (counted < businessDays)
-        {
-            d = d.AddDays(-1);
-            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)) counted++;
-        }
-        return d;
-    }
+    public static DateTime BusinessDaysBefore(DateTime sastDate, int businessDays) =>
+        SaPublicHolidays.AddBusinessDays(sastDate, -businessDays);
 }
