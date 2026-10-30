@@ -86,6 +86,11 @@ public static class DependencyInjection
                 services.AddScoped<INetcashPayNowService, LiveNetcashPayNowService>();
             else
                 services.AddScoped<INetcashPayNowService, StubNetcashPayNowService>();
+
+            if (netcash.Live.Risk)
+                services.AddScoped<ICreditBureauClient, NetcashRiskReportService>();
+            else
+                services.AddScoped<ICreditBureauClient, StubCreditBureauClient>();
         }
         else
         {

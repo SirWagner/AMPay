@@ -159,7 +159,7 @@ public static class DemoSeeder
             }
 
             if (rnd.NextDouble() < 0.6)
-                db.ClientCreditEnquiries.Add(new ClientCreditEnquiry { ClientId = client.Id, Bureau = "Demo bureau", Outcome = "Clear", EnquiryDate = client.CreatedUtc });
+                db.ClientCreditEnquiries.Add(new ClientCreditEnquiry { ClientId = client.Id, Bureau = "Demo bureau", Outcome = "Clear", Status = CreditEnquiryStatus.ReportReceived, EnquiryDate = client.CreatedUtc });
 
             if (i % 50 == 49) await db.SaveChangesAsync();
         }

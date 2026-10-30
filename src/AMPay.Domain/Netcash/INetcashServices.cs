@@ -177,17 +177,57 @@ public interface INetcashPayNowService
 }
 
 /// <summary>
-/// Credit bureau enquiry.
-/// <para>
-/// GAP - deliberately not implemented. Compuscan / Experian is a separate vendor contract
-/// outside the Netcash scope. Netcash does expose RequestCreditDataReport (risk reports,
-/// service id 3), which may satisfy this instead; decide before wiring an implementation.
-/// </para>
+/// Credit bureau enquiries through Netcash risk reports: a batch file (BatchFileUpload,
+/// instruction CD11/CD12/CD13) returns a file token, and RequestCreditDataReport later returns
+/// the bureau's report as a PDF. Uses the business's Risk Services key.
 /// </summary>
 public interface ICreditBureauClient
 {
-    Task<NetcashResult<string>> RequestReportAsync(
-        string idNumber, string reportType, CancellationToken ct = default);
+    /// <summary>Sends the enquiry. Returns Netcash's file token for collecting the report.</summary>
+    Task<NetcashResult<string>> SubmitAsync(CreditCheckRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// The report for a file token: the PDF bytes, or a successful result with no data while the
+    /// bureau has not answered yet ("file not ready").
+    /// </summary>
+    Task<NetcashResult<byte[]>> FetchReportAsync(string fileToken, CancellationToken ct = default);
+}
+
+/// <summary>The bureaus Netcash reaches, with their risk-report instruction codes.</summary>
+public enum CreditBureau
+{
+    TransUnion = 11,
+    Experian = 12,
+    Xds = 13
+}
+
+/// <param name="ReasonCode">The bureau enquiry reason; 32 is a credit application (NCA s81(2)).</param>
+public record CreditCheckRequest(
+    string AccountReference,
+    string IdNumber,
+    string Surname,
+    string FirstName,
+    CreditBureau Bureau,
+    int ReasonCode = CreditCheckReasons.CreditApplication);
+
+/// <summary>The bureau reason codes Netcash lists (field 450).</summary>
+public static class CreditCheckReasons
+{
+    public const int CreditApplication = 32;
+    public const int CreditLimitManagement = 33;
+    public const int FinancialMeansAssessment = 43;
+    public const int PropensityToRepay = 44;
+
+    /// <summary>The reasons a lender uses, with their labels.</summary>
+    public static readonly IReadOnlyList<(int Code, string Label)> ForLending = new[]
+    {
+        (CreditApplication, "Credit application"),
+        (CreditLimitManagement, "Credit limit management"),
+        (FinancialMeansAssessment, "Financial means assessment"),
+        (PropensityToRepay, "Propensity to repay")
+    };
+
+    public static string Label(int code) => ForLending.FirstOrDefault(r => r.Code == code).Label ?? $"Reason {code}";
 }
 
 public static class NetcashSecretStoreExtensions

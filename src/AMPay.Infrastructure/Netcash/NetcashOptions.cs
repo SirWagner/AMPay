@@ -87,7 +87,10 @@ public class NetcashLiveServices
     /// <summary>Pay Now hosted checkout and its notify. Real money on a live account; needs Netcash:PayNowCallbackSecret.</summary>
     public bool PayNow { get; set; }
 
-    public bool Any => Partner || Validation || Avs || DebiCheck || PayNow;
+    /// <summary>Risk reports: credit bureau checks (TransUnion, Experian, XDS). Billed, and footprinted on the client's record.</summary>
+    public bool Risk { get; set; }
+
+    public bool Any => Partner || Validation || Avs || DebiCheck || PayNow || Risk;
 
     /// <summary>Names of the live services, for the banner.</summary>
     public IEnumerable<string> Names()
@@ -97,5 +100,6 @@ public class NetcashLiveServices
         if (Avs) yield return "bank account verification (AVS)";
         if (DebiCheck) yield return "DebiCheck real-time mandates (TT1)";
         if (PayNow) yield return "Pay Now payments";
+        if (Risk) yield return "credit bureau checks";
     }
 }

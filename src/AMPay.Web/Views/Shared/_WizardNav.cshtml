@@ -10,7 +10,7 @@
                         || (current == "General" && step == OnboardingStep.General)
                         || (current == "Edit" && step == OnboardingStep.General);
 
-        var built = step <= OnboardingStep.OtherDetails || step is OnboardingStep.Photo or OnboardingStep.Summary;
+        var built = step <= OnboardingStep.OtherDetails || step is OnboardingStep.CreditCheck or OnboardingStep.Photo or OnboardingStep.Summary;
         var cls = (isCurrent ? "active " : "") + (done ? "done" : "");
 
         @if (step == OnboardingStep.Documents)

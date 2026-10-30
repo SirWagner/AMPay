@@ -1,0 +1,109 @@
+@using AMPay.Domain.Netcash
+@model List<ClientCreditEnquiry>
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var client = (Client)ViewBag.Client;
+    var hasSaId = client.IsSaIdNumber && AMPay.Domain.Validation.SaIdNumber.IsValid(client.IdNumber);
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">@OnboardingSteps.Caption(OnboardingStep.CreditCheck) &mdash; credit bureau check.</p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <div class="card">
+            <div class="card-head"><h2>Run a credit check</h2></div>
+            <div class="card-body">
+                @if (!hasSaId)
+                {
+                    <div class="alert alert-warn mb-0">A credit check needs a valid South African ID number on the client's file. Add it on the General step.</div>
+                }
+                else
+                {
+                    <form asp-action="CreditCheck" asp-route-id="@client.Id" method="post" class="credit-check-form">
+                        <div class="field">
+                            <label for="bureau">Bureau</label>
+                            <select id="bureau" name="bureau">
+                                <option value="@CreditBureau.TransUnion">TransUnion</option>
+                                <option value="@CreditBureau.Experian">Experian</option>
+                                <option value="@CreditBureau.Xds">XDS</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="reasonCode">Reason</label>
+                            <select id="reasonCode" name="reasonCode">
+                                @foreach (var (code, label) in CreditCheckReasons.ForLending)
+                                {
+                                    <option value="@code">@label</option>
+                                }
+                            </select>
+                        </div>
+                        <label class="check">
+                            <input type="checkbox" name="consent" value="true" required />
+                            <span>
+                                <strong>@client.FullName has consented to this credit check.</strong>
+                                An enquiry is recorded on their credit profile and is kept with this file (National Credit Act s81, POPIA).
+                            </span>
+                        </label>
+                        <p class="muted small">
+                            Sent through Netcash risk reports for ID <span class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(client.IdNumber)</span>.
+                            The bureau's report arrives as a PDF, usually within a minute. Each check may be billed by Netcash.
+                        </p>
+                        <button type="submit" class="btn btn-primary">Send credit check</button>
+                    </form>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Checks on file</h3></div>
+            @if (Model.Count == 0)
+            {
+                <div class="card-body"><p class="muted mb-0">No credit checks yet.</p></div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Date</th><th>Bureau</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var e in Model)
+                        {
+                            <tr>
+                                <td>@e.EnquiryDate.AddHours(2).ToString("d MMM yyyy HH:mm")</td>
+                                <td>@e.Bureau</td>
+                                <td>@(e.ReasonCode is { } r ? CreditCheckReasons.Label(r) : "-")</td>
+                                <td>
+                                    @switch (e.Status)
+                                    {
+                                        case CreditEnquiryStatus.ReportReceived: <span class="badge badge-green">Report received</span> break;
+                                        case CreditEnquiryStatus.Failed: <span class="badge badge-red">Failed</span> <span class="muted small">@e.Outcome</span> break;
+                                        default: <span class="badge badge-amber">Waiting for the bureau</span> break;
+                                    }
+                                </td>
+                                <td>
+                                    @if (e.ReportPointer is not null)
+                                    {
+                                        <a asp-action="CreditReport" asp-route-id="@client.Id" asp-route-enquiryId="@e.Id" target="_blank" rel="noopener">Open report</a>
+                                    }
+                                    else if (e.Status == CreditEnquiryStatus.Submitted)
+                                    {
+                                        <a asp-action="CreditCheck" asp-route-id="@client.Id">Check again</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <div class="card-foot">
+                <a asp-action="Photo" asp-route-id="@client.Id" class="btn btn-outline">Next &rarr;</a>
+            </div>
+        </div>
+    </div>
+</div>

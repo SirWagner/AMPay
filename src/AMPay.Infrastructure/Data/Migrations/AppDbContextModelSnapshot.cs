@@ -334,6 +334,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ConsentRecordedUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("EnquiryDate")
                         .HasColumnType("datetime2");
 
@@ -343,13 +346,22 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("Outcome")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("ReasonCode")
+                        .HasColumnType("int");
+
                     b.Property<string>("ReportPointer")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReportReceivedUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("RequestedByUserId")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("Score")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
