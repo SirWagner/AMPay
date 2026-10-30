@@ -30,6 +30,9 @@ public static class SeedData
         // initializer handles both, then migrates whatever is genuinely outstanding.
         await DatabaseInitializer.InitialiseAsync(db, log);
 
+        // The statutory fee and interest caps, on first run only; the admin keeps them current.
+        await RegulatoryCapsProvider.SeedAsync(db);
+
         foreach (var (name, description) in AppRoles.All)
         {
             if (!await roles.RoleExistsAsync(name))

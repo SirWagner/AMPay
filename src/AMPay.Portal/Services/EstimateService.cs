@@ -46,8 +46,19 @@ public class EstimateService
 
         if (package is null) return null;
 
-        var quote = _pricing.Quote(
-            new LoanQuoteRequest(amount, term, LoanOrigination.DefaultFirstCollectionDate(salaryDay, DateTime.Today)),
+        // An estimate errs high, never low: VAT is included (the portal does not know whether the
+        // lender is VAT-registered), and a loan above the short-term limits is estimated at the
+        // package's own rate (the unsecured cap lives in AM-Pay). The lender's real quote decides.
+        var caps = RegulatoryCaps.Statutory with { UnsecuredAnnualRateMax = package.MonthlyInterestRate * 12m };
+        LoanQuote quote;
+        try
+        {
+            quote = _pricing.Quote(
+            new LoanQuoteRequest(amount, term, LoanOrigination.DefaultFirstCollectionDate(salaryDay, DateTime.Today))
+            {
+                Caps = caps,
+                VatRegistered = true
+            },
             new CreditPackage
             {
                 Name = package.Name,
@@ -61,6 +72,11 @@ public class EstimateService
                 MinTermMonths = package.MinTermMonths,
                 MaxTermMonths = package.MaxTermMonths
             });
+        }
+        catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
+        {
+            return null;
+        }
 
         return new Estimate(package.Name, quote.FirstInstalment, quote.TotalRepayable, quote.TotalCostOfCredit, term, amount);
     }

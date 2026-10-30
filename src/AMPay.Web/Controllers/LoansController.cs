@@ -40,6 +40,7 @@ public class LoansController : Controller
     private readonly UserManager<ApplicationUser> _users;
     private readonly ContractService _contracts;
     private readonly LoanLedgerService _ledger;
+    private readonly PricingContext _pricingContext;
     private readonly ILogger<LoansController> _log;
 
     public LoansController(
@@ -50,6 +51,7 @@ public class LoansController : Controller
         UserManager<ApplicationUser> users,
         ContractService contracts,
         LoanLedgerService ledger,
+        PricingContext pricingContext,
         ILogger<LoansController> log)
     {
         _db = db;
@@ -59,6 +61,7 @@ public class LoansController : Controller
         _users = users;
         _contracts = contracts;
         _ledger = ledger;
+        _pricingContext = pricingContext;
         _log = log;
     }
 
@@ -184,7 +187,7 @@ public class LoansController : Controller
         var first = firstCollection ?? LoanOrigination.DefaultFirstCollectionDate(
             client.Employment?.SalaryDay, DateTime.Today);
 
-        var (quote, error) = TryQuote(package, principal, instalments, first);
+        var (quote, error) = await TryQuoteAsync(client.TenantId, client.Id, package, principal, instalments, first);
         if (quote is null)
             return Json(new LoanQuoteView { Ok = false, Error = error });
 
@@ -235,7 +238,7 @@ public class LoansController : Controller
         LoanQuote? quote = null;
         if (ModelState.IsValid && package is not null)
         {
-            var (q, error) = TryQuote(package, model.Principal!.Value,
+            var (q, error) = await TryQuoteAsync(client.TenantId, client.Id, package, model.Principal!.Value,
                 model.NumberOfInstalments!.Value, model.FirstCollectionDate!.Value);
 
             quote = q;
@@ -625,12 +628,13 @@ public class LoansController : Controller
 
     // ---------------------------------------------------------------- helpers
 
-    private (LoanQuote? Quote, string? Error) TryQuote(
-        CreditPackage package, decimal principal, int instalments, DateTime firstCollection)
+    private async Task<(LoanQuote? Quote, string? Error)> TryQuoteAsync(
+        Guid tenantId, Guid clientId, CreditPackage package, decimal principal, int instalments, DateTime firstCollection)
     {
         try
         {
-            return (_pricing.Quote(new LoanQuoteRequest(principal, instalments, firstCollection), package), null);
+            var request = await _pricingContext.RequestAsync(tenantId, clientId, principal, instalments, firstCollection);
+            return (_pricing.Quote(request, package), null);
         }
         catch (ArgumentOutOfRangeException ex)
         {

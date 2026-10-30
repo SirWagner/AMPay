@@ -78,6 +78,30 @@ public class Loan
     /// <summary>Total cost of credit: everything repaid above the principal.</summary>
     public decimal TotalCostOfCredit { get; set; }
 
+    // ---- The rest of the a-l cost elements (loans priced from 30 Oct 2026; zero before) ----
+
+    /// <summary>"Short-term Credit Transaction" or "Unsecured Credit Transaction".</summary>
+    public string? ProductType { get; set; }
+
+    /// <summary>(b) Optional family funeral cover the client opted into.</summary>
+    public decimal FuneralCover { get; set; }
+
+    /// <summary>(c) Optional payment to a third party on the client's behalf.</summary>
+    public decimal ThirdPartyPayment { get; set; }
+
+    /// <summary>(f.5) VAT on the initiation and service fees. Zero for a lender not registered for VAT.</summary>
+    public decimal TotalVat { get; set; }
+
+    /// <summary>The VAT rate the loan was priced at (0 when no VAT was charged).</summary>
+    public decimal VatRate { get; set; }
+
+    /// <summary>(l) Total repayable over the total loan amount.</summary>
+    public decimal CreditCostMultiple { get; set; }
+
+    /// <summary>Why a permitted user changed this loan's fees or rate from the package, if they did.</summary>
+    public string? FeeOverrideReason { get; set; }
+    public string? FeeOverrideByUserId { get; set; }
+
     // ---- Collection terms (moved off ClientPayback) ----
 
     public DebitFrequency Frequency { get; set; } = DebitFrequency.Monthly;
@@ -148,6 +172,9 @@ public class LoanScheduleEntry
     public decimal CapitalPortion { get; set; }
     public decimal ServiceFee { get; set; }
     public decimal CreditLifePremium { get; set; }
+
+    /// <summary>VAT on this month's service fee.</summary>
+    public decimal VatPortion { get; set; }
 
     /// <summary>What the client is debited this month.</summary>
     public decimal InstalmentTotal { get; set; }

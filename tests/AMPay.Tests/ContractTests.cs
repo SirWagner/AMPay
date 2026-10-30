@@ -411,7 +411,7 @@ public class ContractTests
         client.Budgets.Add(new ClientBudget { Kind = BudgetLineKind.Expense, Description = "Rent", Amount = 3_500m });
         client.Budgets.Add(new ClientBudget { Kind = BudgetLineKind.Expense, Description = "Groceries", Amount = 2_500m });
 
-        var quote = new LoanPricingService(Options.Create(new NcaCreditLimits()))
+        var quote = new LoanPricingService()
             .Quote(new LoanQuoteRequest(5_000m, 3, new DateTime(2026, 10, 25)), package);
 
         var loan = new Loan

@@ -43,6 +43,14 @@ public static class LoanOrigination
         loan.TotalRepayable = quote.TotalRepayable;
         loan.TotalCostOfCredit = quote.TotalCostOfCredit;
 
+        loan.ProductType = quote.ProductType;
+        loan.FuneralCover = quote.FuneralCover;
+        loan.ThirdPartyPayment = quote.ThirdPartyPayment;
+        loan.TotalVat = quote.TotalVat;
+        loan.VatRate = quote.VatRate;
+        loan.CreditCostMultiple = quote.CreditCostMultiple;
+        loan.FeeOverrideReason = quote.AppliedOverride?.Reason;
+
         loan.FirstCollectionDate = quote.Schedule.Count > 0 ? quote.Schedule[0].DueDate : null;
 
         return quote.Schedule
@@ -56,6 +64,7 @@ public static class LoanOrigination
                 CapitalPortion = r.CapitalPortion,
                 ServiceFee = r.ServiceFee,
                 CreditLifePremium = r.CreditLifePremium,
+                VatPortion = r.VatPortion,
                 InstalmentTotal = r.InstalmentTotal,
                 ClosingBalance = r.ClosingBalance
             })

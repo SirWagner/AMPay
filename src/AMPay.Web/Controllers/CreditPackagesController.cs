@@ -7,7 +7,6 @@ using AMPay.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace AMPay.Web.Controllers;
 
@@ -30,20 +29,21 @@ public class CreditPackagesController : Controller
 {
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
-    private readonly NcaCreditLimits _limits;
+    private readonly RegulatoryCapsProvider _capsProvider;
+    private RegulatoryCaps? _caps;
     private readonly PortalSync _portalSync;
     private readonly ILogger<CreditPackagesController> _log;
 
     public CreditPackagesController(
         AppDbContext db,
         ICurrentTenant tenant,
-        IOptions<NcaCreditLimits> limits,
+        RegulatoryCapsProvider capsProvider,
         PortalSync portalSync,
         ILogger<CreditPackagesController> log)
     {
         _db = db;
         _tenant = tenant;
-        _limits = limits.Value;
+        _capsProvider = capsProvider;
         _portalSync = portalSync;
         _log = log;
     }
@@ -66,7 +66,7 @@ public class CreditPackagesController : Controller
             .OrderBy(p => p.Tier).ThenBy(p => p.Name)
             .ToListAsync();
 
-        ViewBag.Limits = _limits;
+        ViewBag.Limits = await CapsAsync();
         ViewBag.CanManage = User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin);
         ViewBag.CustomerName = _tenant.TenantName;
         ViewBag.MissingTiers = CreditPackageDefaults
@@ -86,7 +86,7 @@ public class CreditPackagesController : Controller
         if (_tenant.TenantId is null) return RedirectToAction("Index", "Tenants");
 
         ViewData["Title"] = "New credit package";
-        ViewBag.Limits = _limits;
+        ViewBag.Limits = await CapsAsync();
         ViewBag.CustomerName = _tenant.TenantName;
 
         // Start from the Regular terms rather than a blank form: every field then holds a
@@ -111,7 +111,7 @@ public class CreditPackagesController : Controller
         var tenantId = _tenant.TenantId.Value;
 
         ViewData["Title"] = "New credit package";
-        ViewBag.Limits = _limits;
+        ViewBag.Limits = await CapsAsync();
         ViewBag.CustomerName = _tenant.TenantName;
 
         await ValidateAsync(model, tenantId, excludingId: null);
@@ -144,7 +144,7 @@ public class CreditPackagesController : Controller
         if (package is null) return NotFound();
 
         ViewData["Title"] = $"Edit {package.Name}";
-        ViewBag.Limits = _limits;
+        ViewBag.Limits = await CapsAsync();
         ViewBag.CustomerName = _tenant.TenantName;
 
         return View(ToModel(package));
@@ -158,7 +158,7 @@ public class CreditPackagesController : Controller
         if (package is null) return NotFound();
 
         ViewData["Title"] = $"Edit {package.Name}";
-        ViewBag.Limits = _limits;
+        ViewBag.Limits = await CapsAsync();
         ViewBag.CustomerName = _tenant.TenantName;
 
         await ValidateAsync(model, package.TenantId, excludingId: package.Id);
@@ -230,6 +230,9 @@ public class CreditPackagesController : Controller
     /// change when the gazette does.
     /// </para>
     /// </summary>
+    /// <summary>The caps in force today, excluding VAT.</summary>
+    private async Task<RegulatoryCaps> CapsAsync() => _caps ??= await _capsProvider.ForDateAsync(AMPay.Domain.Reporting.Sast.DateOf(DateTime.UtcNow));
+
     private async Task ValidateAsync(CreditPackageEditModel model, Guid tenantId, Guid? excludingId)
     {
         var name = model.Name?.Trim() ?? "";
@@ -260,17 +263,21 @@ public class CreditPackagesController : Controller
             ModelState.AddModelError(nameof(model.MaxTermMonths),
                 "The maximum term must be at least the minimum.");
 
-        if (model.MonthlyInterestPercent / 100m > _limits.MonthlyInterestCeiling)
+        var caps = await CapsAsync();
+
+        // The highest a package can carry: a first short-term loan. Repeat loans in the same year
+        // and unsecured loans are held lower when each loan is priced.
+        if (model.MonthlyInterestPercent / 100m > caps.ShortTermFirstLoanMonthlyRate)
             ModelState.AddModelError(nameof(model.MonthlyInterestPercent),
-                $"Interest cannot exceed the statutory maximum of {_limits.MonthlyInterestCeiling:P2} per month.");
+                $"Interest cannot exceed the statutory maximum of {caps.ShortTermFirstLoanMonthlyRate:P2} per month.");
 
-        if (model.MonthlyServiceFee > _limits.MonthlyServiceFeeCeiling)
+        if (model.MonthlyServiceFee > caps.MonthlyServiceFeeMax)
             ModelState.AddModelError(nameof(model.MonthlyServiceFee),
-                $"The service fee cannot exceed the statutory maximum of R {_limits.MonthlyServiceFeeCeiling:N2}.");
+                $"The service fee cannot exceed the statutory maximum of R {caps.MonthlyServiceFeeMax:N2}, excluding VAT.");
 
-        if (model.CreditLifePercent / 100m > _limits.CreditLifeCeilingRate)
+        if (model.CreditLifePercent / 100m > caps.CreditLifeMonthlyRateMax)
             ModelState.AddModelError(nameof(model.CreditLifePercent),
-                $"Credit life cannot exceed {_limits.CreditLifeCeilingRate:P2} of the balance per month.");
+                $"Credit life cannot exceed {caps.CreditLifeMonthlyRateMax:P2} of the balance per month.");
     }
 
     private static void Apply(CreditPackageEditModel model, CreditPackage package)

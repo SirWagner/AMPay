@@ -21,13 +21,13 @@ public class CreditPackageDefaultsTests
     [Fact]
     public void TheDefaults_AreWithinTheStatutoryCeilings()
     {
-        var limits = new NcaCreditLimits();
+        var limits = RegulatoryCaps.Statutory;
 
         Assert.All(CreditPackageDefaults.For(Tenant), p =>
         {
-            Assert.True(p.MonthlyInterestRate <= limits.MonthlyInterestCeiling, $"{p.Name} interest");
-            Assert.True(p.MonthlyServiceFee <= limits.MonthlyServiceFeeCeiling, $"{p.Name} service fee");
-            Assert.True(p.CreditLifeRate <= limits.CreditLifeCeilingRate, $"{p.Name} credit life");
+            Assert.True(p.MonthlyInterestRate <= limits.ShortTermFirstLoanMonthlyRate, $"{p.Name} interest");
+            Assert.True(p.MonthlyServiceFee <= limits.MonthlyServiceFeeMax, $"{p.Name} service fee");
+            Assert.True(p.CreditLifeRate <= limits.CreditLifeMonthlyRateMax, $"{p.Name} credit life");
             Assert.True(p.MinLoanAmount < p.MaxLoanAmount, $"{p.Name} loan range");
             Assert.True(p.MinTermMonths <= p.MaxTermMonths, $"{p.Name} term range");
         });

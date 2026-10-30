@@ -1,6 +1,6 @@
 @model AMPay.Web.Models.CreditPackageEditModel
 @{
-    var limits = (AMPay.Domain.Credit.NcaCreditLimits)ViewBag.Limits;
+    var limits = (AMPay.Domain.Credit.RegulatoryCaps)ViewBag.Limits;
     var customer = ViewBag.CustomerName as string;
     var isNew = Model.Id == Guid.Empty;
 }
@@ -70,13 +70,13 @@
                 <div class="field">
                     <label asp-for="MonthlyInterestPercent"></label>
                     <input asp-for="MonthlyInterestPercent" type="number" step="0.01" min="0" />
-                    <span class="hint">Statutory maximum @((limits.MonthlyInterestCeiling * 100m).ToString("N2"))%.</span>
+                    <span class="hint">Statutory maximum @((limits.ShortTermFirstLoanMonthlyRate * 100m).ToString("N2"))%.</span>
                     <span asp-validation-for="MonthlyInterestPercent" class="field-error"></span>
                 </div>
                 <div class="field">
                     <label asp-for="MonthlyServiceFee"></label>
                     <input asp-for="MonthlyServiceFee" type="number" step="0.01" min="0" />
-                    <span class="hint">VAT inclusive. Statutory maximum R @limits.MonthlyServiceFeeCeiling.ToString("N2").</span>
+                    <span class="hint">Excluding VAT (a VAT-registered lender adds 15%). Statutory maximum R @limits.MonthlyServiceFeeMax.ToString("N2").</span>
                     <span asp-validation-for="MonthlyServiceFee" class="field-error"></span>
                 </div>
                 <div class="field">
@@ -84,14 +84,14 @@
                     <input asp-for="InitiationFeePercent" type="number" step="0.01" min="0" />
                     <span class="hint">
                         Always reduced to the statutory maximum when it would exceed it &mdash;
-                        at most R @limits.InitiationFeeCeiling.ToString("N2").
+                        at most R @limits.InitiationFeeMax.ToString("N2").
                     </span>
                     <span asp-validation-for="InitiationFeePercent" class="field-error"></span>
                 </div>
                 <div class="field">
                     <label asp-for="CreditLifePercent"></label>
                     <input asp-for="CreditLifePercent" type="number" step="0.01" min="0" />
-                    <span class="hint">Of the outstanding balance. Statutory maximum @((limits.CreditLifeCeilingRate * 100m).ToString("N2"))%.</span>
+                    <span class="hint">Of the outstanding balance. Statutory maximum @((limits.CreditLifeMonthlyRateMax * 100m).ToString("N2"))%.</span>
                     <span asp-validation-for="CreditLifePercent" class="field-error"></span>
                 </div>
             </div>
