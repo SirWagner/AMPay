@@ -73,9 +73,8 @@ public class ClientBudget
 }
 
 /// <summary>
-/// Credit Check tab (Maxmoney calls this Compuscan). Records bureau enquiry history.
-/// <para>GAP: no bureau is wired up. Compuscan/Experian is a separate vendor contract,
-/// not part of the Netcash scope. See ICreditBureauClient.</para>
+/// Credit Check tab (Maxmoney calls this Compuscan): one bureau enquiry through Netcash risk
+/// reports, from request to the report PDF.
 /// </summary>
 public class ClientCreditEnquiry
 {
@@ -85,12 +84,37 @@ public class ClientCreditEnquiry
 
     public DateTime EnquiryDate { get; set; } = DateTime.UtcNow;
     public string? Bureau { get; set; }
+
+    /// <summary>Netcash's file token for collecting the report.</summary>
     public string? EnquiryReference { get; set; }
+
     public int? Score { get; set; }
+
+    /// <summary>What happened, in words: waiting for the bureau, report received, or why it failed.</summary>
     public string? Outcome { get; set; }
+
+    public CreditEnquiryStatus Status { get; set; } = CreditEnquiryStatus.Submitted;
+
+    /// <summary>The bureau reason code sent (32 = credit application).</summary>
+    public int? ReasonCode { get; set; }
+
+    /// <summary>When the operator recorded that the client consented to this enquiry.</summary>
+    public DateTime? ConsentRecordedUtc { get; set; }
+
     public string? RequestedByUserId { get; set; }
-    /// <summary>Base64 PDF or a blob pointer. Netcash RequestCreditDataReport returns Base64 PDF.</summary>
+
+    /// <summary>Where the report PDF is stored (private document store), once received.</summary>
     public string? ReportPointer { get; set; }
+
+    public DateTime? ReportReceivedUtc { get; set; }
+}
+
+public enum CreditEnquiryStatus
+{
+    /// <summary>Sent to Netcash; the bureau has not answered yet.</summary>
+    Submitted = 0,
+    ReportReceived = 1,
+    Failed = 2
 }
 
 /// <summary>Notes tab - diary notes against the client file.</summary>

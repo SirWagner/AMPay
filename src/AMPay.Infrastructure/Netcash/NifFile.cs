@@ -15,6 +15,15 @@ public static class NifField
     public const int AccountName = 102;
     /// <summary>AN13. SA ID number.</summary>
     public const int IdNumber = 111;
+
+    /// <summary>Risk reports: surname, no special characters.</summary>
+    public const int Surname = 113;
+
+    /// <summary>Risk reports: first name, no special characters.</summary>
+    public const int FirstName = 114;
+
+    /// <summary>Risk reports: the bureau enquiry reason code (32 = credit application).</summary>
+    public const int EnquiryReason = 450;
     /// <summary>N1. 0 = not an SA ID, 1 = SA ID and CDV validated.</summary>
     public const int IsIdNumber = 127;
     /// <summary>N1. 1 = bank account, 2 = credit card.</summary>
@@ -70,6 +79,12 @@ public static class NifInstruction
     public const string TwoDay = "TwoDay";
     /// <summary>Batch DebiCheck authentication (TT2 and delayed TT1).</summary>
     public const string DebiCheckAuthentication = "DebiCheckAuthentication";
+    /// <summary>Risk reports: TransUnion consumer credit check.</summary>
+    public const string TransUnionCreditCheck = "CD11";
+    /// <summary>Risk reports: Experian consumer credit check.</summary>
+    public const string ExperianCreditCheck = "CD12";
+    /// <summary>Risk reports: XDS consumer credit check.</summary>
+    public const string XdsCreditCheck = "CD13";
 }
 
 /// <summary>

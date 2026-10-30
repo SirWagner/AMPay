@@ -393,3 +393,57 @@ public class LivePayNowCallbackTests
         Assert.False(LiveNetcashPayNowService.Parse(Secret, Notify("AMP-1", "150.00", check)).Success);
     }
 }
+
+/// <summary>Credit checks through Netcash risk reports: the request file and the report answer.</summary>
+public class NetcashRiskReportTests
+{
+    [Fact]
+    public void TheRequestFile_FollowsTheRiskReportLayout()
+    {
+        var file = NetcashRiskReportService.BuildFile("svc-key", "vendor-key",
+            new CreditCheckRequest("0001", "8506155009085", "Test-Molefe!", "Lerato", CreditBureau.Experian), new DateTime(2026, 10, 30));
+        var lines = file.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Split('\t')).ToList();
+
+        Assert.Equal(new[] { "H", "svc-key", "1", "CD12", "CC-0001", "20261030", "vendor-key" }, lines[0]);
+        Assert.Equal(new[] { "K", "101", "111", "113", "114", "450" }, lines[1]);
+        Assert.Equal(new[] { "T", "0001", "8506155009085", "Test-Molefe", "Lerato", "32" }, lines[2]); // no special characters
+        Assert.Equal(new[] { "F", "1", "0", "9999" }, lines[3]);
+    }
+
+    [Theory]
+    [InlineData(CreditBureau.TransUnion, "CD11")]
+    [InlineData(CreditBureau.Experian, "CD12")]
+    [InlineData(CreditBureau.Xds, "CD13")]
+    public void EachBureau_HasItsInstruction(CreditBureau bureau, string instruction) =>
+        Assert.Equal(instruction, NetcashRiskReportService.Instruction(bureau));
+
+    private static string Answer(params string[] parts) =>
+        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><RequestCreditDataReportResponse xmlns=\"http://tempuri.org/\">" +
+        "<RequestCreditDataReportResult xmlns:a=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\">" +
+        string.Concat(parts.Select(p => $"<a:string>{p}</a:string>")) +
+        "</RequestCreditDataReportResult></RequestCreditDataReportResponse></s:Body></s:Envelope>";
+
+    [Fact]
+    public void FileNotReady_IsSuccessWithNoReportYet()
+    {
+        var r = NetcashRiskReportService.ParseReport(Answer("FILE NOT READY"));
+        Assert.True(r.Success);
+        Assert.Null(r.Data);
+    }
+
+    [Fact]
+    public void ABase64Pdf_IsDecoded_EvenWhenSplitAcrossStrings()
+    {
+        var b64 = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes("%PDF-1.4 a credit report"));
+        var r = NetcashRiskReportService.ParseReport(Answer(b64[..10], b64[10..]));
+        Assert.True(r.Success);
+        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(r.Data!));
+    }
+
+    [Fact]
+    public void AnErrorCode_OrSomethingThatIsNotAPdf_IsAFailure()
+    {
+        Assert.Equal("100", NetcashRiskReportService.ParseReport(Answer("100")).Code);
+        Assert.False(NetcashRiskReportService.ParseReport(Answer("Batch rejected: invalid reason code")).Success);
+    }
+}

@@ -30,6 +30,7 @@ public class ClientsController : Controller
     private readonly INetcashValidationService _validation;
     private readonly IAffordabilityService _affordability;
     private readonly AMPay.Domain.Documents.IDocumentStore _store;
+    private readonly ICreditBureauClient _bureau;
     private readonly ILogger<ClientsController> _log;
 
     public ClientsController(
@@ -38,6 +39,7 @@ public class ClientsController : Controller
         INetcashValidationService validation,
         IAffordabilityService affordability,
         AMPay.Domain.Documents.IDocumentStore store,
+        ICreditBureauClient bureau,
         ILogger<ClientsController> log)
     {
         _db = db;
@@ -45,6 +47,7 @@ public class ClientsController : Controller
         _validation = validation;
         _affordability = affordability;
         _store = store;
+        _bureau = bureau;
         _log = log;
     }
 
@@ -904,6 +907,120 @@ public class ClientsController : Controller
         return RedirectToAction(nameof(Details), new { id = client.Id });
     }
 
+    // ------------------------------------------------------------- credit check
+
+    [HttpGet]
+    public async Task<IActionResult> CreditCheck(Guid id)
+    {
+        var client = await LoadClientAsync(id, c => c.CreditEnquiries);
+        if (client is null) return NotFound();
+
+        // An enquiry still waiting gets one look each time the page opens - cheap, and the
+        // operator sees the report as soon as the bureau has answered.
+        foreach (var pending in client.CreditEnquiries.Where(e => e.Status == CreditEnquiryStatus.Submitted && e.EnquiryReference is not null))
+            await CollectReportAsync(client, pending);
+
+        ViewData["Title"] = "Credit check";
+        await PopulateWizardAsync(id, OnboardingStep.CreditCheck);
+        ViewBag.Client = client;
+        return View(client.CreditEnquiries.OrderByDescending(e => e.EnquiryDate).ToList());
+    }
+
+    /// <summary>
+    /// Sends a credit bureau enquiry through Netcash risk reports. Refused without the operator
+    /// recording the client's consent (NCA s81, POPIA): an enquiry marks the client's credit record.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreditCheck(Guid id, CreditBureau bureau, int reasonCode, bool consent)
+    {
+        var client = await LoadClientAsync(id, c => c.CreditEnquiries);
+        if (client is null) return NotFound();
+
+        if (!consent)
+        {
+            TempData["Error"] = "Record that the client consented to this credit check before sending it.";
+            return RedirectToAction(nameof(CreditCheck), new { id });
+        }
+        if (!client.IsSaIdNumber || !AMPay.Domain.Validation.SaIdNumber.IsValid(client.IdNumber))
+        {
+            TempData["Error"] = "A credit check needs a valid South African ID number on the client's file.";
+            return RedirectToAction(nameof(CreditCheck), new { id });
+        }
+        if (!CreditCheckReasons.ForLending.Any(r => r.Code == reasonCode))
+            reasonCode = CreditCheckReasons.CreditApplication;
+
+        var result = await _bureau.SubmitAsync(new CreditCheckRequest(
+            client.ClientNumber, client.IdNumber, client.Surname, client.FirstName, bureau, reasonCode));
+
+        var enquiry = new ClientCreditEnquiry
+        {
+            ClientId = client.Id,
+            Bureau = bureau.ToString(),
+            ReasonCode = reasonCode,
+            ConsentRecordedUtc = DateTime.UtcNow,
+            RequestedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+            EnquiryReference = result.Success ? result.Data : null,
+            Status = result.Success ? CreditEnquiryStatus.Submitted : CreditEnquiryStatus.Failed,
+            Outcome = result.Success ? "Waiting for the bureau" : result.Message
+        };
+        _db.ClientCreditEnquiries.Add(enquiry);
+        await _db.SaveChangesAsync();
+
+        if (result.Success)
+        {
+            await CollectReportAsync(client, enquiry); // some bureaus answer at once
+            TempData[enquiry.Status == CreditEnquiryStatus.ReportReceived ? "Success" : "Info"] =
+                enquiry.Status == CreditEnquiryStatus.ReportReceived
+                    ? "The credit report is in."
+                    : "Credit check sent. The report usually takes a minute - this page checks for it each time it opens.";
+        }
+        else
+        {
+            TempData["Error"] = result.Message ?? "The credit check could not be sent.";
+        }
+        return RedirectToAction(nameof(CreditCheck), new { id });
+    }
+
+    /// <summary>Opens a received credit report (PDF), for staff of the client's business only.</summary>
+    [HttpGet]
+    public async Task<IActionResult> CreditReport(Guid id, Guid enquiryId)
+    {
+        var client = await LoadClientAsync(id, c => c.CreditEnquiries);
+        var enquiry = client?.CreditEnquiries.FirstOrDefault(e => e.Id == enquiryId);
+        if (enquiry?.ReportPointer is null) return NotFound();
+
+        var stream = await _store.OpenAsync(enquiry.ReportPointer);
+        if (stream is null) return NotFound();
+
+        Response.Headers.CacheControl = "no-store";
+        return File(stream, "application/pdf");
+    }
+
+    /// <summary>Asks Netcash for the report once; stores it when it is in.</summary>
+    private async Task CollectReportAsync(Client client, ClientCreditEnquiry enquiry)
+    {
+        var report = await _bureau.FetchReportAsync(enquiry.EnquiryReference!);
+        if (!report.Success)
+        {
+            enquiry.Status = CreditEnquiryStatus.Failed;
+            enquiry.Outcome = report.Message;
+        }
+        else if (report.Data is { Length: > 0 } pdf)
+        {
+            var stored = await _store.SaveAsync(client.TenantId, client.Id, $"credit-report-{enquiry.Bureau}.pdf", new MemoryStream(pdf));
+            enquiry.ReportPointer = stored.StoragePath;
+            enquiry.ReportReceivedUtc = DateTime.UtcNow;
+            enquiry.Status = CreditEnquiryStatus.ReportReceived;
+            enquiry.Outcome = "Report received";
+        }
+        else
+        {
+            return; // not ready yet
+        }
+        await _db.SaveChangesAsync();
+    }
+
     // ------------------------------------------------------------- photograph
 
     /// <summary>Largest photo accepted. A phone camera shot is resized in the browser well below this.</summary>
@@ -1230,6 +1347,8 @@ public class ClientsController : Controller
         if (client.Addresses.Count > 0) done.Add(OnboardingStep.Address);
         if (client.OtherDetails is not null) done.Add(OnboardingStep.OtherDetails);
         if (await _db.ClientPhotos.AnyAsync(p => p.ClientId == clientId)) done.Add(OnboardingStep.Photo);
+        if (await _db.ClientCreditEnquiries.AnyAsync(e => e.ClientId == clientId && e.Status == CreditEnquiryStatus.ReportReceived))
+            done.Add(OnboardingStep.CreditCheck);
         if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0))
             done.Add(OnboardingStep.Budgets);
 
