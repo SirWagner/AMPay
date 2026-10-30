@@ -1,0 +1,28 @@
+@model Guid
+@{
+    var hasLogo = ViewBag.HasLogo as bool? ?? false;
+}
+<div class="card">
+    <div class="card-head"><h3>Logo <span class="muted small">(optional)</span></h3></div>
+    <div class="card-body logo-field">
+        <div class="logo-preview" id="logoPreviewBox" @(hasLogo ? "" : "hidden")>
+            <img id="logoPreview" alt="Logo preview" src="@(hasLogo && Model != Guid.Empty ? $"/logo/{Model}?v={DateTime.UtcNow.Ticks}" : "")" />
+        </div>
+        <div class="field">
+            <label for="logo">@(hasLogo ? "Replace the logo" : "Upload the business's logo")</label>
+            <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" />
+            <span class="hint">PNG, JPG or WebP, up to 300 KB. Shown in their Loan Flow, on their self-service page and on agreements. They can change it later under Branding.</span>
+            
+            @Html.ValidationMessage("logo", new { @class = "field-error" })
+        </div>
+    </div>
+</div>
+<script>
+    document.getElementById('logo').addEventListener('change', function (e) {
+        var file = e.target.files[0], box = document.getElementById('logoPreviewBox');
+        if (!file) return;
+        if (file.size > 300 * 1024) { alert('That logo is over 300 KB. Use a smaller file.'); e.target.value = ''; return; }
+        document.getElementById('logoPreview').src = URL.createObjectURL(file);
+        box.hidden = false;
+    });
+</script>

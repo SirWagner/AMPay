@@ -29,6 +29,7 @@ public class ClientsController : Controller
     private readonly ICurrentTenant _tenant;
     private readonly INetcashValidationService _validation;
     private readonly IAffordabilityService _affordability;
+    private readonly AMPay.Domain.Documents.IDocumentStore _store;
     private readonly ILogger<ClientsController> _log;
 
     public ClientsController(
@@ -36,12 +37,14 @@ public class ClientsController : Controller
         ICurrentTenant tenant,
         INetcashValidationService validation,
         IAffordabilityService affordability,
+        AMPay.Domain.Documents.IDocumentStore store,
         ILogger<ClientsController> log)
     {
         _db = db;
         _tenant = tenant;
         _validation = validation;
         _affordability = affordability;
+        _store = store;
         _log = log;
     }
 
@@ -901,6 +904,144 @@ public class ClientsController : Controller
         return RedirectToAction(nameof(Details), new { id = client.Id });
     }
 
+    // ------------------------------------------------------------- photograph
+
+    /// <summary>Largest photo accepted. A phone camera shot is resized in the browser well below this.</summary>
+    public const int MaxPhotoBytes = 5 * 1024 * 1024;
+
+    [HttpGet]
+    public async Task<IActionResult> Photo(Guid id)
+    {
+        var client = await LoadClientAsync(id, c => c.Photo);
+        if (client is null) return NotFound();
+
+        ViewData["Title"] = "Photograph";
+        await PopulateWizardAsync(id, OnboardingStep.Photo);
+        ViewBag.Client = client;
+        return View();
+    }
+
+    /// <summary>
+    /// Saves the client's photograph, from the camera (a data URL the page captured) or an
+    /// uploaded file. The bytes decide what it is; anything that is not a JPEG, PNG or WebP image
+    /// is refused. It is stored privately, like the identity documents.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(MaxPhotoBytes * 2)]
+    public async Task<IActionResult> Photo(Guid id, IFormFile? file, string? captured)
+    {
+        var client = await LoadClientAsync(id, c => c.Photo);
+        if (client is null) return NotFound();
+
+        byte[]? bytes = null;
+        if (!string.IsNullOrWhiteSpace(captured))
+        {
+            var comma = captured.IndexOf(',');
+            try { bytes = Convert.FromBase64String(comma >= 0 ? captured[(comma + 1)..] : captured); }
+            catch (FormatException) { bytes = null; }
+        }
+        else if (file is { Length: > 0 })
+        {
+            if (file.Length > MaxPhotoBytes)
+            {
+                TempData["Error"] = "That photo is over 5 MB. Use a smaller one or take it with the camera.";
+                return RedirectToAction(nameof(Photo), new { id });
+            }
+            await using var s = file.OpenReadStream();
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            bytes = ms.ToArray();
+        }
+
+        var contentType = bytes is { Length: > 0 and <= MaxPhotoBytes } ? TenantLogo.SniffContentType(bytes) : null;
+        if (contentType is null)
+        {
+            TempData["Error"] = "Take a photo with the camera, or upload a JPG, PNG or WebP picture of 5 MB or less.";
+            return RedirectToAction(nameof(Photo), new { id });
+        }
+
+        var extension = contentType switch { "image/png" => ".png", "image/webp" => ".webp", _ => ".jpg" };
+        var stored = await _store.SaveAsync(client.TenantId, client.Id, "photo" + extension, new MemoryStream(bytes!));
+
+        var oldPath = client.Photo?.StoragePath;
+        if (client.Photo is null)
+        {
+            client.Photo = new ClientPhoto { ClientId = client.Id };
+            _db.ClientPhotos.Add(client.Photo);
+        }
+        client.Photo.StoragePath = stored.StoragePath;
+        client.Photo.ContentType = contentType;
+        client.Photo.CapturedUtc = DateTime.UtcNow;
+        client.Photo.CapturedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        client.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        if (oldPath is not null && oldPath != stored.StoragePath) await _store.DeleteAsync(oldPath);
+
+        TempData["Success"] = "Photograph saved.";
+        return RedirectToAction(nameof(Summary), new { id });
+    }
+
+    /// <summary>The client's photo, for signed-in staff of that business only; never cached by the browser.</summary>
+    [HttpGet]
+    public async Task<IActionResult> PhotoImage(Guid id)
+    {
+        var client = await LoadClientAsync(id, c => c.Photo);
+        if (client?.Photo is null) return NotFound();
+
+        var stream = await _store.OpenAsync(client.Photo.StoragePath);
+        if (stream is null) return NotFound();
+
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(stream, client.Photo.ContentType ?? "image/jpeg");
+    }
+
+    // ------------------------------------------------------------- summary step
+
+    /// <summary>
+    /// The last step: everything captured on one page, what is still missing, and the button that
+    /// onboards the client once nothing required is.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Summary(Guid id)
+    {
+        var client = await _db.Clients
+            .Include(c => c.Employment)
+            .Include(c => c.Financial)
+            .Include(c => c.BankAccounts)
+            .Include(c => c.Addresses)
+            .Include(c => c.OtherDetails)
+            .Include(c => c.References)
+            .Include(c => c.Documents)
+            .Include(c => c.Photo)
+            .FirstOrDefaultAsync(c => c.Id == id);
+        if (client is null) return NotFound();
+
+        await _tenant.LoadAsync();
+        _tenant.EnsureCanAccess(client.TenantId);
+
+        ViewData["Title"] = "Summary";
+        await PopulateWizardAsync(id, OnboardingStep.Summary);
+
+        // What Activate will insist on, worked out the same way, so the page never promises more.
+        var missing = new List<string>();
+        if (client.BankAccounts.Count == 0) missing.Add("a bank account");
+        if (!client.Addresses.Any(a => !string.IsNullOrWhiteSpace(a.MobileNumber))) missing.Add("a mobile number");
+        if (client.OtherDetails?.DataProcessingConsent != true) missing.Add("POPIA consent");
+        foreach (var required in DocumentsController.Required)
+            if (!client.Documents.Any(d => d.DocumentType == required && d.ReviewStatus == DocumentReviewStatus.Approved))
+                missing.Add($"an accepted {DocumentsController.Describe(required).ToLowerInvariant()}");
+
+        ViewBag.Missing = missing;
+        var f = client.Financial;
+        ViewBag.NetOfNet = f is null ? null
+            : NetOfNetFor(f.GrossMonthlyIncome, f.NetMonthlyIncome, f.OtherIncome,
+                f.TotalMonthlyExpenses ?? 0m, f.TotalMonthlyDebtRepayments ?? 0m);
+        return View(client);
+    }
+
     // ------------------------------------------------------- remaining tabs
 
     /// <summary>
@@ -949,6 +1090,7 @@ public class ClientsController : Controller
             .Include(c => c.BankAccounts)
             .Include(c => c.Addresses)
             .Include(c => c.Mandates)
+            .Include(c => c.Photo)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (client is null) return NotFound();
@@ -1087,6 +1229,7 @@ public class ClientsController : Controller
         if (client.BankAccounts.Count > 0) done.Add(OnboardingStep.Banking);
         if (client.Addresses.Count > 0) done.Add(OnboardingStep.Address);
         if (client.OtherDetails is not null) done.Add(OnboardingStep.OtherDetails);
+        if (await _db.ClientPhotos.AnyAsync(p => p.ClientId == clientId)) done.Add(OnboardingStep.Photo);
         if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0))
             done.Add(OnboardingStep.Budgets);
 

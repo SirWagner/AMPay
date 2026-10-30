@@ -137,7 +137,9 @@ public class LiveNetcashValidationService : INetcashValidationService
         if (!_options.Live.Validation) return await _stub.ValidateBankAccountAsync(accountNumber, branchCode, accountType, ct);
 
         var key = await _keys.KeyAsync(_options.ValidationKeyService, ct);
-        if (key is null) return MissingKey<bool>(_options.ValidationKeyService);
+        // A business still waiting on its Netcash keys can capture clients: the format and check-digit
+        // test runs locally instead, and the account is verified against the bank later (AVS).
+        if (key is null) return await LocalOnly(_stub.ValidateBankAccountAsync(accountNumber, branchCode, accountType, ct), "bank account");
 
         var code = await CallStringAsync("ValidateBankAccount",
             El("ServiceKey", key) + El("AccountNumber", accountNumber.Trim()) + El("BranchCode", branchCode.Trim()) +
@@ -167,7 +169,7 @@ public class LiveNetcashValidationService : INetcashValidationService
             return NetcashResult<bool>.Fail(NetcashCodes.ParameterError, "South African ID number failed validation.");
 
         var key = await _keys.KeyAsync(_options.ValidationKeyService, ct);
-        if (key is null) return MissingKey<bool>(_options.ValidationKeyService);
+        if (key is null) return await LocalOnly(_stub.ValidateIdNumberAsync(idNumber, ct), "ID number");
 
         var code = await CallStringAsync("ValidateId", El("ServiceKey", key) + El("IdNumber", idNumber.Trim()), ct);
         if (code.Error is not null) return NetcashResult<bool>.Fail(NetcashCodes.GeneralServiceError, code.Error);
@@ -373,6 +375,13 @@ public class LiveNetcashValidationService : INetcashValidationService
     };
 
     private static string Normalise(string bank) => Regex.Replace(bank.ToUpperInvariant(), "[^A-Z0-9]", "");
+
+    /// <summary>The local check, logged as such, when the business has no Netcash key yet.</summary>
+    private async Task<NetcashResult<bool>> LocalOnly(Task<NetcashResult<bool>> local, string what)
+    {
+        _log.LogInformation("No Netcash validation key loaded for this business: {What} checked locally only.", what);
+        return await local;
+    }
 
     private static NetcashResult<T> MissingKey<T>(NetcashServiceId service) => NetcashResult<T>.Fail(NetcashCodes.NoActiveServiceKey,
         $"This business's Netcash {service} service key is not loaded, so the check was not sent. Load it on the Netcash service keys screen.");

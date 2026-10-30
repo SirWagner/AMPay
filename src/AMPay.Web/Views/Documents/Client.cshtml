@@ -79,16 +79,18 @@ else if (Model.ClientStatus == ClientStatus.PendingVerification)
                 </div>
 
                 <div class="field">
-                    <label for="file">File</label>
-                    <input type="file" id="file" name="file" required
+                    <label for="file">Files</label>
+                    <input type="file" id="file" name="file" required multiple
                            accept="@Model.AcceptedExtensions" />
                     <span class="muted small">
-                        @Model.AcceptedExtensions &middot; up to @Model.MaxFileSizeDisplay.
-                        A clear photograph of the original is acceptable.
+                        Drag files here, or browse. @Model.AcceptedExtensions &middot; up to @Model.MaxFileSizeDisplay each.
+                        A clear photograph of the original is acceptable. Each file is filed under the type chosen above.
                     </span>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Upload</button>
+                @* Without the drag-and-drop library (no script), the plain form still uploads one file. *@
+                <noscript><button type="submit" class="btn btn-primary">Upload</button></noscript>
+                <button type="submit" class="btn btn-primary" id="classicUpload" hidden>Upload</button>
             </form>
         </div>
     </div>
@@ -233,3 +235,73 @@ else if (Model.ClientStatus == ClientStatus.PendingVerification)
         </div>
     }
 </div>
+
+@if (Model.CanOpenClientFile)
+{
+    @section Scripts {
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/filepond@4.31.1/dist/filepond.min.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/filepond-plugin-image-preview@4.6.12/dist/filepond-plugin-image-preview.min.css" />
+        <script src="https://cdn.jsdelivr.net/npm/filepond-plugin-file-validate-size@2.2.8/dist/filepond-plugin-file-validate-size.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/filepond-plugin-file-validate-type@1.2.9/dist/filepond-plugin-file-validate-type.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/filepond-plugin-image-preview@4.6.12/dist/filepond-plugin-image-preview.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/filepond@4.31.1/dist/filepond.min.js"></script>
+        <script>
+        (function () {
+            var input = document.getElementById('file');
+            if (!input || !window.FilePond) {
+                // The library did not load (offline, blocked): fall back to the plain form.
+                var b = document.getElementById('classicUpload'); if (b) b.hidden = false;
+                if (input) input.removeAttribute('multiple');
+                return;
+            }
+
+            FilePond.registerPlugin(FilePondPluginFileValidateSize, FilePondPluginFileValidateType, FilePondPluginImagePreview);
+
+            // The types are set below as MIME types; the input's own ".pdf, .jpg" list would override them
+            // and, written with spaces, reject everything.
+            input.removeAttribute('accept');
+
+            var form = input.form;
+            var token = form.querySelector('input[name="__RequestVerificationToken"]').value;
+            var typeSelect = document.getElementById('documentType');
+            var uploaded = 0;
+
+            var pond = FilePond.create(input, {
+                name: 'file',
+                allowMultiple: true,
+                maxParallelUploads: 2,
+                credits: false,
+                storeAsFile: false,
+                maxFileSize: '@(Model.MaxFileSizeBytes / 1024 / 1024)MB',
+                acceptedFileTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'],
+                fileValidateTypeLabelExpectedTypes: 'PDF or a photograph',
+                labelIdle: '<strong>Drag documents here</strong> or <span class="filepond--label-action">browse</span>',
+                labelFileProcessingComplete: 'Uploaded - waiting for review',
+                labelTapToCancel: 'tap to cancel',
+                imagePreviewHeight: 120,
+                server: {
+                    process: {
+                        url: '@Url.Action("UploadOne", new { id = Model.ClientId })',
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': token },
+                        // The document type chosen when the file is dropped travels with it.
+                        ondata: function (data) { data.append('documentType', typeSelect.value); return data; },
+                        onload: function () { uploaded++; return uploaded; },
+                        onerror: function (body) {
+                            try { return JSON.parse(body).message; } catch (e) { return 'Upload failed'; }
+                        }
+                    },
+                    revert: null
+                },
+                labelFileProcessingError: function (error) { return error.body || 'Upload failed'; }
+            });
+
+            input.removeAttribute('required');
+            form.addEventListener('submit', function (e) { e.preventDefault(); });
+
+            // When every file has finished, refresh so the list and review status show them.
+            pond.on('processfiles', function () { if (uploaded > 0) setTimeout(function () { location.reload(); }, 900); });
+        })();
+        </script>
+    }
+}

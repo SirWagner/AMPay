@@ -114,21 +114,41 @@ public class DocumentsController : Controller
         var client = await LoadClientAsync(id);
         if (client is null) return NotFound();
 
+        var (ok, message) = await SaveUploadAsync(client, documentType, file);
+        TempData[ok ? "Success" : "Error"] = message;
+        return RedirectToAction(nameof(Client), new { id });
+    }
+
+    /// <summary>
+    /// The drag-and-drop uploader's endpoint: one file per request, answered in JSON so the page
+    /// can show each file's outcome without reloading. Same checks as <see cref="Upload"/>.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = AppPolicies.CanCapture)]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    public async Task<IActionResult> UploadOne(Guid id, DocumentType documentType, IFormFile? file)
+    {
+        var client = await LoadClientAsync(id);
+        if (client is null) return NotFound();
+
+        var (ok, message) = await SaveUploadAsync(client, documentType, file);
+        return ok ? Ok(new { ok, message }) : BadRequest(new { ok, message });
+    }
+
+    private async Task<(bool Ok, string Message)> SaveUploadAsync(Client client, DocumentType documentType, IFormFile? file)
+    {
         if (file is null || file.Length == 0)
-        {
-            TempData["Error"] = "Choose a file to upload.";
-            return RedirectToAction(nameof(Client), new { id });
-        }
+            return (false, "Choose a file to upload.");
+
+        if (documentType == DocumentType.SignedAgreement)
+            return (false, "A signed agreement is recorded from its contract page.");
 
         // Content type is a client-supplied header, so it is a courtesy check only - the
         // extension allow-list in the store is what actually constrains what lands on disk.
         if (!string.IsNullOrEmpty(file.ContentType) &&
             !_options.AllowedContentTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
-        {
-            TempData["Error"] =
-                $"{file.ContentType} is not an accepted document type. Upload a PDF or a photograph.";
-            return RedirectToAction(nameof(Client), new { id });
-        }
+            return (false, $"{file.ContentType} is not an accepted document type. Upload a PDF or a photograph.");
 
         StoredDocument stored;
         try
@@ -138,11 +158,10 @@ public class DocumentsController : Controller
         }
         catch (InvalidOperationException ex)
         {
-            TempData["Error"] = ex.Message;
-            return RedirectToAction(nameof(Client), new { id });
+            return (false, ex.Message);
         }
 
-        var document = new ClientDocument
+        _db.ClientDocuments.Add(new ClientDocument
         {
             ClientId = client.Id,
             DocumentType = documentType,
@@ -153,9 +172,7 @@ public class DocumentsController : Controller
             ContentHash = stored.ContentHash,
             UploadedByUserId = _users.GetUserId(User),
             ReviewStatus = DocumentReviewStatus.Pending
-        };
-
-        _db.ClientDocuments.Add(document);
+        });
 
         // Uploading the last outstanding document is what moves a client into the queue.
         await MoveToPendingVerificationIfReadyAsync(client);
@@ -165,8 +182,7 @@ public class DocumentsController : Controller
         _log.LogInformation(
             "Document {Type} uploaded for client {ClientNumber}.", documentType, client.ClientNumber);
 
-        TempData["Success"] = $"{Describe(documentType)} uploaded and sent for verification.";
-        return RedirectToAction(nameof(Client), new { id });
+        return (true, $"{Describe(documentType)} uploaded and sent for verification.");
     }
 
     // ---------------------------------------------------------------- retrieval
