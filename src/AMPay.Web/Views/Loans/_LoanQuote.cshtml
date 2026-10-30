@@ -1,0 +1,169 @@
+@using static AMPay.Domain.Contracts.ContractFormat
+@using AMPay.Infrastructure.Contracts
+@model LoanQuotesPanel
+@{
+    var current = Model.Current;
+    var history = Model.Quotes.Where(q => current is null || q.Id != current.Id).ToList();
+    var link = TempData["QuoteLink"] as string;
+    var snapshot = current is null ? null : QuoteService.ReadSnapshot(current);
+    var canIssue = Model.CanCapture && Model.LoanStatus == LoanStatus.Approved && !Model.AgreementSigned;
+    var consents = QuoteService.Consents(Model.Lender);
+
+    (string Css, string Label) Badge(QuoteStatus s) => s switch
+    {
+        QuoteStatus.Accepted => ("badge-green", "Accepted"),
+        QuoteStatus.Declined => ("badge-red", "Declined"),
+        QuoteStatus.Expired => ("badge-grey", "Expired"),
+        QuoteStatus.Voided => ("badge-grey", "Voided"),
+        QuoteStatus.Viewed => ("badge-navy", "Opened by client"),
+        QuoteStatus.Sent => ("badge-amber", "Sent"),
+        _ => ("badge-amber", "Not sent")
+    };
+}
+
+@if (Model.LoanStatus is LoanStatus.Approved or LoanStatus.Disbursed || Model.Quotes.Count > 0)
+{
+    <div class="card" id="quote">
+        <div class="card-head flex-between">
+            <h3>Quote</h3>
+            @if (current is not null)
+            {
+                var b = Badge(current.Status);
+                <span class="badge @b.Css">@b.Label</span>
+            }
+        </div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(link))
+            {
+                <div class="alert alert-info">
+                    <strong>Quote link for the client</strong> &mdash; shown once. Copy it now to send it another way (WhatsApp, for example).
+                    Sending again creates a new link and stops this one.
+                    <div class="contract-link">
+                        <input id="quoteLink" type="text" readonly value="@link" aria-label="Quote link" />
+                        <button type="button" class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(document.getElementById('quoteLink').value); this.textContent='Copied';">Copy</button>
+                    </div>
+                </div>
+            }
+
+            @if (current is null || snapshot is null)
+            {
+                <p class="mb-0">
+                    No quote has been issued. The client must accept a quote, binding for five business days, before the
+                    credit agreement can be issued.
+                </p>
+            }
+            else
+            {
+                <p>
+                    <span class="mono">@current.Reference</span> issued @SastTime(current.CreatedUtc)
+                    &middot; @Money(snapshot.Quote.TotalRepayable) repayable in @snapshot.Quote.NumberOfInstalments × @Money(snapshot.Quote.InstalmentAmount)
+                </p>
+                @switch (current.Status)
+                {
+                    case QuoteStatus.Accepted:
+                        <p class="mb-0">
+                            Accepted @SastTime(current.AcceptedUtc!.Value)
+                            @(current.AcceptanceMethod == QuoteAcceptanceMethod.OnlineOtp
+                                ? "online with a PIN to " + MaskMobile(current.AcceptedMobile)
+                                : "in the branch")
+                        </p>
+                        break;
+                    case QuoteStatus.Declined:
+                        <p class="mb-0">Declined @SastTime(current.DeclinedUtc!.Value): <em>@current.DeclineReason</em></p>
+                        break;
+                    case QuoteStatus.Expired:
+                        <p class="mb-0">Expired @SastTime(current.ValidUntilUtc) without an answer. Issue a new quote if the client still wants the loan.</p>
+                        break;
+                    default:
+                        <p class="muted small mb-0">
+                            Binding until @SastTime(current.ValidUntilUtc).
+                            @if (current.SentUtc is not null) { <text>Sent @SastTime(current.SentUtc.Value) by @current.SentChannels.</text> }
+                            @if (current.FirstViewedUtc is not null) { <text>Opened @SastTime(current.FirstViewedUtc.Value).</text> }
+                        </p>
+                        break;
+                }
+
+                @if (current.IsOpen && Model.CanCapture)
+                {
+                    <hr />
+                    @if (Model.MessagesStubbed)
+                    {
+                        <div class="stub-banner small">No SMS or email provider is connected yet. Messages are recorded under <em>Messages sent</em> and not delivered.</div>
+                    }
+                    <form asp-controller="Quotes" asp-action="Send" asp-route-id="@current.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <label class="check"><input type="checkbox" name="sms" value="true" checked /> SMS to @(snapshot.Borrower.Mobile ?? "no cell number on file")</label>
+                        <label class="check"><input type="checkbox" name="email" value="true" checked /> Email to @(snapshot.Borrower.Email ?? "no email on file")</label>
+                        <p class="muted small">The client reads the quote and accepts it with three ticks and a PIN sent to their cell, or declines it.</p>
+                        <button type="submit" class="btn btn-primary">@(current.SentUtc is null ? "Send quote to client" : "Send again (new link)")</button>
+                    </form>
+
+                    <details style="margin-top:1rem;">
+                        <summary class="small">The client accepted in the branch</summary>
+                        <form asp-controller="Quotes" asp-action="AcceptInBranch" asp-route-id="@current.Id" method="post" style="margin-top:.5rem;">
+                            @Html.AntiForgeryToken()
+                            <p class="muted small">Read the quote to the client, give them a printed copy, and tick each statement only once they confirm it.</p>
+                            @for (var i = 0; i < consents.Count; i++)
+                            {
+                                <label class="check consent">
+                                    <input type="checkbox" name="consent" value="@i" required />
+                                    <span>@consents[i]</span>
+                                </label>
+                            }
+                            <button type="submit" class="btn btn-outline" style="margin-top:.5rem;">Record acceptance</button>
+                        </form>
+                    </details>
+                }
+            }
+
+            @if (history.Count > 0)
+            {
+                <details style="margin-top:.75rem;">
+                    <summary class="small">Earlier quotes (@history.Count)</summary>
+                    <ul class="small">
+                        @foreach (var h in history)
+                        {
+                            var hb = Badge(h.Status);
+                            <li>
+                                <span class="mono">@h.Reference</span> &middot; <span class="badge @hb.Css">@hb.Label</span>
+                                @if (h.VoidReason is not null) { <span class="muted">&middot; @h.VoidReason</span> }
+                                @if (h.DeclineReason is not null) { <span class="muted">&middot; @h.DeclineReason</span> }
+                            </li>
+                        }
+                    </ul>
+                </details>
+            }
+        </div>
+        @if (canIssue || (current is not null && Model.CanDecide && !Model.AgreementSigned))
+        {
+            <div class="card-foot contract-actions">
+                @if (canIssue)
+                {
+                    <form asp-controller="Quotes" asp-action="Issue" asp-route-loanId="@Model.LoanId" method="post">
+                        @Html.AntiForgeryToken()
+                        @if (current is null)
+                        {
+                            <button type="submit" class="btn btn-primary">Issue quote</button>
+                        }
+                        else
+                        {
+                            <button type="submit" class="btn btn-outline"
+                                    onclick="return confirm('Issue a new quote? The current quote, and any unsigned agreement, will be voided.');">Issue new quote</button>
+                        }
+                    </form>
+                }
+                @if (current is not null && Model.CanDecide && !Model.AgreementSigned)
+                {
+                    <details>
+                        <summary class="btn btn-outline btn-sm">Void quote</summary>
+                        <form asp-controller="Quotes" asp-action="Void" asp-route-id="@current.Id" method="post" style="margin-top:.5rem;">
+                            @Html.AntiForgeryToken()
+                            <input name="reason" maxlength="500" placeholder="Why is the quote being voided?" required />
+                            <button type="submit" class="btn btn-danger btn-sm">Void</button>
+                        </form>
+                    </details>
+                }
+            </div>
+        }
+    </div>
+}

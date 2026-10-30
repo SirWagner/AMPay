@@ -53,6 +53,14 @@ public record ContractSnapshot
         JsonSerializer.Deserialize<ContractSnapshot>(json, Json)
         ?? throw new InvalidOperationException("The contract snapshot could not be read.");
 
+    /// <summary>
+    /// Fingerprint of the money and the schedule only - not the wording, the parties or the
+    /// quote date. Equal fingerprints on a quote and an agreement prove the agreement carries
+    /// the terms the client accepted.
+    /// </summary>
+    public string TermsFingerprint() =>
+        HashOf(JsonSerializer.Serialize(new { Quote = Quote with { QuoteDate = default }, Schedule }, Json));
+
     /// <summary>SHA-256 of the exact JSON stored, hex. Recompute and compare to prove integrity.</summary>
     public static string HashOf(string json) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();

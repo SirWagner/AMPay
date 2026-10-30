@@ -72,55 +72,12 @@
     <section>
         <h3>2. Quote and cost of credit</h3>
         <p class="muted small">Quote dated @Date(q.QuoteDate). This quote is binding on the credit provider for five business days.</p>
-        <table class="data quote-table contract-quote">
-            <tbody>
-            <tr><td class="code">(a)</td><td>Loan amount paid to you</td><td class="num">@Money(q.LoanAmount)</td></tr>
-            <tr><td class="code">(b)</td><td>Optional family funeral insurance paid on your behalf</td><td class="num">@Money(q.FuneralInsurance)</td></tr>
-            <tr><td class="code">(c)</td><td>Optional payment to a third party on your behalf</td><td class="num">@Money(q.ThirdPartyPayment)</td></tr>
-            <tr class="sub"><td class="code">(d)</td><td>Total loan amount (a) + (b) + (c)</td><td class="num">@Money(q.TotalLoanAmount)</td></tr>
-            <tr><td class="code">(f.1)</td><td>Credit life insurance premium</td><td class="num">@Money(q.CreditLife)</td></tr>
-            <tr><td class="code">(f.2)</td><td>Initiation fee</td><td class="num">@Money(q.InitiationFee)</td></tr>
-            <tr><td class="code">(f.3)</td><td>Service fees</td><td class="num">@Money(q.ServiceFees)</td></tr>
-            <tr><td class="code">(f.4)</td><td>Interest</td><td class="num">@Money(q.Interest)</td></tr>
-            <tr><td class="code">(f.5)</td><td>VAT</td><td class="num">@Money(q.Vat)</td></tr>
-            <tr class="sub"><td class="code">(e)</td><td>Total cost of credit (f.1) to (f.5)</td><td class="num">@Money(q.TotalCostOfCredit)</td></tr>
-            <tr class="total"><td class="code">(g)</td><td>Total amount repayable (d) + (e)</td><td class="num">@Money(q.TotalRepayable)</td></tr>
-            <tr><td class="code">(h)</td><td>Interest rate</td><td class="num">@Percent(q.MonthlyInterestRate) a month (@Percent(q.AnnualInterestRate) a year)</td></tr>
-            <tr><td class="code">(i)</td><td>Interest rate on arrears</td><td class="num">@Percent(q.PenaltyInterestRate) a month</td></tr>
-            <tr><td class="code">(j)</td><td>Instalments</td><td class="num">@q.NumberOfInstalments × @Money(q.InstalmentAmount)@(q.FinalInstalmentAmount != 0 && q.FinalInstalmentAmount != q.InstalmentAmount ? ", final " + Money(q.FinalInstalmentAmount) : "")</td></tr>
-            <tr><td class="code"></td><td>Frequency and method</td><td class="num">@q.Frequency, @q.PaymentMethod</td></tr>
-            <tr><td class="code"></td><td>First and final payment</td><td class="num">@Date(q.FirstPaymentDate) to @Date(q.FinalPaymentDate)</td></tr>
-            <tr><td class="code">(l)</td><td>Credit cost multiple (g) / (d)</td><td class="num">@q.CreditCostMultiple.ToString("N2")</td></tr>
-            </tbody>
-        </table>
+        <partial name="_QuoteCostTable" model="q" />
     </section>
 
     <section>
         <h3>3. Payment schedule</h3>
-        <div class="table-wrap">
-            <table class="data">
-                <thead>
-                <tr>
-                    <th>#</th><th>Due</th><th class="num">Instalment</th><th class="num">Interest</th>
-                    <th class="num">Capital</th><th class="num">Service fee</th><th class="num">Credit life</th><th class="num">Balance</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach (var l in s.Schedule)
-                {
-                    <tr>
-                        <td>@l.Number</td><td>@Date(l.DueDate)</td>
-                        <td class="num"><strong>@l.Instalment.ToString("N2")</strong></td>
-                        <td class="num">@l.Interest.ToString("N2")</td>
-                        <td class="num">@l.Capital.ToString("N2")</td>
-                        <td class="num">@l.ServiceFee.ToString("N2")</td>
-                        <td class="num">@l.CreditLife.ToString("N2")</td>
-                        <td class="num">@l.ClosingBalance.ToString("N2")</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
+        <partial name="_PaymentScheduleTable" model="s.Schedule" />
     </section>
 
     @if (Terms(ContractTemplateKind.CreditAgreementTerms) is { } terms)

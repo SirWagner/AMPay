@@ -2,7 +2,8 @@
 @{
     var current = Model.Current;
     var history = Model.Contracts.Where(c => current is null || c.Id != current.Id).ToList();
-    var canIssue = Model.CanCapture && Model.LoanStatus == LoanStatus.Approved && current?.Status != ContractStatus.Signed;
+    var canIssue = Model.CanCapture && Model.LoanStatus == LoanStatus.Approved && current?.Status != ContractStatus.Signed
+                   && Model.QuoteAccepted;
 }
 
 @if (Model.LoanStatus is LoanStatus.Approved or LoanStatus.Disbursed || Model.Contracts.Count > 0)
@@ -22,6 +23,10 @@
                     No contract has been issued. Issuing freezes the quote, payment schedule, budget, credit life and the
                     DebiCheck mandate details into one pack for the client to read and sign.
                 </p>
+                @if (!Model.QuoteAccepted && Model.LoanStatus == LoanStatus.Approved)
+                {
+                    <p class="muted small" style="margin:.5rem 0 0;">The client must accept the quote above first.</p>
+                }
             }
             else
             {

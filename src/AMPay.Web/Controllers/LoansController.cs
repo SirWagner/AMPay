@@ -39,6 +39,7 @@ public class LoansController : Controller
     private readonly IAffordabilityService _affordability;
     private readonly UserManager<ApplicationUser> _users;
     private readonly ContractService _contracts;
+    private readonly QuoteService _quotes;
     private readonly LoanLedgerService _ledger;
     private readonly PricingContext _pricingContext;
     private readonly ILogger<LoansController> _log;
@@ -50,6 +51,7 @@ public class LoansController : Controller
         IAffordabilityService affordability,
         UserManager<ApplicationUser> users,
         ContractService contracts,
+        QuoteService quotes,
         LoanLedgerService ledger,
         PricingContext pricingContext,
         ILogger<LoansController> log)
@@ -60,6 +62,7 @@ public class LoansController : Controller
         _affordability = affordability;
         _users = users;
         _contracts = contracts;
+        _quotes = quotes;
         _ledger = ledger;
         _pricingContext = pricingContext;
         _log = log;
@@ -354,16 +357,40 @@ public class LoansController : Controller
         ViewBag.CanDecide = canDecide;
         ViewBag.CanCapture = canDecide || User.IsInRole(AppRoles.Capturer);
 
+        var contracts = await _db.LoanContracts.AsNoTracking()
+            .Where(c => c.LoanId == loan.Id)
+            .OrderByDescending(c => c.Issue)
+            .ToListAsync();
+
+        var quotes = await _db.CreditQuotes
+            .Where(q => q.LoanId == loan.Id)
+            .OrderByDescending(q => q.Issue)
+            .ToListAsync();
+        foreach (var q in quotes) await _quotes.ExpireIfDueAsync(q);
+
+        var lender = await _db.Tenants.Where(t => t.Id == loan.TenantId)
+            .Select(t => t.TradingName ?? t.Name).FirstAsync();
+
+        ViewBag.Quotes = new LoanQuotesPanel
+        {
+            LoanId = loan.Id,
+            LoanStatus = loan.Status,
+            Quotes = quotes,
+            Lender = lender,
+            CanCapture = (bool)ViewBag.CanCapture,
+            CanDecide = canDecide,
+            MessagesStubbed = _quotes.MessagesAreStubbed,
+            AgreementSigned = contracts.Any(c => c.Status == ContractStatus.Signed)
+        };
+
         ViewBag.Contracts = new LoanContractsPanel
         {
             LoanId = loan.Id,
             LoanStatus = loan.Status,
-            Contracts = await _db.LoanContracts.AsNoTracking()
-                .Where(c => c.LoanId == loan.Id)
-                .OrderByDescending(c => c.Issue)
-                .ToListAsync(),
+            Contracts = contracts,
             CanCapture = (bool)ViewBag.CanCapture,
-            CanDecide = canDecide
+            CanDecide = canDecide,
+            QuoteAccepted = quotes.Any(q => q.Status == QuoteStatus.Accepted)
         };
 
         return View(loan);
@@ -545,6 +572,7 @@ public class LoansController : Controller
 
         loan.Status = LoanStatus.Cancelled;
         await _contracts.VoidOpenForLoanAsync(loan.Id, "The loan was cancelled.", _users.GetUserId(User));
+        await _quotes.VoidOpenForLoanAsync(loan.Id, "The loan was cancelled.", _users.GetUserId(User));
         await _db.SaveChangesAsync();
 
         TempData["Success"] = $"Loan {loan.LoanNumber} cancelled.";

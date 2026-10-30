@@ -205,6 +205,35 @@ public enum ContractStatus
     Voided = 4
 }
 
+/// <summary>Where a loan's quote is in its life. The agreement can be issued only from an accepted quote.</summary>
+public enum QuoteStatus
+{
+    /// <summary>Frozen, not yet sent.</summary>
+    Issued = 0,
+    /// <summary>Link sent to the client.</summary>
+    Sent = 1,
+    /// <summary>The client has opened the link.</summary>
+    Viewed = 2,
+    /// <summary>Accepted online with a PIN, or in the branch. Final.</summary>
+    Accepted = 3,
+    /// <summary>The client said no. Final.</summary>
+    Declined = 4,
+    /// <summary>Five business days passed without an answer.</summary>
+    Expired = 5,
+    /// <summary>Withdrawn by the lender - terms changed, loan cancelled.</summary>
+    Voided = 6
+}
+
+/// <summary>How a quote was accepted.</summary>
+public enum QuoteAcceptanceMethod
+{
+    None = 0,
+    /// <summary>On the quote page, with a PIN sent to the client's cell.</summary>
+    OnlineOtp = 1,
+    /// <summary>In the branch, recorded by staff.</summary>
+    InBranch = 2
+}
+
 /// <summary>How a contract was signed.</summary>
 public enum SignatureMethod
 {

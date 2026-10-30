@@ -1,0 +1,151 @@
+@using static AMPay.Domain.Contracts.ContractFormat
+@model QuotePageModel
+@{
+    Layout = "_PublicLayout";
+    var basePath = "/q/" + Uri.EscapeDataString(Model.Token);
+    var q = Model.Quote;
+    var s = Model.Snapshot;
+    var cost = s.Quote;
+    var contact = Model.LenderContact is null ? "" : " on " + Model.LenderContact;
+}
+
+<div class="page-head">
+    <h1 style="font-size:1.35rem;">Your loan quote</h1>
+    <p class="lede">
+        Hello @s.Borrower.FullName. This is exactly what your loan with @Model.Lender will cost.
+        Accept it to receive your credit agreement, or decline it.
+    </p>
+</div>
+
+@if (Model.Stubbed)
+{
+    <div class="stub-banner small" style="margin-bottom:1rem;">
+        Test system: no SMS is really sent. Staff can read the PIN under Messages sent in AM-Pay.
+    </div>
+}
+
+<div class="quote-summary">
+    <div><span class="muted small">You receive</span><strong>@Money(cost.LoanAmount)</strong></div>
+    <div><span class="muted small">Instalments</span><strong>@cost.NumberOfInstalments × @Money(cost.InstalmentAmount)</strong></div>
+    <div><span class="muted small">Total repayable</span><strong>@Money(cost.TotalRepayable)</strong></div>
+</div>
+
+<div class="card">
+    <div class="card-head flex-between">
+        <h3>Quote <span class="mono">@q.Reference</span></h3>
+        <span class="muted small">Dated @Date(cost.QuoteDate)</span>
+    </div>
+    <div class="card-body">
+        @if (q.IsOpen)
+        {
+            <p class="small">
+                This quote is binding on @Model.Lender until <strong>@SastTime(q.ValidUntilUtc)</strong> (five business days).
+                Accepting it does not sign anything yet: your credit agreement follows for you to read and sign.
+            </p>
+        }
+        <partial name="_QuoteCostTable" model="cost" />
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><h3>Payment schedule</h3></div>
+    <partial name="_PaymentScheduleTable" model="s.Schedule" />
+</div>
+
+<div class="card sign-panel" id="answer">
+    <div class="card-head"><h3>Your answer</h3></div>
+    <div class="card-body">
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-error" role="alert">@Model.Error</div>
+        }
+        @if (Model.Notice is not null)
+        {
+            <div class="alert alert-success" role="status">@Model.Notice</div>
+        }
+
+        @if (q.Status == QuoteStatus.Accepted)
+        {
+            <p class="mb-0">You accepted this quote on @SastTime(q.AcceptedUtc!.Value). @Model.Lender will send your credit agreement to sign.</p>
+        }
+        else if (q.Status == QuoteStatus.Declined)
+        {
+            <p class="mb-0">You declined this quote on @SastTime(q.DeclinedUtc!.Value).</p>
+        }
+        else if (q.Status == QuoteStatus.Expired)
+        {
+            <p class="mb-0">This quote expired on @SastTime(q.ValidUntilUtc). Contact @Model.Lender@contact if you still want the loan.</p>
+        }
+        else
+        {
+            @if (!Model.CanAcceptOnline)
+            {
+                <p>
+                    This quote cannot be accepted online because there is no cell number on it.
+                    Contact @Model.Lender@contact to accept it in the branch.
+                </p>
+            }
+            else
+            {
+                <ol class="steps">
+                    <li>Ask for a one-time PIN. It is sent by SMS to @Model.MaskedMobile.</li>
+                    <li>Tick the three boxes, enter the PIN and accept.</li>
+                </ol>
+
+                <form action="@basePath/pin" method="post" style="margin:.75rem 0 1rem;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn @(Model.PinSent ? "btn-outline" : "btn-primary")">
+                        @(Model.PinSent ? "Send a new PIN" : "Send me a PIN")
+                    </button>
+                </form>
+
+                @if (Model.PinSent)
+                {
+                    <form action="@basePath/accept" method="post" class="quote-accept">
+                        @Html.AntiForgeryToken()
+                        @for (var i = 0; i < Model.Consents.Count; i++)
+                        {
+                            <label class="check consent">
+                                <input type="checkbox" name="consent" value="@i" required />
+                                <span>@Model.Consents[i]</span>
+                            </label>
+                        }
+                        <div class="field" style="max-width:14rem;margin-top:.75rem;">
+                            <label for="pin">PIN</label>
+                            <input id="pin" name="pin" class="pin-input" inputmode="numeric" autocomplete="one-time-code"
+                                   maxlength="6" pattern="\d{6}" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg">Accept quote</button>
+                    </form>
+                }
+            }
+
+            <details class="quote-decline">
+                <summary>I do not want this loan</summary>
+                <form action="@basePath/decline" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="field">
+                        <label for="reason">Why are you declining?</label>
+                        <select id="reason" name="reason" required>
+                            <option value="">Choose a reason</option>
+                            @foreach (var r in AMPay.Infrastructure.Contracts.QuoteService.DeclineReasons)
+                            {
+                                <option value="@r">@r</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="detail">Anything to add (needed for "Other")</label>
+                        <textarea id="detail" name="detail" rows="2" maxlength="400"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-outline"
+                            onclick="return confirm('Decline this quote? You will need a new quote if you change your mind.');">Decline quote</button>
+                </form>
+            </details>
+        }
+
+        <p class="muted small" style="margin-top:1rem;margin-bottom:0;">
+            If you did not apply for credit with @Model.Lender, do not accept. Contact them@(contact).
+        </p>
+    </div>
+</div>

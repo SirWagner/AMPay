@@ -1503,3 +1503,13 @@ label.check { display: inline-flex; align-items: center; gap: .45rem; font-weigh
     /* A table not already in a scroll box scrolls inside its card, not the whole page. */
     .card-body > table.data { display: block; overflow-x: auto; }
 }
+
+/* ---- Quote page ---- */
+.quote-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); gap: .75rem; margin-bottom: 1rem; }
+.quote-summary > div { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .75rem 1rem; display: flex; flex-direction: column; gap: .15rem; }
+.quote-summary strong { font-size: 1.15rem; }
+label.check.consent { display: flex; align-items: flex-start; margin: .4rem 0; line-height: 1.45; }
+label.check.consent input { margin-top: .25rem; flex: none; }
+.quote-decline { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: .75rem; }
+.quote-decline summary { cursor: pointer; color: var(--text-muted); }
+.quote-decline form { margin-top: .75rem; max-width: 28rem; }

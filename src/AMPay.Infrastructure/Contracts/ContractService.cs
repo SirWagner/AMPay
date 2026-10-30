@@ -6,6 +6,7 @@ using AMPay.Domain.Documents;
 using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Domain.Messaging;
+using AMPay.Domain.Reporting;
 using AMPay.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -93,6 +94,66 @@ public class ContractService
         if (loan.Status != LoanStatus.Approved)
             throw new ContractException("A contract can be issued only for an approved loan that has not been paid out.");
 
+        var quote = await _db.CreditQuotes.AsNoTracking()
+            .Where(q => q.LoanId == loan.Id && q.Status == QuoteStatus.Accepted)
+            .OrderByDescending(q => q.Issue)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new ContractException(
+                "The client has not accepted a quote for this loan. Issue the quote and have the client accept it first.");
+
+        var previous = await _db.LoanContracts
+            .Where(c => c.LoanId == loan.Id)
+            .ToListAsync(ct);
+
+        var issue = previous.Count == 0 ? 1 : previous.Max(c => c.Issue) + 1;
+        var reference = $"{loan.LoanNumber}/{issue}";
+        var now = DateTime.UtcNow;
+
+        var snapshot = await BuildSnapshotAsync(loan, reference, now, ct);
+
+        // The agreement must carry the terms the client accepted, to the cent and the day.
+        if (snapshot.TermsFingerprint() != quote.TermsHash)
+            throw new ContractException(
+                $"The loan's terms have changed since the client accepted quote {quote.Reference}. " +
+                "Issue a new quote for the client to accept.");
+
+        snapshot = snapshot with { Quote = snapshot.Quote with { QuoteDate = Sast.DateOf(quote.CreatedUtc) } };
+
+        foreach (var open in previous.Where(c => c.IsOpen))
+            Void(open, "Replaced by a newly issued contract.", userId, now);
+
+        var json = snapshot.ToJson();
+
+        var contract = new LoanContract
+        {
+            TenantId = loan.TenantId,
+            LoanId = loan.Id,
+            ClientId = loan.ClientId,
+            Reference = reference,
+            Issue = issue,
+            Status = ContractStatus.Issued,
+            SnapshotJson = json,
+            SnapshotHash = ContractSnapshot.HashOf(json),
+            TemplatesApproved = snapshot.TemplatesApproved,
+            CreatedUtc = now,
+            CreatedByUserId = userId
+        };
+
+        _db.LoanContracts.Add(contract);
+        await _db.SaveChangesAsync(ct);
+
+        _log.LogInformation("Contract {Reference} issued from quote {Quote}{Draft}.",
+            reference, quote.Reference, snapshot.TemplatesApproved ? "" : " with draft wording");
+
+        return contract;
+    }
+
+    /// <summary>
+    /// Everything a pack shows, from the loan as it stands now. Shared with quotes so a quote
+    /// and the agreement issued from it are built by the same code.
+    /// </summary>
+    internal async Task<ContractSnapshot> BuildSnapshotAsync(Loan loan, string reference, DateTime now, CancellationToken ct)
+    {
         var client = await _db.Clients
             .AsSplitQuery()
             .Include(c => c.Employment)
@@ -118,44 +179,8 @@ public class ContractService
         (AffordabilityInput, AffordabilityResult)? budget =
             input is null ? null : (input, _affordability.Assess(input));
 
-        var previous = await _db.LoanContracts
-            .Where(c => c.LoanId == loan.Id)
-            .ToListAsync(ct);
-
-        var now = DateTime.UtcNow;
-        foreach (var open in previous.Where(c => c.IsOpen))
-            Void(open, "Replaced by a newly issued contract.", userId, now);
-
-        var issue = previous.Count == 0 ? 1 : previous.Max(c => c.Issue) + 1;
-        var reference = $"{loan.LoanNumber}/{issue}";
-
-        var snapshot = ContractSnapshotBuilder.Build(new ContractSnapshotBuilder.Inputs(
+        return ContractSnapshotBuilder.Build(new ContractSnapshotBuilder.Inputs(
             loan, client, tenant, templates, budget, reference, now));
-
-        var json = snapshot.ToJson();
-
-        var contract = new LoanContract
-        {
-            TenantId = loan.TenantId,
-            LoanId = loan.Id,
-            ClientId = client.Id,
-            Reference = reference,
-            Issue = issue,
-            Status = ContractStatus.Issued,
-            SnapshotJson = json,
-            SnapshotHash = ContractSnapshot.HashOf(json),
-            TemplatesApproved = snapshot.TemplatesApproved,
-            CreatedUtc = now,
-            CreatedByUserId = userId
-        };
-
-        _db.LoanContracts.Add(contract);
-        await _db.SaveChangesAsync(ct);
-
-        _log.LogInformation("Contract {Reference} issued{Draft}.",
-            reference, snapshot.TemplatesApproved ? "" : " with draft wording");
-
-        return contract;
     }
 
     // ---------------------------------------------------------------- send

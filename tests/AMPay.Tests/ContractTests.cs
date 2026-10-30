@@ -343,10 +343,11 @@ public class ContractTests
     // Anchored on " is ": the agreement reference (LN-000001) also contains six digits.
     private static string PinIn(string body) => Regex.Match(body, @" is (\d{6})\.").Groups[1].Value;
 
-    private static async Task<(AppDbContext Db, ContractService Svc, Loan Loan)> ArrangeAsync(
+    internal static async Task<(AppDbContext Db, ContractService Svc, Loan Loan)> ArrangeAsync(
         LoanStatus status = LoanStatus.Approved,
         decimal creditLifeRate = 0.0045m,
-        IMessageSender? sender = default)
+        IMessageSender? sender = default,
+        bool acceptQuote = true)
     {
         var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase($"contracts-{Guid.NewGuid()}")
@@ -441,6 +442,14 @@ public class ContractTests
             messages,
             new MemoryDocumentStore(),
             NullLogger<ContractService>.Instance);
+
+        // An agreement is issued only from an accepted quote: accept one in the branch, as staff would.
+        if (acceptQuote && status == LoanStatus.Approved)
+        {
+            var quotes = new QuoteService(db, svc, messages, NullLogger<QuoteService>.Instance);
+            var accepted = await quotes.IssueAsync(loan.Id, "user-1");
+            await quotes.RecordInBranchAsync(accepted.Id, new[] { 0, 1, 2 }, "user-1");
+        }
 
         return (db, svc, loan);
     }
