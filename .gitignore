@@ -15,3 +15,6 @@ folder/*mandate*.pdf
 
 # Local-only settings with test credentials (Netcash test keys). Never commit.
 appsettings.Local.json
+
+# Client documents and private reference material - never commit (the repo is public).
+folder/

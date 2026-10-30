@@ -169,7 +169,7 @@ public class LiveNetcashValidationTests
         Assert.True(r.Success);
         Assert.Equal(new[] { "ABSA", "CAPITEC BANK", "TYMEBANK" }, r.Data!.Select(b => b.Name));
         Assert.All(r.Data!, b => Assert.True(b.SupportsDebiCheck));
-        Assert.All(r.Data, b => Assert.Null(b.DefaultBranchCode));
+        Assert.All(r.Data!, b => Assert.Null(b.DefaultBranchCode));
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class LiveNetcashValidationTests
 
         Assert.True(r.Success);
         Assert.Equal("632005", r.Data!.Single(b => b.Name == "ABSA").DefaultBranchCode);
-        Assert.Equal("470010", r.Data.Single(b => b.Name == "CAPITEC BANK").DefaultBranchCode);
+        Assert.Equal("470010", r.Data!.Single(b => b.Name == "CAPITEC BANK").DefaultBranchCode);
     }
 
     [Fact]
