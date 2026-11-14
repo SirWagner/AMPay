@@ -1,0 +1,113 @@
+@using AMPay.Domain.Contracts
+@using AMPay.Web.Controllers
+@model LoanWordingEditModel
+@{
+    var locked = Model.LockedReason is not null;
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@Model.Title</h1>
+        <p class="lede">
+            For @Model.ClientName, loan <span class="mono">@Model.LoanNumber</span>.
+            @ContractTemplatesController.Describe(Model.Kind)
+        </p>
+    </div>
+    <a asp-action="Index" asp-route-loanId="@Model.LoanId" class="btn btn-outline">All sections</a>
+</div>
+
+@if (locked)
+{
+    <div class="alert alert-info">@Model.LockedReason</div>
+}
+@if (ViewBag.Extracted is string extracted)
+{
+    <div class="alert alert-info">
+        The text of <strong>@extracted</strong> is in the box below. <strong>It is not saved yet.</strong>
+        Read it through, fix anything the upload got wrong, then save.
+    </div>
+}
+
+@if (!locked)
+{
+    <form asp-action="Extract" asp-route-loanId="@Model.LoanId" asp-route-kind="@Model.Kind" method="post"
+          enctype="multipart/form-data" class="card">
+        <div class="card-head"><h3>Upload a document for this client</h3></div>
+        <div class="card-body">
+            <div class="field">
+                <label for="file">Word document or text file</label>
+                <input type="file" id="file" name="file" required
+                       accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" />
+                <span class="hint">
+                    The text is pulled out and put in the editor below for you to check and change. Formatting does not
+                    come across. A PDF cannot be read reliably: save it as Word first.
+                </span>
+            </div>
+            <label class="check">
+                <input type="checkbox" name="append" value="true" />
+                <span>Add it to the end of the current wording instead of replacing it</span>
+            </label>
+        </div>
+        <div class="card-foot">
+            <button type="submit" class="btn btn-outline">Extract the text</button>
+        </div>
+    </form>
+}
+
+<form asp-action="Edit" method="post">
+    <input type="hidden" asp-for="LoanId" />
+    <input type="hidden" asp-for="Kind" />
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="field">
+                <label asp-for="Title"></label>
+                <input asp-for="Title" readonly="@locked" />
+                <span asp-validation-for="Title" class="field-error"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Body"></label>
+                <textarea asp-for="Body" class="template-body" spellcheck="true" readonly="@locked"></textarea>
+                <span class="hint">
+                    @(Model.IsOwn ? "This is this client's own version." : "This is your standard wording. Change it and save to make a version for this client only.")
+                    Plain text. Leave a blank line between paragraphs.
+                </span>
+                <span asp-validation-for="Body" class="field-error"></span>
+            </div>
+            <div class="field">
+                <label asp-for="Reason"></label>
+                <input asp-for="Reason" readonly="@locked" placeholder="e.g. Settlement discount agreed with the client on 14 November" />
+                <span class="hint">Kept with the loan, so a one-off term can be explained later.</span>
+                <span asp-validation-for="Reason" class="field-error"></span>
+            </div>
+            @if (!locked)
+            {
+                <label class="check" style="display:flex;">
+                    <input asp-for="Approved" type="checkbox" />
+                    <span>
+                        This wording, exactly as it is here, is approved for use with this client.
+                        <span class="muted small" style="display:block;">Without this the contract is watermarked DRAFT. Changing the text later clears it.</span>
+                    </span>
+                </label>
+            }
+        </div>
+        @if (!locked)
+        {
+            <div class="card-foot">
+                <button type="submit" class="btn btn-primary">Save for this client</button>
+                <a asp-action="Index" asp-route-loanId="@Model.LoanId" class="btn btn-outline">Cancel</a>
+            </div>
+        }
+    </div>
+</form>
+
+<partial name="_MergeFields" />
+
+@if (Model.IsOwn || ViewBag.Extracted is string)
+{
+    <details class="card" style="padding:1rem 1.25rem;">
+        <summary><strong>Your standard wording for this section</strong> <span class="muted small">(for comparison)</span></summary>
+        <div style="white-space:pre-line;margin-top:.75rem;" class="small">@Model.StandardBody</div>
+    </details>
+}

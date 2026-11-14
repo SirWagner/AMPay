@@ -255,7 +255,9 @@ public enum ContractTemplateKind
     CreditAgreementTerms = 0,
     DebitOrderAuthorisation = 1,
     BudgetAcknowledgement = 2,
-    CreditLifeDisclosure = 3
+    CreditLifeDisclosure = 3,
+    /// <summary>What the borrower declares on the face of the agreement, above the quote.</summary>
+    BorrowerDeclarations = 4
 }
 
 /// <summary>How a message reaches the client.</summary>

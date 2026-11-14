@@ -60,6 +60,7 @@ public class MigraDocContractRenderer : IContractRenderer
 
         Heading(sec, s);
         Parties(sec, s);
+        Terms(sec, s, nameof(ContractTemplateKind.BorrowerDeclarations));
         Quote(sec, s);
         Schedule(sec, s);
         Terms(sec, s, nameof(ContractTemplateKind.CreditAgreementTerms));

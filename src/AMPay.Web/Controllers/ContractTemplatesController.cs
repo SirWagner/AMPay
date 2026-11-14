@@ -102,6 +102,13 @@ public class ContractTemplatesController : Controller
         _tenant.EnsureCanAccess(t.TenantId);
 
         ViewData["Title"] = t.Title;
+
+        var unknown = AMPay.Domain.Contracts.ContractMergeFields.Unknown(model.Body);
+        if (unknown.Count > 0)
+            ModelState.AddModelError(nameof(model.Body),
+                "These fields do not exist: " + string.Join(", ", unknown.Select(u => "{{" + u + "}}")) +
+                ". Use the fields listed under the editor, or remove the double braces.");
+
         if (!ModelState.IsValid)
         {
             model.Kind = t.Kind;
@@ -231,6 +238,7 @@ public class ContractTemplatesController : Controller
         ContractTemplateKind.DebitOrderAuthorisation => "Printed under the DebiCheck mandate details.",
         ContractTemplateKind.BudgetAcknowledgement => "Printed under the client's budget and NET of NET.",
         ContractTemplateKind.CreditLifeDisclosure => "Printed when the loan carries credit life insurance.",
+        ContractTemplateKind.BorrowerDeclarations => "What the borrower declares, printed above the quote.",
         _ => ""
     };
 }

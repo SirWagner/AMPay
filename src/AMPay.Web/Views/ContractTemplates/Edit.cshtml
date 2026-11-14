@@ -73,6 +73,8 @@
     </div>
 </form>
 
+<partial name="_MergeFields" />
+
 @if (!Model.IsApproved)
 {
     <form asp-action="Approve" asp-route-id="@Model.Id" method="post" class="card" style="padding:1rem 1.25rem;">

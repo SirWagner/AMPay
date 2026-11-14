@@ -69,6 +69,11 @@
         </div>
     </section>
 
+    @if (Terms(ContractTemplateKind.BorrowerDeclarations) is { } declarations)
+    {
+        <section class="contract-terms"><h3>@declarations.Title</h3>@Paras(declarations.Body)</section>
+    }
+
     <section>
         <h3>2. Quote and cost of credit</h3>
         <p class="muted small">Quote dated @Date(q.QuoteDate). This quote is binding on the credit provider for five business days.</p>

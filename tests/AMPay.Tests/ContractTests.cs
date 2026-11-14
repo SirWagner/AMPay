@@ -46,8 +46,8 @@ public class ContractTests
 
         // Placeholder wording is seeded on first issue and is never approved.
         Assert.False(contract.TemplatesApproved);
-        Assert.Equal(4, s.Terms.Count);
-        Assert.Equal(4, await db.ContractTemplates.CountAsync());
+        Assert.Equal(5, s.Terms.Count);
+        Assert.Equal(5, await db.ContractTemplates.CountAsync());
     }
 
     [Fact]

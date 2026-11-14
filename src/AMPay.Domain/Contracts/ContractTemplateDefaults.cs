@@ -17,6 +17,32 @@ public static class ContractTemplateDefaults
 {
     public static IReadOnlyList<ContractTemplate> For(Guid tenantId) => new[]
     {
+        Make(tenantId, ContractTemplateKind.BorrowerDeclarations, "Borrower's declarations", """
+            DRAFT WORDING - to be reviewed and replaced by the credit provider's attorney before use.
+
+            I, the borrower, acknowledge and declare that:
+
+            1. This agreement is subject to the terms and conditions set out in this document.
+
+            2. I applied to {{Lender.RegisteredName}} for the loan described in the quote below.
+
+            3. If I accept the quote, I owe {{Lender.RegisteredName}} the total amount repayable shown in it, {{Cost.TotalRepayable}}.
+
+            4. I am not under administration and have not started any process to be placed under administration.
+
+            5. I am not insolvent and no process that could lead to my insolvency has been started.
+
+            6. I am not over-indebted and have not applied for debt review.
+
+            7. I can afford the {{Schedule.InstalmentCount}} instalment(s) of {{Schedule.InstalmentAmount}} shown in the payment schedule.
+
+            8. I know that I may take up to five business days to consider the quote before signing, and that if I sign within that time the agreement is concluded at or below the interest rate and costs quoted.
+
+            9. This agreement is in a language I chose and understand, and its meaning has been explained to me.
+
+            10. I agree that {{Lender.RegisteredName}} may obtain my credit record from a registered credit bureau and may report how I conduct this account to registered credit bureaux.
+            """),
+
         Make(tenantId, ContractTemplateKind.CreditAgreementTerms, "Terms and conditions", """
             DRAFT WORDING - to be reviewed and replaced by the credit provider's attorney before use.
 

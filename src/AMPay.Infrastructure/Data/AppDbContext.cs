@@ -42,6 +42,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
     public DbSet<LoanContract> LoanContracts => Set<LoanContract>();
+    public DbSet<LoanWording> LoanWordings => Set<LoanWording>();
     public DbSet<CreditQuote> CreditQuotes => Set<CreditQuote>();
     public DbSet<OutboundMessage> OutboundMessages => Set<OutboundMessage>();
 
@@ -246,6 +247,18 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.HasIndex(x => new { x.FollowUpOn, x.FollowUpDoneUtc });
             e.HasOne(x => x.Client).WithMany(c => c.Notes)
                 .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<LoanWording>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Body).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.ApprovedByUserId).HasMaxLength(64);
+            e.Property(x => x.UpdatedByUserId).HasMaxLength(64);
+            e.HasIndex(x => new { x.LoanId, x.Kind }).IsUnique();
+            e.HasOne(x => x.Loan).WithMany()
+                .HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<Employer>(e =>

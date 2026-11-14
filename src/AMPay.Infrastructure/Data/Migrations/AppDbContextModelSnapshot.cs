@@ -1860,6 +1860,56 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("LoanScheduleEntries");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.LoanWording", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ApprovedByUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("ApprovedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoanId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("LoanWordings");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.MandateEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3024,6 +3074,17 @@ namespace AMPay.Infrastructure.Data.Migrations
                 {
                     b.HasOne("AMPay.Domain.Entities.Loan", "Loan")
                         .WithMany("Schedule")
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Loan");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.LoanWording", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Loan", "Loan")
+                        .WithMany()
                         .HasForeignKey("LoanId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
