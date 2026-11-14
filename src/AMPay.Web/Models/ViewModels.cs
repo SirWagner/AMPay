@@ -110,7 +110,9 @@ public enum OnboardingStep
     Documents = 12,
     Photo = 13,
     /// <summary>The last step: everything captured, on one page, before the client is onboarded.</summary>
-    Summary = 14
+    Summary = 14,
+    /// <summary>The lender's own pre-screen, run before the paid credit check is allowed.</summary>
+    GoodToGo = 15
 }
 
 public static class OnboardingSteps
@@ -128,14 +130,17 @@ public static class OnboardingSteps
         (OnboardingStep.General,      "General",       "General"),
         (OnboardingStep.Employment,   "Employment",    "Employment"),
         (OnboardingStep.Financial,    "Financial",     "Financial"),
+        (OnboardingStep.Budgets,      "Budgets",       "Budgets"),
         (OnboardingStep.Banking,      "Banking",       "Banking"),
         (OnboardingStep.Address,      "Address",       "Address"),
         (OnboardingStep.OtherDetails, "Other details", "OtherDetails"),
         (OnboardingStep.References,   "References",    "References"),
-        (OnboardingStep.Budgets,      "Budgets",       "Budgets"),
-        (OnboardingStep.CreditCheck,  "Credit check",  "CreditCheck"),
         (OnboardingStep.Notes,        "Notes",         "Notes"),
+        // From here the order is the lender's rule, not Maxmoney's: score the client on what
+        // is on file, only then ask for documents, and run the paid bureau check last of all.
+        (OnboardingStep.GoodToGo,     "Good to go",    "GoodToGo"),
         (OnboardingStep.Documents,    "Documents",     "Documents"),
+        (OnboardingStep.CreditCheck,  "Credit check",  "CreditCheck"),
         (OnboardingStep.Photo,        "Photograph",    "Photo"),
         (OnboardingStep.Summary,      "Summary",       "Summary")
     };
@@ -210,8 +215,30 @@ public class EmploymentStepModel
 {
     public Guid ClientId { get; set; }
 
+    /// <summary>The employer picked from the lender's list. Empty when a new one is typed.</summary>
+    [Display(Name = "Employer")]
+    public Guid? EmployerId { get; set; }
+
     [Display(Name = "Employer name"), StringLength(200)]
     public string? EmployerName { get; set; }
+
+    [Display(Name = "Pay point"), StringLength(100)]
+    public string? PayPoint { get; set; }
+
+    [Display(Name = "Pay-point number"), StringLength(50)]
+    public string? PayPointNumber { get; set; }
+
+    [Display(Name = "Other employer reference"), StringLength(50)]
+    public string? OtherEmployerReference { get; set; }
+
+    [Display(Name = "Contract expiry date"), DataType(DataType.Date)]
+    public DateTime? ContractExpiryDate { get; set; }
+
+    [Display(Name = "Years at previous employer"), Range(0, 60)]
+    public int? YearsAtPreviousEmployer { get; set; }
+
+    [Display(Name = "No work telephone")]
+    public bool WorkTelephoneNotAvailable { get; set; }
 
     [StringLength(100)]
     public string? Occupation { get; set; }
@@ -650,6 +677,9 @@ public class ClientDocumentsModel
 
     public long MaxFileSizeBytes { get; set; }
     public string AcceptedExtensions { get; set; } = "";
+
+    /// <summary>Income and budget are in. Until then the upload form is not offered.</summary>
+    public bool AffordabilityCaptured { get; set; }
 
     public List<Row> Documents { get; set; } = new();
 

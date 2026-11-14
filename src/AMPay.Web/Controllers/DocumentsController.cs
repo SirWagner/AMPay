@@ -36,6 +36,7 @@ public class DocumentsController : Controller
     private readonly ICurrentTenant _tenant;
     private readonly UserManager<ApplicationUser> _users;
     private readonly DocumentStorageOptions _options;
+    private readonly AMPay.Infrastructure.Credit.ScreeningService _screening;
     private readonly ILogger<DocumentsController> _log;
 
     public DocumentsController(
@@ -44,8 +45,10 @@ public class DocumentsController : Controller
         ICurrentTenant tenant,
         UserManager<ApplicationUser> users,
         IOptions<DocumentStorageOptions> options,
+        AMPay.Infrastructure.Credit.ScreeningService screening,
         ILogger<DocumentsController> log)
     {
+        _screening = screening;
         _db = db;
         _store = store;
         _tenant = tenant;
@@ -143,6 +146,11 @@ public class DocumentsController : Controller
 
         if (documentType == DocumentType.SignedAgreement)
             return (false, "A signed agreement is recorded from its contract page.");
+
+        // Documents are asked for only once the client's income and budget show there is
+        // something to lend against: nobody should hand over an ID copy for a loan they cannot have.
+        if (!await _screening.AffordabilityCapturedAsync(client.Id))
+            return (false, "Capture the client's income and budget on the Financial step first. Documents are uploaded after the affordability assessment.");
 
         // Content type is a client-supplied header, so it is a courtesy check only - the
         // extension allow-list in the store is what actually constrains what lands on disk.
@@ -299,6 +307,9 @@ public class DocumentsController : Controller
         var clientId = document.ClientId;
 
         await _store.DeleteAsync(document.StoragePath);
+        // An assessment of a statement that is gone describes nothing.
+        _db.BankStatementAssessments.RemoveRange(
+            await _db.BankStatementAssessments.Where(a => a.DocumentId == document.Id).ToListAsync());
         _db.ClientDocuments.Remove(document);
         await _db.SaveChangesAsync();
 
@@ -401,7 +412,8 @@ public class DocumentsController : Controller
             Outstanding = Required
                 .Where(t => !client.Documents.Any(d =>
                     d.DocumentType == t && d.ReviewStatus != DocumentReviewStatus.Rejected))
-                .ToList()
+                .ToList(),
+            AffordabilityCaptured = await _screening.AffordabilityCapturedAsync(client.Id)
         };
     }
 
@@ -474,6 +486,7 @@ public class DocumentsController : Controller
         DocumentType.SignedAgreement => "Signed credit agreement",
         DocumentType.Photograph => "Photograph",
         DocumentType.CreditReport => "Credit bureau report",
+        DocumentType.BankStatement => "Bank statement",
         _ => "Other document"
     };
 }

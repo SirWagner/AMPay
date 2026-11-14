@@ -183,6 +183,8 @@ public enum DocumentType
     Photograph = 7,
     /// <summary>A credit bureau report (Compuscan, Experian) attached to an enquiry.</summary>
     CreditReport = 8,
+    /// <summary>Three months of the client's bank statements, for the AI money-behaviour assessment.</summary>
+    BankStatement = 9,
     Other = 99
 }
 

@@ -3,6 +3,9 @@
     var wizard = ViewBag.Wizard as AMPay.Web.Models.WizardContext;
     var isNew = Model.ClientId is null;
     ViewData["Title"] = isNew ? "New client" : "General details";
+    ViewData["PhotoUrl"] = wizard is not null && wizard.CompletedSteps.Contains(OnboardingStep.Photo)
+        ? Url.Action("PhotoImage", new { id = Model.ClientId, v = DateTime.UtcNow.Ticks })
+        : null;
 }
 
 <div class="page-head">
@@ -20,7 +23,7 @@
     }
 
     <div>
-        <form asp-action="General" method="post">
+        <form asp-action="General" method="post" enctype="multipart/form-data">
             <input type="hidden" asp-for="ClientId" />
             <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
 
@@ -130,6 +133,13 @@
                             </select>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Photograph</h2></div>
+                <div class="card-body">
+                    <partial name="_PhotoField" />
                 </div>
                 <div class="card-foot">
                     <button type="submit" class="btn btn-primary">

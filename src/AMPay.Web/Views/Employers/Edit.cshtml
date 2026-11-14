@@ -1,0 +1,88 @@
+@model EmployerEditModel
+@{
+    var isNew = Model.Id is null;
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>@(isNew ? "Add an employer" : Model.Name)</h1>
+        <p class="lede">These details fill in by themselves when a capturer picks this employer for a client.</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline">All employers</a>
+</div>
+
+<form asp-action="Edit" method="post">
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+    <div class="card">
+        <div class="card-head"><h2>Employer</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="Name"></label>
+                    <input asp-for="Name" />
+                    <span asp-validation-for="Name" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="PayPoint"></label>
+                    <input asp-for="PayPoint" />
+                    <span class="hint">The branch or site that pays, when the employer has more than one. Each pay point is its own entry.</span>
+                </div>
+                <div class="field">
+                    <label asp-for="Telephone"></label>
+                    <input asp-for="Telephone" type="tel" />
+                    <span class="hint">The number your staff phone to confirm someone works there.</span>
+                </div>
+                <div class="field">
+                    <label asp-for="ContactPerson"></label>
+                    <input asp-for="ContactPerson" />
+                </div>
+                <div class="field">
+                    <label asp-for="EmailAddress"></label>
+                    <input asp-for="EmailAddress" type="email" />
+                    <span asp-validation-for="EmailAddress" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Address"></label>
+                    <input asp-for="Address" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><h2>Pay cycle</h2></div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="field">
+                    <label asp-for="PayFrequency"></label>
+                    <select asp-for="PayFrequency">
+                        <option value="">&mdash;</option>
+                        @foreach (var f in new[] { "Monthly", "Fortnightly", "Weekly" })
+                        {
+                            <option value="@f">@f</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="SalaryDay"></label>
+                    <input asp-for="SalaryDay" type="number" min="1" max="31" />
+                    <span asp-validation-for="SalaryDay" class="field-error"></span>
+                </div>
+            </div>
+            <label class="check" style="display:flex;margin-top:.5rem;">
+                <input asp-for="IsVerified" type="checkbox" />
+                <span>We have confirmed this employer exists and the number above is right</span>
+            </label>
+            <label class="check" style="display:flex;margin-top:.5rem;">
+                <input asp-for="IsActive" type="checkbox" />
+                <span>Show in the employer list when capturing a client (clear this to hide a duplicate; clients already linked keep it)</span>
+            </label>
+        </div>
+        <div class="card-foot">
+            <button type="submit" class="btn btn-primary">Save employer</button>
+            <a asp-action="Index" class="btn btn-outline">Cancel</a>
+        </div>
+    </div>
+</form>

@@ -67,6 +67,12 @@ public class Tenant
     /// <summary>Business days after payout during which the client may still cancel. Five is the usual.</summary>
     public int CoolingOffBusinessDays { get; set; } = 5;
 
+    /// <summary>
+    /// Days after which a client's good-to-go result is stale and is run again by itself. Facts move
+    /// without anyone touching the file: a contract ends, an instalment goes unpaid, a birthday passes.
+    /// </summary>
+    public int ScreeningRecheckDays { get; set; } = 30;
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedUtc { get; set; }
 

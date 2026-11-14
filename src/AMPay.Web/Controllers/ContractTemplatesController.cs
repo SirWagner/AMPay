@@ -142,6 +142,55 @@ public class ContractTemplatesController : Controller
         return RedirectToAction(nameof(Edit), new { id = t.Id });
     }
 
+    /// <summary>
+    /// Pulls the text out of an uploaded Word or text file and shows it in the editor, unsaved,
+    /// for the lender to check and edit. Nothing changes until they press Save wording - and
+    /// saving withdraws the approval as any other edit does.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(DocumentText.MaxBytes + 64 * 1024)]
+    public async Task<IActionResult> Extract(Guid id, IFormFile? file, bool append)
+    {
+        var t = await _db.ContractTemplates.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (t is null) return NotFound();
+
+        await _tenant.LoadAsync();
+        _tenant.EnsureCanAccess(t.TenantId);
+
+        if (file is null || file.Length == 0 || file.Length > DocumentText.MaxBytes)
+        {
+            TempData["Error"] = "Choose a Word document (.docx) or text file (.txt) of 5 MB or less.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        // Buffered: reading a .docx needs a seekable stream.
+        using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer);
+        buffer.Position = 0;
+        var (text, error) = DocumentText.Extract(file.FileName, buffer);
+        if (text is null)
+        {
+            TempData["Error"] = error;
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        var approvedBy = t.ApprovedByUserId is null ? null : await _users.FindByIdAsync(t.ApprovedByUserId);
+
+        ViewData["Title"] = t.Title;
+        ViewBag.Extracted = Path.GetFileName(file.FileName);
+        return View(nameof(Edit), new ContractTemplateEditModel
+        {
+            Id = t.Id,
+            Kind = t.Kind,
+            Title = t.Title,
+            Body = append ? t.Body + "\n\n" + text : text,
+            IsApproved = t.IsApproved,
+            ApprovedUtc = t.ApprovedUtc,
+            ApprovedBy = approvedBy?.FullName ?? approvedBy?.Email
+        });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Approve(Guid id, bool attorneyConfirmed)

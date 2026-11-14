@@ -1,0 +1,62 @@
+@model List<FollowUpRow>
+@{
+    ViewData["Title"] = "Follow-ups";
+    var today = DateTime.UtcNow.AddHours(2).Date;
+    var overdue = Model.Count(r => r.FollowUpOn < today);
+    var dueToday = Model.Count(r => r.FollowUpOn == today);
+}
+
+<div class="page-head">
+    <h1>Follow-ups</h1>
+    <p class="lede">
+        Everyone you said you would get back to, soonest first. Add one from a client's Notes; a good-to-go flag that
+        gets worse on the automatic recheck lands here by itself.
+    </p>
+</div>
+
+<div class="stat-grid">
+    <div class="stat"><div class="label">Overdue</div><div class="value @(overdue > 0 ? "warn" : "")">@overdue</div></div>
+    <div class="stat"><div class="label">Due today</div><div class="value">@dueToday</div></div>
+    <div class="stat"><div class="label">Coming up</div><div class="value">@(Model.Count - overdue - dueToday)</div></div>
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="empty">Nothing to follow up. Notes with a follow-up date appear here.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th style="width:8rem;">Due</th><th>Client</th><th style="width:7rem;">How</th><th>Note</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var r in Model)
+                {
+                    <tr>
+                        <td>
+                            <span class="badge @(r.FollowUpOn < today ? "badge-red" : r.FollowUpOn == today ? "badge-amber" : "badge-grey")">
+                                @r.FollowUpOn.ToString("d MMM yyyy")
+                            </span>
+                        </td>
+                        <td>
+                            <a asp-controller="Clients" asp-action="Notes" asp-route-id="@r.ClientId"><strong>@r.ClientName</strong></a>
+                            <div class="muted small"><span class="mono">@r.ClientNumber</span>@(string.IsNullOrWhiteSpace(r.Mobile) ? "" : " · " + r.Mobile)</div>
+                        </td>
+                        <td><span class="badge badge-navy">@(r.Channel ?? "Note")</span></td>
+                        <td>
+                            <span style="white-space:pre-line;">@r.Body</span>
+                            <div class="muted small">@r.CreatedBy</div>
+                        </td>
+                        <td>
+                            <form asp-action="Done" asp-route-id="@r.NoteId" method="post">
+                                <button type="submit" class="btn btn-outline btn-sm">Mark done</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

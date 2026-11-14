@@ -1,6 +1,7 @@
 @model AMPay.Web.Models.EmploymentStepModel
 @{
     var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var employers = ViewBag.Employers as List<Employer> ?? new List<Employer>();
     ViewData["Title"] = "Employment";
 }
 
@@ -20,10 +21,53 @@
             <div class="card">
                 <div class="card-head"><h2>Employer</h2></div>
                 <div class="card-body">
+                    @if (employers.Count > 0)
+                    {
+                        <div class="form-grid employer-pick">
+                            <div class="field">
+                                <label for="employerSearch">Employer search</label>
+                                <input type="text" id="employerSearch" placeholder="Type part of the name" autocomplete="off" />
+                                <span class="hint">Narrows the Employer list. Leave empty to see every employer.</span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="EmployerId"></label>
+                                <select asp-for="EmployerId">
+                                    <option value="">&mdash; not on the list: type it below &mdash;</option>
+                                    @foreach (var e in employers)
+                                    {
+                                        <option value="@e.Id" data-name="@e.Name" data-paypoint="@e.PayPoint" data-tel="@e.Telephone"
+                                                data-freq="@e.PayFrequency" data-day="@e.SalaryDay">@e.DisplayName</option>
+                                    }
+                                </select>
+                                <span class="hint">Picking one fills in the employer's details. A new employer you type is added to the list when you save.</span>
+                            </div>
+                        </div>
+                    }
                     <div class="form-grid">
                         <div class="field">
                             <label asp-for="EmployerName"></label>
                             <input asp-for="EmployerName" />
+                            @if (employers.Count == 0)
+                            {
+                                <span class="hint">Saved to your employer list, so the next client at the same company can simply pick it.</span>
+                            }
+                        </div>
+                        <div class="field">
+                            <label asp-for="PayPoint"></label>
+                            <input asp-for="PayPoint" />
+                            <span class="hint">The branch or site that pays, if the employer has more than one.</span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="PayPointNumber"></label>
+                            <input asp-for="PayPointNumber" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="EmployeeNumber"></label>
+                            <input asp-for="EmployeeNumber" />
+                        </div>
+                        <div class="field">
+                            <label asp-for="OtherEmployerReference"></label>
+                            <input asp-for="OtherEmployerReference" />
                         </div>
                         <div class="field">
                             <label asp-for="Occupation"></label>
@@ -34,14 +78,30 @@
                             <input asp-for="Department" />
                         </div>
                         <div class="field">
-                            <label asp-for="EmployeeNumber"></label>
-                            <input asp-for="EmployeeNumber" />
+                            <label asp-for="SupervisorName"></label>
+                            <input asp-for="SupervisorName" />
                         </div>
+                        <div class="field">
+                            <label asp-for="WorkTelephone"></label>
+                            <input asp-for="WorkTelephone" type="tel" />
+                            <label class="check" style="margin-top:.35rem;">
+                                <input asp-for="WorkTelephoneNotAvailable" type="checkbox" />
+                                <span>Not available</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>Appointment</h2></div>
+                <div class="card-body">
+                    <div class="form-grid">
                         <div class="field">
                             <label asp-for="EmploymentType"></label>
                             <select asp-for="EmploymentType">
                                 <option value="">&mdash;</option>
-                                @foreach (var t in new[] { "Permanent", "Contract", "Temporary", "Self-employed", "Pensioner", "Unemployed" })
+                                @foreach (var t in AMPay.Domain.Credit.GoodToGo.EmploymentTypes)
                                 {
                                     <option value="@t">@t</option>
                                 }
@@ -52,12 +112,14 @@
                             <input asp-for="EmployedSince" type="date" />
                         </div>
                         <div class="field">
-                            <label asp-for="WorkTelephone"></label>
-                            <input asp-for="WorkTelephone" type="tel" />
+                            <label asp-for="ContractExpiryDate"></label>
+                            <input asp-for="ContractExpiryDate" type="date" />
+                            <span class="hint">For contract and temporary staff. A loan should not run past it.</span>
                         </div>
                         <div class="field">
-                            <label asp-for="SupervisorName"></label>
-                            <input asp-for="SupervisorName" />
+                            <label asp-for="YearsAtPreviousEmployer"></label>
+                            <input asp-for="YearsAtPreviousEmployer" type="number" min="0" max="60" />
+                            <span asp-validation-for="YearsAtPreviousEmployer" class="field-error"></span>
                         </div>
                     </div>
                 </div>
@@ -96,3 +158,40 @@
         </form>
     </div>
 </div>
+
+@if (employers.Count > 0)
+{
+<script>
+(function () {
+    var pick = document.getElementById('EmployerId'), search = document.getElementById('employerSearch');
+    var name = document.getElementById('EmployerName'), point = document.getElementById('PayPoint');
+    var tel = document.getElementById('WorkTelephone'), freq = document.getElementById('PayFrequency');
+    var day = document.getElementById('SalaryDay');
+    var all = Array.prototype.slice.call(pick.options, 1);
+
+    // Rebuilding the list, not hiding options: a hidden option still shows on a phone.
+    search.addEventListener('input', function () {
+        var term = search.value.trim().toLowerCase(), chosen = pick.value;
+        all.forEach(function (o) { if (o.parentNode) pick.removeChild(o); });
+        all.filter(function (o) { return !term || o.value === chosen || o.text.toLowerCase().indexOf(term) >= 0; })
+           .forEach(function (o) { pick.appendChild(o); });
+    });
+
+    pick.addEventListener('change', function () {
+        var o = pick.options[pick.selectedIndex];
+        if (!o || !o.value) return;
+        name.value = o.dataset.name || '';
+        point.value = o.dataset.paypoint || '';
+        if (!tel.value && o.dataset.tel) tel.value = o.dataset.tel;
+        if (o.dataset.freq) freq.value = o.dataset.freq;
+        if (o.dataset.day) day.value = o.dataset.day;
+    });
+
+    // Typing a different name means a different employer: let go of the one picked.
+    name.addEventListener('input', function () {
+        var o = pick.options[pick.selectedIndex];
+        if (o && o.value && (o.dataset.name || '') !== name.value) pick.value = '';
+    });
+})();
+</script>
+}

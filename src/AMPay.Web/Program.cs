@@ -113,6 +113,11 @@ builder.Services.AddScoped<LoanLedgerService>();
 if (builder.Configuration.GetValue<bool>(PortfolioSnapshotService.NightlySetting))
     builder.Services.AddHostedService<PortfolioSnapshotService>();
 
+// The daily good-to-go recheck: opt-in for the same reason. Without it the client list does the
+// same work a few clients at a time whenever it is opened.
+if (builder.Configuration.GetValue<bool>(ScreeningRecheckService.DailySetting))
+    builder.Services.AddHostedService<ScreeningRecheckService>();
+
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {

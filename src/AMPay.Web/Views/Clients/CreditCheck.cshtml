@@ -4,11 +4,13 @@
     var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
     var client = (Client)ViewBag.Client;
     var hasSaId = client.IsSaIdNumber && AMPay.Domain.Validation.SaIdNumber.IsValid(client.IdNumber);
+    var screening = ViewBag.Screening as ClientScreening;
+    var unlocked = screening?.AllowsCreditCheck == true;
 }
 
 <div class="page-head">
     <h1>@wizard.ClientName</h1>
-    <p class="lede">@OnboardingSteps.Caption(OnboardingStep.CreditCheck) &mdash; credit bureau check.</p>
+    <p class="lede">@OnboardingSteps.Caption(OnboardingStep.CreditCheck) &mdash; credit bureau check. The final check, and the one that is paid for.</p>
 </div>
 
 <div class="wizard">
@@ -18,7 +20,16 @@
         <div class="card">
             <div class="card-head"><h2>Run a credit check</h2></div>
             <div class="card-body">
-                @if (!hasSaId)
+                @if (!unlocked)
+                {
+                    <div class="alert alert-warn">
+                        <strong>Locked.</strong> This client is
+                        <span class="badge @(screening is null ? "badge-grey" : ScreeningDisplay.Tone(screening.Outcome))">@(screening is null ? "not screened" : AMPay.Domain.Credit.GoodToGo.Label(screening.Outcome))</span>.
+                        A bureau report costs money, so it is run only once your own good-to-go check has passed.
+                    </div>
+                    <a asp-action="GoodToGo" asp-route-id="@client.Id" class="btn btn-primary">Open the good-to-go check</a>
+                }
+                else if (!hasSaId)
                 {
                     <div class="alert alert-warn mb-0">A credit check needs a valid South African ID number on the client's file. Add it on the General step.</div>
                 }

@@ -16,6 +16,38 @@
     </div>
 }
 
+@if (ViewBag.Extracted is string extracted)
+{
+    <div class="alert alert-info">
+        The text of <strong>@extracted</strong> is in the box below. <strong>It is not saved yet.</strong>
+        Read it through, fix anything the upload got wrong, then press Save wording.
+    </div>
+}
+
+<form asp-action="Extract" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" class="card">
+    @Html.AntiForgeryToken()
+    <div class="card-head"><h3>Upload your attorney's document</h3></div>
+    <div class="card-body">
+        <div class="field">
+            <label for="file">Word document or text file</label>
+            <input type="file" id="file" name="file" required
+                   accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" />
+            <span class="hint">
+                The text is pulled out and put in the editor below for you to check and change. Formatting
+                (bold, tables, automatic numbering) does not come across. A PDF cannot be read reliably:
+                save it as Word first.
+            </span>
+        </div>
+        <label class="check">
+            <input type="checkbox" name="append" value="true" />
+            <span>Add it to the end of the current wording instead of replacing it</span>
+        </label>
+    </div>
+    <div class="card-foot">
+        <button type="submit" class="btn btn-outline">Extract the text</button>
+    </div>
+</form>
+
 <form asp-action="Edit" method="post">
     @Html.AntiForgeryToken()
     <input type="hidden" asp-for="Id" />

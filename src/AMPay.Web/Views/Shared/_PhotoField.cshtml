@@ -1,0 +1,99 @@
+@* A photograph taken or chosen inside another form: the picture travels as the hidden "captured"
+   field (shrunk in the browser), or as the "photo" file when script is off. ViewData["PhotoUrl"] is
+   the photo already on file, if any. The form must be multipart/form-data. *@
+@{
+    var photoUrl = ViewData["PhotoUrl"] as string;
+}
+<div class="photo-step photo-field">
+    <div class="photo-stage">
+        <video id="pfCam" playsinline muted hidden></video>
+        <canvas id="pfShot" hidden></canvas>
+        @if (photoUrl is not null)
+        {
+            <img id="pfCurrent" src="@photoUrl" alt="Current photograph" />
+        }
+        else
+        {
+            <div id="pfCurrent" class="photo-empty">No photograph yet</div>
+        }
+    </div>
+
+    <div>
+        <input type="hidden" name="captured" id="pfCaptured" />
+        <div class="photo-actions">
+            <button type="button" class="btn btn-outline" id="pfStart">Take a picture</button>
+            <button type="button" class="btn btn-primary" id="pfTake" hidden>Take photo</button>
+            <button type="button" class="btn btn-outline" id="pfRetake" hidden>Retake</button>
+        </div>
+        <div class="field" id="pfUpload">
+            <label for="pfFile">Or upload a photo</label>
+            <input type="file" id="pfFile" name="photo" accept="image/jpeg,image/png,image/webp" />
+            <span class="hint">Optional. A clear, front-facing photo of the client's face. It is saved with the rest of this page.</span>
+        </div>
+        <p class="muted small" id="pfError" hidden></p>
+        <p class="muted small" id="pfReady" hidden>Photograph ready. It is saved when you save this page.</p>
+    </div>
+</div>
+
+<script>
+(function () {
+    var video = document.getElementById('pfCam'), canvas = document.getElementById('pfShot');
+    var current = document.getElementById('pfCurrent'), captured = document.getElementById('pfCaptured');
+    var start = document.getElementById('pfStart'), take = document.getElementById('pfTake');
+    var retake = document.getElementById('pfRetake'), upload = document.getElementById('pfUpload');
+    var error = document.getElementById('pfError'), ready = document.getElementById('pfReady');
+    var file = document.getElementById('pfFile'), stream = null;
+    var MAX = 900; // longest side in pixels: plenty for a face, small to store
+
+    function show(el, on) { el.hidden = !on; }
+    function stop() { if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; } }
+
+    start.addEventListener('click', function () {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            error.textContent = 'This browser cannot use the camera here. Upload a photo instead.';
+            show(error, true); return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+            .then(function (s) {
+                stream = s; video.srcObject = s; video.play();
+                show(video, true); show(current, false); show(canvas, false);
+                show(start, false); show(take, true); show(upload, false); show(error, false); show(ready, false);
+            })
+            .catch(function () {
+                error.textContent = 'The camera could not be opened (permission refused or no camera). Upload a photo instead.';
+                show(error, true);
+            });
+    });
+
+    take.addEventListener('click', function () {
+        var w = video.videoWidth, h = video.videoHeight, scale = Math.min(1, MAX / Math.max(w, h));
+        canvas.width = Math.round(w * scale); canvas.height = Math.round(h * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        captured.value = canvas.toDataURL('image/jpeg', 0.85);
+        stop();
+        show(video, false); show(canvas, true); show(take, false); show(retake, true); show(ready, true);
+    });
+
+    retake.addEventListener('click', function () {
+        captured.value = ''; show(retake, false); show(ready, false); start.click();
+    });
+
+    // An uploaded file is shrunk the same way before sending, so a 10 MB phone photo goes up small.
+    file.addEventListener('change', function () {
+        var f = file.files[0];
+        if (!f) return;
+        var img = new Image();
+        img.onload = function () {
+            var scale = Math.min(1, MAX / Math.max(img.width, img.height));
+            canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            captured.value = canvas.toDataURL('image/jpeg', 0.85);
+            file.value = '';
+            show(current, false); show(canvas, true); show(ready, true);
+        };
+        img.src = URL.createObjectURL(f);
+    });
+
+    window.addEventListener('pagehide', stop);
+})();
+</script>

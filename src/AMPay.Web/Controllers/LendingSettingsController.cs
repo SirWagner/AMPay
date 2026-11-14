@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AMPay.Web.Controllers;
 
 /// <summary>
-/// A lender's own lending figures: the capital set aside to lend, and how long clients may
-/// cancel after payout. Both feed the dashboard.
+/// A lender's own lending figures: the capital set aside to lend, how long clients may
+/// cancel after payout, and how often a client's good-to-go flag is rechecked.
 /// </summary>
 [Authorize(Policy = AppPolicies.TenantAdministration)]
 public class LendingSettingsController : Controller
@@ -42,7 +42,8 @@ public class LendingSettingsController : Controller
         return View(new LendingSettingsModel
         {
             LendingCapital = t.LendingCapital,
-            CoolingOffBusinessDays = t.CoolingOffBusinessDays
+            CoolingOffBusinessDays = t.CoolingOffBusinessDays,
+            ScreeningRecheckDays = t.ScreeningRecheckDays
         });
     }
 
@@ -63,6 +64,7 @@ public class LendingSettingsController : Controller
 
         t.LendingCapital = model.LendingCapital;
         t.CoolingOffBusinessDays = model.CoolingOffBusinessDays;
+        t.ScreeningRecheckDays = model.ScreeningRecheckDays;
         t.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -84,4 +86,9 @@ public class LendingSettingsModel
     [Display(Name = "Cooling-off period (business days)")]
     [Range(0, 30, ErrorMessage = "Enter between 0 and 30 business days.")]
     public int CoolingOffBusinessDays { get; set; } = 5;
+
+    /// <summary>0 switches the automatic recheck off.</summary>
+    [Display(Name = "Recheck good-to-go every (days)")]
+    [Range(0, 365, ErrorMessage = "Enter between 0 and 365 days.")]
+    public int ScreeningRecheckDays { get; set; } = 30;
 }

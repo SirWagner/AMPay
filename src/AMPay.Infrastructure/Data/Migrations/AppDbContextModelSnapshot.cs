@@ -101,6 +101,65 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("AffordabilityAssessments");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.BankStatementAssessment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("AverageMonthlyIncome")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("AverageMonthlySpend")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ConsentRecordedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Flag")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Observations")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<bool>("Simulated")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.ToTable("BankStatementAssessments");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.Client", b =>
                 {
                     b.Property<Guid>("Id")
@@ -439,6 +498,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ContractExpiryDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Department")
                         .HasColumnType("nvarchar(max)");
 
@@ -447,6 +509,9 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.Property<string>("EmployeeNumber")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("EmployerId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("EmployerName")
                         .HasColumnType("nvarchar(max)");
@@ -457,8 +522,20 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("Occupation")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("OtherEmployerReference")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("PayFrequency")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PayPoint")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PayPointNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("SalaryDay")
                         .HasColumnType("int");
@@ -469,10 +546,18 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("WorkTelephone")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("WorkTelephoneNotAvailable")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("YearsAtPreviousEmployer")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId")
                         .IsUnique();
+
+                    b.HasIndex("EmployerId");
 
                     b.ToTable("ClientEmployments");
                 });
@@ -545,9 +630,21 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FollowUpDoneBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("FollowUpDoneUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FollowUpOn")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("FollowUpOn", "FollowUpDoneUtc");
 
                     b.ToTable("ClientNotes");
                 });
@@ -727,6 +824,101 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId");
 
                     b.ToTable("ClientReferences");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.ClientScreening", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CheckedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CheckedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Checks")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsFirstTimeApplicant")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OverriddenBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("OverriddenUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OverrideReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId", "CheckedUtc");
+
+                    b.ToTable("ClientScreenings");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.ClientVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CheckedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CheckedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Simulated")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId", "Kind", "CheckedUtc");
+
+                    b.ToTable("ClientVerifications");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientWallet", b =>
@@ -1136,6 +1328,66 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("TenantId", "Status");
 
                     b.ToTable("Mandates");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.Employer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("ContactPerson")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmailAddress")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PayFrequency")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("PayPoint")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("SalaryDay")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Telephone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("Employers");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.Loan", b =>
@@ -2028,6 +2280,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("ScreeningRecheckDays")
+                        .HasColumnType("int");
+
                     b.Property<string>("SelfServiceCode")
                         .HasMaxLength(12)
                         .HasColumnType("nvarchar(12)");
@@ -2369,6 +2624,25 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Loan");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.BankStatementAssessment", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany("StatementAssessments")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AMPay.Domain.Entities.ClientDocument", "Document")
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Document");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.Client", b =>
                 {
                     b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
@@ -2443,7 +2717,14 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("AMPay.Domain.Entities.Employer", "Employer")
+                        .WithMany()
+                        .HasForeignKey("EmployerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Client");
+
+                    b.Navigation("Employer");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.ClientFinancial", b =>
@@ -2505,6 +2786,28 @@ namespace AMPay.Infrastructure.Data.Migrations
                 {
                     b.HasOne("AMPay.Domain.Entities.Client", "Client")
                         .WithMany("References")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.ClientScreening", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany("Screenings")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.ClientVerification", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany("Verifications")
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2594,6 +2897,17 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("BankAccount");
 
                     b.Navigation("Client");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.Employer", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Tenant");
                 });
@@ -2881,6 +3195,12 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Photo");
 
                     b.Navigation("References");
+
+                    b.Navigation("Screenings");
+
+                    b.Navigation("StatementAssessments");
+
+                    b.Navigation("Verifications");
 
                     b.Navigation("Wallets");
                 });
