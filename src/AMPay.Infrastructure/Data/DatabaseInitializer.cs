@@ -49,7 +49,8 @@ public static class DatabaseInitializer
             ["20260916194822_CreditOrigination"] = "CreditPackages",
             ["20261007092442_ContractPacksAndMessaging"] = "LoanContracts",
             ["20261114072200_GoodToGoScreening"] = "Employers",
-            ["20261114174506_LoanWording"] = "LoanWordings"
+            ["20261114174506_LoanWording"] = "LoanWordings",
+            ["20261114223245_StatementReviews"] = "StatementReviews"
         };
 
     public static async Task InitialiseAsync(

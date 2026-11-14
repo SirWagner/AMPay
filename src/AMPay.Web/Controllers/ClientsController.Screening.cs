@@ -23,7 +23,7 @@ public partial class ClientsController
     [HttpGet]
     public async Task<IActionResult> GoodToGo(Guid id, [FromServices] IBankStatementAnalyst analyst)
     {
-        var client = await LoadClientAsync(id, c => c.Employment, c => c.Documents);
+        var client = await LoadClientAsync(id, c => c.Employment, c => c.Documents, c => c.Financial);
         if (client is null) return NotFound();
 
         // Opening the page is the recheck: whatever changed on the file since last time shows now.
@@ -57,6 +57,10 @@ public partial class ClientsController
             Statements = client.Documents.Where(d => d.DocumentType == DocumentType.BankStatement)
                 .OrderByDescending(d => d.UploadedUtc).ToList(),
             Assessments = assessments.GroupBy(a => a.DocumentId).ToDictionary(g => g.Key, g => g.First()),
+            StatementReview = await _db.StatementReviews.AsNoTracking()
+                .Where(r => r.ClientId == id).OrderByDescending(r => r.CreatedUtc).FirstOrDefaultAsync(),
+            DeclaredNetIncome = client.Financial?.NetMonthlyIncome,
+            DeclaredDebtInstalments = client.Financial?.TotalMonthlyDebtRepayments ?? 0m,
             AnalystLive = analyst.IsLive,
             AffordabilityCaptured = await _screening.AffordabilityCapturedAsync(id),
             CanOverride = User.IsInRole(AppRoles.TenantAdmin) || User.IsInRole(AppRoles.SuperAdmin),
@@ -189,6 +193,72 @@ public partial class ClientsController
         _log.LogInformation("Good-to-go review overridden for client {ClientNumber}.", client.ClientNumber);
 
         TempData["Success"] = "Recorded. The credit check can now be run.";
+        return RedirectToAction(nameof(GoodToGo), new { id });
+    }
+
+    /// <summary>
+    /// Runs the bank-statement model on the figures a staff member read off the statement: it
+    /// validates the declared income and debt against them and flags the statement Good, Warning
+    /// or Bad. Rules, no AI, nothing leaves the system.
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CheckStatement(Guid id, StatementFiguresModel model)
+    {
+        var client = await LoadClientAsync(id, c => c.Financial, c => c.Documents);
+        if (client is null) return NotFound();
+
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Check the statement figures: " +
+                string.Join(" ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).Distinct());
+            return RedirectToAction(nameof(GoodToGo), new { id });
+        }
+        if (model.SalaryDeposits > 0 && model.AverageSalaryDeposit <= 0)
+        {
+            TempData["Error"] = "Enter the average salary deposit, or 0 salary deposits if there are none.";
+            return RedirectToAction(nameof(GoodToGo), new { id });
+        }
+
+        var figures = new StatementFigures
+        {
+            MonthsCovered = model.MonthsCovered,
+            SalaryDeposits = model.SalaryDeposits,
+            AverageSalaryDeposit = model.AverageSalaryDeposit,
+            ReturnedDebitOrders = model.ReturnedDebitOrders,
+            OtherLenders = model.OtherLenders,
+            MonthlyLoanRepayments = model.MonthlyLoanRepayments,
+            MonthlyGambling = model.MonthlyGambling,
+            DaysOverdrawn = model.DaysOverdrawn
+        };
+        var declaredIncome = client.Financial?.NetMonthlyIncome;
+        var declaredDebt = client.Financial?.TotalMonthlyDebtRepayments ?? 0m;
+        var verdict = StatementModel.Evaluate(figures, declaredIncome, declaredDebt);
+
+        _db.StatementReviews.Add(new StatementReview
+        {
+            ClientId = id,
+            DocumentId = client.Documents.Any(d => d.Id == model.DocumentId && d.DocumentType == DocumentType.BankStatement)
+                ? model.DocumentId : null,
+            MonthsCovered = figures.MonthsCovered,
+            SalaryDeposits = figures.SalaryDeposits,
+            AverageSalaryDeposit = figures.AverageSalaryDeposit,
+            ReturnedDebitOrders = figures.ReturnedDebitOrders,
+            OtherLenders = figures.OtherLenders,
+            MonthlyLoanRepayments = figures.MonthlyLoanRepayments,
+            MonthlyGambling = figures.MonthlyGambling,
+            DaysOverdrawn = figures.DaysOverdrawn,
+            DeclaredNetIncome = declaredIncome,
+            DeclaredDebtInstalments = declaredDebt,
+            Flag = verdict.Flag,
+            Summary = verdict.Summary,
+            Findings = Truncate(verdict.SerialisedFindings, 4000) ?? "",
+            CreatedBy = User.Identity?.Name
+        });
+        await _db.SaveChangesAsync();
+
+        TempData[verdict.Flag == StatementFlag.Bad ? "Error" : verdict.Flag == StatementFlag.Warning ? "Info" : "Success"] =
+            $"Bank statement: {verdict.Flag}. {verdict.Summary}";
         return RedirectToAction(nameof(GoodToGo), new { id });
     }
 

@@ -298,6 +298,20 @@ public class GoodToGoTests
         Assert.False(await service.AffordabilityCapturedAsync(client.Id));
     }
 
+    [Fact]
+    public async Task TheStatementCheck_FeedsTheFlag_AndTheLatestOneCounts()
+    {
+        var (db, service, client) = await ArrangeAsync();
+        db.StatementReviews.Add(new StatementReview { ClientId = client.Id, Flag = StatementFlag.Bad, Summary = "x", CreatedUtc = Today.AddDays(-2) });
+        await db.SaveChangesAsync();
+        Assert.Equal(ScreeningOutcome.NotGoodToGo, (await service.EvaluateAsync(client.Id, ScreeningTrigger.Manual, "t", Today))!.Outcome);
+
+        db.StatementReviews.Add(new StatementReview { ClientId = client.Id, Flag = StatementFlag.Good, Summary = "x", CreatedUtc = Today.AddDays(-1) });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(ScreeningOutcome.GoodToGo, (await service.EvaluateAsync(client.Id, ScreeningTrigger.Manual, "t", Today))!.Outcome);
+    }
+
     // ----------------------------------------------------------------- employer list
 
     [Fact]

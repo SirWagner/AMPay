@@ -2265,6 +2265,80 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.ToTable("RegulatoryCaps");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.StatementReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AverageSalaryDeposit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DaysOverdrawn")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("DeclaredDebtInstalments")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("DeclaredNetIncome")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Findings")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("Flag")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MonthlyGambling")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MonthlyLoanRepayments")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MonthsCovered")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OtherLenders")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReturnedDebitOrders")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SalaryDeposits")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId", "CreatedUtc");
+
+                    b.ToTable("StatementReviews");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3154,6 +3228,17 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("AMPay.Domain.Entities.StatementReview", b =>
+                {
+                    b.HasOne("AMPay.Domain.Entities.Client", "Client")
+                        .WithMany("StatementReviews")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+                });
+
             modelBuilder.Entity("AMPay.Domain.Entities.TenantLogo", b =>
                 {
                     b.HasOne("AMPay.Domain.Entities.Tenant", "Tenant")
@@ -3260,6 +3345,8 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Navigation("Screenings");
 
                     b.Navigation("StatementAssessments");
+
+                    b.Navigation("StatementReviews");
 
                     b.Navigation("Verifications");
 

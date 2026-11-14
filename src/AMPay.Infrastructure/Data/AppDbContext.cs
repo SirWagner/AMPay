@@ -30,6 +30,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ClientScreening> ClientScreenings => Set<ClientScreening>();
     public DbSet<ClientVerification> ClientVerifications => Set<ClientVerification>();
     public DbSet<BankStatementAssessment> BankStatementAssessments => Set<BankStatementAssessment>();
+    public DbSet<StatementReview> StatementReviews => Set<StatementReview>();
     public DbSet<Employer> Employers => Set<Employer>();
 
     public DbSet<CreditPackage> CreditPackages => Set<CreditPackage>();
@@ -305,6 +306,16 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.CheckedBy).HasMaxLength(256);
             e.HasIndex(x => new { x.ClientId, x.Kind, x.CheckedUtc });
             e.HasOne(x => x.Client).WithMany(c => c.Verifications)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<StatementReview>(e =>
+        {
+            e.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.Findings).HasMaxLength(4000).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(256);
+            e.HasIndex(x => new { x.ClientId, x.CreatedUtc });
+            e.HasOne(x => x.Client).WithMany(c => c.StatementReviews)
                 .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
         });
 

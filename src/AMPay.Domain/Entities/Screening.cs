@@ -175,6 +175,43 @@ public class BankStatementAssessment
     public string? CreatedBy { get; set; }
 }
 
+/// <summary>
+/// A bank statement checked with the rules model (<see cref="Credit.StatementModel"/>): the
+/// figures a staff member read off the statement, what the client had declared at the time, and
+/// the verdict. Kept as history; the latest one feeds the good-to-go check.
+/// </summary>
+public class StatementReview
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ClientId { get; set; }
+    public Client? Client { get; set; }
+
+    /// <summary>The uploaded statement the figures were read from, when there is one on file.</summary>
+    public Guid? DocumentId { get; set; }
+
+    public int MonthsCovered { get; set; }
+    public int SalaryDeposits { get; set; }
+    public decimal AverageSalaryDeposit { get; set; }
+    public int ReturnedDebitOrders { get; set; }
+    public int OtherLenders { get; set; }
+    public decimal MonthlyLoanRepayments { get; set; }
+    public decimal MonthlyGambling { get; set; }
+    public int DaysOverdrawn { get; set; }
+
+    /// <summary>What the client had declared when the statement was checked, so the comparison can be read back later.</summary>
+    public decimal? DeclaredNetIncome { get; set; }
+    public decimal DeclaredDebtInstalments { get; set; }
+
+    public StatementFlag Flag { get; set; }
+    public string Summary { get; set; } = string.Empty;
+
+    /// <summary>One line per finding, stored as the good-to-go checks are.</summary>
+    public string Findings { get; set; } = string.Empty;
+
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public string? CreatedBy { get; set; }
+}
+
 public enum StatementFlag
 {
     Good = 0,

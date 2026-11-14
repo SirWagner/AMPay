@@ -74,6 +74,7 @@ public class Client
     public ICollection<ClientScreening> Screenings { get; set; } = new List<ClientScreening>();
     public ICollection<ClientVerification> Verifications { get; set; } = new List<ClientVerification>();
     public ICollection<BankStatementAssessment> StatementAssessments { get; set; } = new List<BankStatementAssessment>();
+    public ICollection<StatementReview> StatementReviews { get; set; } = new List<StatementReview>();
 
     /// <summary>
     /// Credit agreements raised against this client. Loans are originated after onboarding

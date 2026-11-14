@@ -63,12 +63,19 @@ public class ScreeningService
             .Select(v => new { v.Kind, v.Result, v.Simulated })
             .ToListAsync(ct);
 
-        // A simulated assessment read nothing, so it must not move the flag either way.
-        var statementFlag = await _db.BankStatementAssessments.AsNoTracking()
-            .Where(a => a.ClientId == clientId && !a.Simulated)
-            .OrderByDescending(a => a.CreatedUtc)
-            .Select(a => (StatementFlag?)a.Flag)
-            .FirstOrDefaultAsync(ct);
+        // The rules model on the figures staff read off the statement comes first; an AI
+        // assessment counts only where there is none. A simulated assessment read nothing, so it
+        // must not move the flag either way.
+        var statementFlag = await _db.StatementReviews.AsNoTracking()
+            .Where(r => r.ClientId == clientId)
+            .OrderByDescending(r => r.CreatedUtc)
+            .Select(r => (StatementFlag?)r.Flag)
+            .FirstOrDefaultAsync(ct)
+            ?? await _db.BankStatementAssessments.AsNoTracking()
+                .Where(a => a.ClientId == clientId && !a.Simulated)
+                .OrderByDescending(a => a.CreatedUtc)
+                .Select(a => (StatementFlag?)a.Flag)
+                .FirstOrDefaultAsync(ct);
 
         var loans = await _db.Loans.AsNoTracking()
             .Where(l => l.ClientId == clientId)

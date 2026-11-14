@@ -22,6 +22,11 @@ public class GoodToGoPageModel
     public List<ClientDocument> Statements { get; set; } = new();
     public Dictionary<Guid, BankStatementAssessment> Assessments { get; set; } = new();
 
+    /// <summary>The latest rules-model check of the client's bank statement, if one was done.</summary>
+    public StatementReview? StatementReview { get; set; }
+    public decimal? DeclaredNetIncome { get; set; }
+    public decimal DeclaredDebtInstalments { get; set; }
+
     /// <summary>False while the stub answers: the page then says the assessment is simulated.</summary>
     public bool AnalystLive { get; set; }
     public bool AffordabilityCaptured { get; set; }
@@ -30,6 +35,21 @@ public class GoodToGoPageModel
 
     public static readonly string[] EmploymentMethods =
         { "Phoned the employer", "Payslip checked", "Letter from the employer", "Email from HR" };
+}
+
+/// <summary>The figures staff read off a bank statement, as posted from the good-to-go page.</summary>
+public class StatementFiguresModel
+{
+    public Guid? DocumentId { get; set; }
+
+    [Range(1, 12)] public int MonthsCovered { get; set; } = 3;
+    [Range(0, 60)] public int SalaryDeposits { get; set; }
+    [Range(0, 10_000_000)] public decimal AverageSalaryDeposit { get; set; }
+    [Range(0, 200)] public int ReturnedDebitOrders { get; set; }
+    [Range(0, 50)] public int OtherLenders { get; set; }
+    [Range(0, 10_000_000)] public decimal MonthlyLoanRepayments { get; set; }
+    [Range(0, 10_000_000)] public decimal MonthlyGambling { get; set; }
+    [Range(0, 366)] public int DaysOverdrawn { get; set; }
 }
 
 /// <summary>The Notes step: the client's contact history.</summary>

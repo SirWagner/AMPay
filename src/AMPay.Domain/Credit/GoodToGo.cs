@@ -229,9 +229,9 @@ public static class GoodToGo
                 }, "Bank statement",
                 flag switch
                 {
-                    StatementFlag.Good => "The statement assessment found nothing of concern.",
-                    StatementFlag.Warning => "The statement assessment raised warnings. Read it.",
-                    _ => "The statement assessment flagged it Bad. Read it before going further."
+                    StatementFlag.Good => "The statement agrees with what was declared and shows nothing of concern.",
+                    StatementFlag.Warning => "The statement check raised warnings. Read them below.",
+                    _ => "The statement check flagged it Bad. Read it before going further."
                 });
 
         // ---- bank account
