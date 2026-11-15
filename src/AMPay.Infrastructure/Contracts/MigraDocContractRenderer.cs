@@ -263,7 +263,7 @@ public class MigraDocContractRenderer : IContractRenderer
         if (b.OtherIncome > 0) Line(t, "Other income", Money(b.OtherIncome));
 
         foreach (var l in b.Lines)
-            Line(t, l.Kind == "Instalment" ? $"{l.Description} (credit instalment)" : l.Description, Money(l.Amount));
+            Line(t, l.Kind == "Instalment" ? $"{l.Description} (credit instalment)" : l.Kind == "Payslip" ? $"{l.Description} (deducted from salary)" : l.Description, Money(l.Amount));
 
         Line(t, "Declared living expenses", Money(b.DeclaredLivingExpenses), bold: true);
         Line(t, "Minimum living expenses under the regulations", Money(b.StatutoryMinimum));

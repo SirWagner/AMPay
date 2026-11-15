@@ -348,7 +348,13 @@ public enum BudgetLineKind
     /// An instalment to a credit provider. Deducted on top of living expenses, never in
     /// place of them: the Regulation 23A norm is a floor on living costs alone.
     /// </summary>
-    DebtInstalment = 2
+    DebtInstalment = 2,
+
+    /// <summary>
+    /// Taken off the salary before it is paid (tax, UIF, pension, payroll loans). Recorded to
+    /// explain gross against net; never deducted from net pay a second time.
+    /// </summary>
+    PayslipDeduction = 3
 }
 
 /// <summary>How money for an instalment arrived, or was attempted.</summary>

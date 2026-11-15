@@ -1546,3 +1546,11 @@ a.badge:hover { filter: brightness(.96); text-decoration: none; }
 .employer-mode-option > span { display: grid; gap: .1rem; }
 .employer-card { border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem .9rem; background: #fafbfd; margin-top: .25rem; }
 .employer-card .detail-list { margin: .5rem 0 0; }
+
+/* ---- Budget: grouped, every line captured, empty ones foldable ---- */
+.budget-table tr.budget-group-head th { background: #f3f6fc; color: var(--navy-deeper); text-align: left; font-size: .8rem; letter-spacing: .02em; padding-top: .55rem; padding-bottom: .55rem; }
+.budget-table tr.budget-group-head th.num { text-align: right; }
+.budget-table.folded tr.budget-row.is-empty:not(.is-main) { display: none; }
+.budget-table .budget-check td { background: #fffdf5; }
+.budget-ok { color: #1d7a46; }
+.budget-warn { color: #b42318; }

@@ -92,3 +92,70 @@ public class BudgetLineVisibilityTests
     public void ExactlyThreeLinesAreMain() =>
         Assert.Equal(3, BudgetCategories.Standard.Count(c => BudgetCategories.IsMain(c.Key)));
 }
+
+/// <summary>The detailed budget: every Maxmoney line kept, payslip deductions apart.</summary>
+public class DetailedBudgetTests
+{
+    /// <summary>Category keys already stored on clients' budget rows. Never renamed, only added to.</summary>
+    [Theory]
+    [InlineData("Groceries")] [InlineData("Travel")] [InlineData("MortgageRent")] [InlineData("Education")]
+    [InlineData("Phone")] [InlineData("Alimony")] [InlineData("CreditCard")] [InlineData("Loans")]
+    [InlineData("Clothing")] [InlineData("OtherMedical")] [InlineData("Other")] [InlineData("VehicleInstalment")]
+    [InlineData("GasOil")] [InlineData("WaterElectricity")] [InlineData("Insurance")] [InlineData("HealthInsurance")]
+    [InlineData("Taxes")]
+    public void EveryEarlierLine_IsStillThere(string key) =>
+        Assert.NotNull(BudgetCategories.Find(key));
+
+    [Fact]
+    public void EveryLine_SitsInAKnownGroup_AndTheGroupsHoldOneKindEach()
+    {
+        Assert.All(BudgetCategories.Standard, c => Assert.Contains(c.Group, BudgetCategories.Groups));
+        Assert.All(BudgetCategories.Standard.Where(c => c.Group == BudgetCategories.Payslip),
+            c => Assert.Equal(BudgetLineKind.PayslipDeduction, c.Kind));
+        Assert.All(BudgetCategories.Standard.Where(c => c.Group == BudgetCategories.Debt),
+            c => Assert.Equal(BudgetLineKind.DebtInstalment, c.Kind));
+        Assert.DoesNotContain(BudgetCategories.Standard,
+            c => c.Kind == BudgetLineKind.PayslipDeduction && c.Group != BudgetCategories.Payslip);
+    }
+
+    [Fact]
+    public void PayslipDeductions_AreNeverCountedAsExpensesOrDebt()
+    {
+        var lines = new[]
+        {
+            new ClientBudget { Kind = BudgetLineKind.PayslipDeduction, Amount = 4_000m, Description = "PAYE" },
+            new ClientBudget { Kind = BudgetLineKind.PayslipDeduction, Amount = 700m, Description = "Payroll loan" },
+            new ClientBudget { Kind = BudgetLineKind.Expense, Amount = 3_000m, Description = "Groceries" },
+            new ClientBudget { Kind = BudgetLineKind.DebtInstalment, Amount = 500m, Description = "Loans" }
+        };
+
+        Assert.Equal(3_000m, BudgetCategories.TotalExpenses(lines));
+        Assert.Equal(500m, BudgetCategories.TotalDebtInstalments(lines));
+        Assert.Equal(4_700m, BudgetCategories.TotalPayslipDeductions(lines));
+    }
+
+    [Fact]
+    public void TheFormTotals_LeavePayslipDeductionsOut()
+    {
+        var model = new AMPay.Web.Models.FinancialStepModel
+        {
+            Budget =
+            {
+                new AMPay.Web.Models.BudgetLineModel { Kind = BudgetLineKind.PayslipDeduction, Amount = 4_000m },
+                new AMPay.Web.Models.BudgetLineModel { Kind = BudgetLineKind.Expense, Amount = 3_000m }
+            }
+        };
+
+        Assert.Equal(3_000m, model.TotalExpenses);
+        Assert.Equal(4_000m, model.TotalPayslipDeductions);
+    }
+
+    [Theory]
+    [InlineData(20_000, 15_000, 5_000, null)]     // agrees exactly
+    [InlineData(20_000, 15_000, 4_950, null)]     // R50 off: rounding
+    [InlineData(20_000, 15_000, 3_000, 2_000)]    // R2 000 of deductions not listed
+    [InlineData(20_000, 15_000, 6_000, -1_000)]   // more listed than the payslip shows
+    [InlineData(20_000, 15_000, 0, null)]         // nothing listed yet: nothing to compare
+    public void GrossLessDeductions_IsCheckedAgainstNetPay(decimal gross, decimal net, decimal deductions, int? gap) =>
+        Assert.Equal(gap is null ? null : (decimal?)gap, BudgetCategories.PayslipGap(gross, net, deductions));
+}

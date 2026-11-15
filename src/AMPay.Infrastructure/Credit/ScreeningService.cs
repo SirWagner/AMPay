@@ -41,7 +41,7 @@ public class ScreeningService
     /// </summary>
     public async Task<bool> AffordabilityCapturedAsync(Guid clientId, CancellationToken ct = default) =>
         await _db.ClientFinancials.AnyAsync(f => f.ClientId == clientId && f.GrossMonthlyIncome > 0 && f.NetMonthlyIncome > 0, ct)
-        && await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0, ct);
+        && await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0 && b.Kind != BudgetLineKind.PayslipDeduction, ct);
 
     /// <summary>Everything the check reads, gathered from the client's file.</summary>
     public async Task<GoodToGoInput?> BuildInputAsync(Guid clientId, DateTime todayUtc, CancellationToken ct = default)
@@ -95,7 +95,7 @@ public class ScreeningService
                 .FirstOrDefaultAsync(ct);
 
         var f = c.Financial;
-        var budgetCaptured = await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0, ct);
+        var budgetCaptured = await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0 && b.Kind != BudgetLineKind.PayslipDeduction, ct);
 
         decimal? netOfNet = null;
         if (f is { GrossMonthlyIncome: > 0, NetMonthlyIncome: > 0 })

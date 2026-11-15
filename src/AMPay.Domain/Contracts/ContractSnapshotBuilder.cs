@@ -174,7 +174,12 @@ public static class ContractSnapshotBuilder
             .OrderBy(b => b.Kind).ThenBy(b => b.DisplayOrder)
             .Select(b => new BudgetDetailsLine(
                 b.Description,
-                b.Kind == BudgetLineKind.DebtInstalment ? "Instalment" : "Expense",
+                b.Kind switch
+                {
+                    BudgetLineKind.DebtInstalment => "Instalment",
+                    BudgetLineKind.PayslipDeduction => "Payslip",
+                    _ => "Expense"
+                },
                 b.Amount))
             .ToList();
 

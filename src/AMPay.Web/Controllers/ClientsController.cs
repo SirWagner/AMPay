@@ -516,7 +516,8 @@ public partial class ClientsController : Controller
                 Description = c.Label,
                 Amount = row?.Amount,
                 Note = row?.Notes,
-                Hint = c.Hint
+                Hint = c.Hint,
+                Group = c.Group
             };
 
             if (carryOver && financial is not null)
@@ -570,6 +571,7 @@ public partial class ClientsController : Controller
             line.Kind = c.Kind;
             line.Description = c.Label;
             line.Hint = c.Hint;
+            line.Group = c.Group;
             return line;
         });
 
@@ -1470,7 +1472,7 @@ public partial class ClientsController : Controller
         if (await _db.ClientPhotos.AnyAsync(p => p.ClientId == clientId)) done.Add(OnboardingStep.Photo);
         if (await _db.ClientCreditEnquiries.AnyAsync(e => e.ClientId == clientId && e.Status == CreditEnquiryStatus.ReportReceived))
             done.Add(OnboardingStep.CreditCheck);
-        if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0))
+        if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0 && b.Kind != BudgetLineKind.PayslipDeduction))
             done.Add(OnboardingStep.Budgets);
         if (await _db.ClientNotes.AnyAsync(n => n.ClientId == clientId)) done.Add(OnboardingStep.Notes);
         if ((await _screening.LatestAsync(clientId))?.AllowsCreditCheck == true) done.Add(OnboardingStep.GoodToGo);

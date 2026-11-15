@@ -299,7 +299,7 @@ public class FinancialStepModel
     public string? OtherIncomeSource { get; set; }
 
     /// <summary>
-    /// The budget: every standard category in Maxmoney order, then any lines the operator
+    /// The budget: every standard category, grouped, then any lines the operator
     /// added. The expense and debt totals are always the sums of these lines - there is no
     /// separate total to type in and disagree with them.
     /// </summary>
@@ -316,6 +316,10 @@ public class FinancialStepModel
 
     public decimal TotalDebtInstalments =>
         Budget.Where(l => l.Kind == BudgetLineKind.DebtInstalment).Sum(l => l.Amount ?? 0m);
+
+    /// <summary>What comes off the payslip. Explains gross against net; never deducted from net pay.</summary>
+    public decimal TotalPayslipDeductions =>
+        Budget.Where(l => l.Kind == BudgetLineKind.PayslipDeduction).Sum(l => l.Amount ?? 0m);
 
     /// <summary>Set by the controller; null until there is income to work from.</summary>
     public NetOfNetView? NetOfNet { get; set; }
@@ -343,6 +347,9 @@ public class BudgetLineModel
 
     /// <summary>Display only: guidance for the standard category, if any.</summary>
     public string? Hint { get; set; }
+
+    /// <summary>Display only: the section of the budget the line sits in.</summary>
+    public string? Group { get; set; }
 
     /// <summary>
     /// Chosen from the "Add a budget line" list. Keeps an optional line on screen while it
