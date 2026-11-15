@@ -40,6 +40,8 @@
                 <p class="small muted" style="text-align:center;">Billed to @Model.CustomerName</p>
             }
 
+            <partial name="_PayNowTestMode" />
+
             <form method="post" action="@form.PostUrl" id="payNowForm">
                 @foreach (var field in form.Fields)
                 {

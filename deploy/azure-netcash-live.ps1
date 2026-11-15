@@ -17,6 +17,9 @@
     Afterwards, in the Netcash portal, set the Pay Now service's URLs (printed at the end).
 
 .EXAMPLE
+    ./deploy/azure-netcash-live.ps1 -Account 53117132692 -MandateTemplate NCDCT000003645 -PayNowTestMode
+    # Pay Now live but simulated: tick "Make test mode active" on the Pay Now service in the Netcash portal too.
+.EXAMPLE
     ./deploy/azure-netcash-live.ps1 -Account 53117132692 -MandateTemplate NCDCT000003645
     ./deploy/azure-netcash-live.ps1 -Account 53117132692 -Off      # everything back to the stub
 #>
@@ -26,6 +29,8 @@ param(
     [string]$ResourceGroup = 'rg-ampay-staging',
     [string]$App = 'ampay-staging-o823r',
     [string]$Vault = 'kv-ampay-o823r',
+    # Netcash's Pay Now test mode is ticked in the portal: the app then labels payments as simulated.
+    [switch]$PayNowTestMode,
     [switch]$Off
 )
 
@@ -116,6 +121,7 @@ if ($MandateTemplate) { $settings += "Netcash__MandateTemplates__$Account=$Manda
 
 # ---- the live switches. UseStubs stays as it is: each service is switched on by itself.
 $settings += $switches | ForEach-Object { "Netcash__Live__$_=true" }
+$settings += "Netcash__PayNowTestMode=$(if ($PayNowTestMode) { 'true' } else { 'false' })"
 
 Set-AppSettings $settings
 
@@ -125,6 +131,11 @@ Write-Host "Netcash is LIVE on Azure staging for $Account (the app restarts by i
 Write-Host "  $($switches -join ', ')$(if ($MandateTemplate) { "; DebiCheck template $MandateTemplate" })"
 Write-Host '  Credit bureau (Risk) stays a stub until its key is loaded.'
 Write-Host ''
+if ($PayNowTestMode) {
+    Write-Host 'Pay Now is in TEST MODE in AM-Pay. In the Netcash portal tick "Make test mode active"' -ForegroundColor Yellow
+    Write-Host '(Account profile -> NetConnector -> Pay Now) or real cards will be charged.' -ForegroundColor Yellow
+    Write-Host ''
+}
 Write-Host 'In the Netcash portal -> Pay Now service settings, set:'
 Write-Host "  Accept URL:   $base/Checkout/Accepted"
 Write-Host "  Decline URL:  $base/Checkout/Declined"

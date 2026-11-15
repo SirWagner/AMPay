@@ -51,6 +51,14 @@ public class NetcashOptions
     public NetcashLiveServices Live { get; set; } = new();
 
     /// <summary>
+    /// The Pay Now service is in Netcash's test mode ("Make test mode active" under Account profile >
+    /// NetConnector > Pay Now in the Netcash portal): payments go to the real Pay Now page but are
+    /// simulated. The app cannot read that portal setting; this flag mirrors it, so the Pay Now pages
+    /// say "test mode" and show Netcash's test cards. Keep the two in step.
+    /// </summary>
+    public bool PayNowTestMode { get; set; }
+
+    /// <summary>
     /// Which of the business's keys the validation service (bank account, ID, bank lists) is
     /// called with. Netcash ties it to the Account service.
     /// </summary>

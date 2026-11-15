@@ -1,0 +1,23 @@
+@using AMPay.Infrastructure.Netcash
+@using Microsoft.Extensions.Options
+@inject IOptions<NetcashOptions> Netcash
+@*
+    Shown while Netcash:PayNowTestMode is on. It mirrors the "Make test mode active" tick on the
+    Pay Now service in the Netcash portal (Account profile > NetConnector > Pay Now): with that ticked,
+    Netcash simulates every payment and no money moves. The app cannot see the portal setting,
+    so this flag must be kept in step with it.
+*@
+@if (Netcash.Value.PayNowTestMode && Netcash.Value.Live.PayNow)
+{
+    <div class="paynow-test" role="note">
+        <strong>Pay Now test mode.</strong> Netcash simulates these payments: no money moves. Pay with a test card,
+        any future expiry date, CVV 123:
+        <table class="paynow-test-cards">
+            <tr><td>Visa, approved</td><td class="mono">4000 0000 0000 0002</td></tr>
+            <tr><td>Mastercard, approved</td><td class="mono">5200 0000 0000 0015</td></tr>
+            <tr><td>Visa, declined</td><td class="mono">4000 0000 0000 0036</td></tr>
+            <tr><td>Mastercard, declined</td><td class="mono">5200 0000 0000 0049</td></tr>
+        </table>
+        Keep amounts under R 100: a new Pay Now service hides card payment above that until Netcash raises the limit.
+    </div>
+}

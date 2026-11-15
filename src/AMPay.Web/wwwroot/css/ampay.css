@@ -1554,3 +1554,8 @@ a.badge:hover { filter: brightness(.96); text-decoration: none; }
 .budget-table .budget-check td { background: #fffdf5; }
 .budget-ok { color: #1d7a46; }
 .budget-warn { color: #b42318; }
+
+/* ---- Pay Now test mode notice ---- */
+.paynow-test { background: #fff8e1; border: 1px solid #ecd9a4; color: #6b4e00; border-radius: var(--radius); padding: .75rem .9rem; margin: .75rem 0; font-size: .85rem; line-height: 1.45; }
+.paynow-test-cards { margin: .4rem 0; border-collapse: collapse; }
+.paynow-test-cards td { padding: .1rem .9rem .1rem 0; }
