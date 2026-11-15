@@ -1529,3 +1529,10 @@ a.badge:hover { filter: brightness(.96); text-decoration: none; }
 .photo-field > div:last-child { flex: 1 1 16rem; }
 /* The hidden attribute must win over a component's own display (a .btn is inline-flex). */
 [hidden] { display: none !important; }
+
+/* ---- Reading the ID (id-reader.js) ---- */
+.id-reader { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-bottom: .4rem; }
+.id-reader input[type=file] { flex: 1 1 14rem; min-width: 0; }
+.id-autofilled { background-color: #fff8e1 !important; }
+.hint.id-status-good { color: #1d7a46; }
+.hint.id-status-bad { color: #b42318; }

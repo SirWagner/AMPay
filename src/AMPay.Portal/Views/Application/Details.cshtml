@@ -8,9 +8,25 @@
 <h1>About you</h1>
 <p class="lede">As it appears on your ID.</p>
 
-<form method="post" action="/a/@l.PublicCode/application/details" class="card" novalidate>
+<form method="post" action="/a/@l.PublicCode/application/details" class="card" novalidate data-id-form>
     @Html.AntiForgeryToken()
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="id-reader-box">
+                <div class=""><h2 style="margin-top:0;">Read it from the ID</h2></div>
+                <div class="">
+                    <p class="muted small" style="margin-top:0;">
+                        Take a photo of the ID, or choose a photo or scanned PDF. The barcode on the back of a smart ID card
+                        is the most reliable; a green ID book is read from its printed page. The picture is read on this
+                        device only: it is not uploaded or stored.
+                    </p>
+                    <div class="id-reader">
+                        <input type="file" data-id-reader-file accept="image/*,application/pdf" capture="environment" aria-label="Photo or scan of the ID" />
+                        <button type="button" class="btn btn-outline" data-id-reader-go>Read the ID</button>
+                    </div>
+                    <span class="hint" data-id-reader-status></span>
+                </div>
+            </div>
 
     <div class="grid-2">
         <div class="field">
@@ -23,22 +39,23 @@
         <div></div>
         <div class="field">
             <label asp-for="FirstName"></label>
-            <input asp-for="FirstName" autocomplete="given-name" />
+            <input asp-for="FirstName" autocomplete="given-name" data-id-field="firstName" />
             <span asp-validation-for="FirstName" class="field-error"></span>
         </div>
         <div class="field">
             <label asp-for="Surname"></label>
-            <input asp-for="Surname" autocomplete="family-name" />
+            <input asp-for="Surname" autocomplete="family-name" data-id-field="surname" />
             <span asp-validation-for="Surname" class="field-error"></span>
         </div>
     </div>
     <div class="field">
         <label asp-for="MiddleNames"></label>
-        <input asp-for="MiddleNames" autocomplete="additional-name" />
+        <input asp-for="MiddleNames" autocomplete="additional-name" data-id-field="middleNames" />
     </div>
     <div class="field">
         <label asp-for="IdNumber"></label>
-        <input asp-for="IdNumber" inputmode="numeric" maxlength="13" autocomplete="off" />
+        <input asp-for="IdNumber" inputmode="numeric" maxlength="13" autocomplete="off" data-id-field="idNumber" />
+        <span class="hint" data-id-status></span>
         <span class="hint">13 digits. Applications need a South African ID; if you do not have one, talk to an advisor.</span>
         <span asp-validation-for="IdNumber" class="field-error"></span>
     </div>
@@ -84,3 +101,7 @@
 
     <button type="submit" class="btn btn-primary btn-block">Save and continue</button>
 </form>
+
+@section Scripts {
+    <script src="~/js/id-reader.js" asp-append-version="true"></script>
+}

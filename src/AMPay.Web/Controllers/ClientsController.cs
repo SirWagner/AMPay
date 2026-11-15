@@ -205,6 +205,11 @@ public partial class ClientsController : Controller
                 client.DateOfBirth = dob;
 
             client.Gender ??= SaIdNumber.GetGender(client.IdNumber);
+
+            // Digit 11 says citizen or permanent resident. A resident is not "South African" by nationality.
+            var citizen = SaIdNumber.IsCitizen(client.IdNumber);
+            if (citizen == true && string.IsNullOrWhiteSpace(client.Nationality)) client.Nationality = "South African";
+            else if (citizen == false && client.Nationality == "South African") client.Nationality = null;
         }
 
         await _db.SaveChangesAsync();

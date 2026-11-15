@@ -23,9 +23,25 @@
     }
 
     <div>
-        <form asp-action="General" method="post" enctype="multipart/form-data">
+        <form asp-action="General" method="post" enctype="multipart/form-data" data-id-form>
             <input type="hidden" asp-for="ClientId" />
             <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="card">
+                <div class="card-head"><h2>Read it from the ID</h2></div>
+                <div class="card-body">
+                    <p class="muted small" style="margin-top:0;">
+                        Take a photo of the ID, or choose a photo or scanned PDF. The barcode on the back of a smart ID card
+                        is the most reliable; a green ID book is read from its printed page. The picture is read on this
+                        device only: it is not uploaded or stored.
+                    </p>
+                    <div class="id-reader">
+                        <input type="file" data-id-reader-file accept="image/*,application/pdf" capture="environment" aria-label="Photo or scan of the ID" />
+                        <button type="button" class="btn btn-outline" data-id-reader-go>Read the ID</button>
+                    </div>
+                    <span class="hint" data-id-reader-status></span>
+                </div>
+            </div>
 
             <div class="card">
                 <div class="card-head"><h2>Identity</h2></div>
@@ -51,18 +67,18 @@
 
                         <div class="field">
                             <label asp-for="FirstName"></label>
-                            <input asp-for="FirstName" />
+                            <input asp-for="FirstName" data-id-field="firstName" />
                             <span asp-validation-for="FirstName" class="field-error"></span>
                         </div>
 
                         <div class="field">
                             <label asp-for="MiddleNames"></label>
-                            <input asp-for="MiddleNames" />
+                            <input asp-for="MiddleNames" data-id-field="middleNames" />
                         </div>
 
                         <div class="field">
                             <label asp-for="Surname"></label>
-                            <input asp-for="Surname" />
+                            <input asp-for="Surname" data-id-field="surname" />
                             <span asp-validation-for="Surname" class="field-error"></span>
                         </div>
                     </div>
@@ -73,7 +89,7 @@
                 <div class="card-head"><h2>Identification</h2></div>
                 <div class="card-body">
                     <div class="check" style="margin-bottom:1rem;">
-                        <input asp-for="IsSaIdNumber" type="checkbox" />
+                        <input asp-for="IsSaIdNumber" type="checkbox" data-id-field="isSaId" />
                         <label asp-for="IsSaIdNumber">
                             This client uses a South African ID number
                             <span class="hint" style="display:block;font-weight:400;">
@@ -86,19 +102,20 @@
                     <div class="form-grid">
                         <div class="field">
                             <label asp-for="IdNumber"></label>
-                            <input asp-for="IdNumber" />
+                            <input asp-for="IdNumber" data-id-field="idNumber" inputmode="numeric" autocomplete="off" />
+                            <span class="hint" data-id-status></span>
                             <span asp-validation-for="IdNumber" class="field-error"></span>
                         </div>
 
                         <div class="field">
                             <label asp-for="DateOfBirth"></label>
-                            <input asp-for="DateOfBirth" type="date" />
-                            <span class="hint">Filled in from the ID number when left blank.</span>
+                            <input asp-for="DateOfBirth" type="date" data-id-field="dateOfBirth" />
+                            <span class="hint">Filled in from the ID number.</span>
                         </div>
 
                         <div class="field">
                             <label asp-for="Gender"></label>
-                            <select asp-for="Gender">
+                            <select asp-for="Gender" data-id-field="gender">
                                 <option value="">&mdash;</option>
                                 <option value="Female">Female</option>
                                 <option value="Male">Male</option>
@@ -119,7 +136,7 @@
 
                         <div class="field">
                             <label asp-for="Nationality"></label>
-                            <input asp-for="Nationality" />
+                            <input asp-for="Nationality" data-id-field="nationality" />
                         </div>
 
                         <div class="field">
@@ -151,3 +168,5 @@
         </form>
     </div>
 </div>
+
+<script src="~/js/id-reader.js" asp-append-version="true"></script>
