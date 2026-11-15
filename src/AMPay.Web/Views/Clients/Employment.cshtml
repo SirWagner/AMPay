@@ -18,52 +18,99 @@
             <input type="hidden" asp-for="ClientId" />
             <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
 
+            @{
+                var counts = ViewBag.EmployerClients as Dictionary<Guid, int> ?? new Dictionary<Guid, int>();
+                var mode = employers.Count == 0 ? "new" : Model.EmployerMode == "new" ? "new" : "select";
+            }
             <div class="card">
                 <div class="card-head"><h2>Employer</h2></div>
                 <div class="card-body">
-                    @if (employers.Count > 0)
-                    {
-                        <div class="form-grid employer-pick">
+                    <div class="employer-mode" role="radiogroup" aria-label="Employer">
+                        <label class="employer-mode-option">
+                            <input type="radio" name="EmployerMode" value="select" checked="@(mode == "select")" disabled="@(employers.Count == 0)" />
+                            <span><strong>Select an employer</strong><span class="muted small">
+                                @(employers.Count == 0 ? "Your list is empty: add the first one." : $"From your list of {employers.Count}.")</span></span>
+                        </label>
+                        <label class="employer-mode-option">
+                            <input type="radio" name="EmployerMode" value="new" checked="@(mode == "new")" />
+                            <span><strong>Add a new employer</strong><span class="muted small">Saved to your list for the next client who works there.</span></span>
+                        </label>
+                    </div>
+
+                    <div data-mode="select" hidden="@(mode != "select")">
+                        <div class="form-grid">
                             <div class="field">
-                                <label for="employerSearch">Employer search</label>
-                                <input type="text" id="employerSearch" placeholder="Type part of the name" autocomplete="off" />
-                                <span class="hint">Narrows the Employer list. Leave empty to see every employer.</span>
+                                <label for="employerSearch">Search</label>
+                                <input type="text" id="employerSearch" placeholder="Type part of the name or pay point" autocomplete="off" />
                             </div>
                             <div class="field">
                                 <label asp-for="EmployerId"></label>
                                 <select asp-for="EmployerId">
-                                    <option value="">&mdash; not on the list: type it below &mdash;</option>
+                                    <option value="">&mdash; choose the employer &mdash;</option>
                                     @foreach (var e in employers)
                                     {
                                         <option value="@e.Id" data-name="@e.Name" data-paypoint="@e.PayPoint" data-tel="@e.Telephone"
-                                                data-freq="@e.PayFrequency" data-day="@e.SalaryDay">@e.DisplayName</option>
+                                                data-contact="@e.ContactPerson" data-freq="@e.PayFrequency" data-day="@e.SalaryDay"
+                                                data-verified="@(e.IsVerified ? "1" : "")" data-clients="@counts.GetValueOrDefault(e.Id)">@e.DisplayName</option>
                                     }
                                 </select>
-                                <span class="hint">Picking one fills in the employer's details. A new employer you type is added to the list when you save.</span>
+                                <span asp-validation-for="EmployerId" class="field-error"></span>
                             </div>
                         </div>
-                    }
+                        <div class="employer-card" id="employerCard" hidden>
+                            <div class="flex-between">
+                                <strong id="ecName"></strong>
+                                <span id="ecVerified"></span>
+                            </div>
+                            <dl class="detail-list">
+                                <dt>HR / payroll</dt><dd id="ecTel"></dd>
+                                <dt>Pay cycle</dt><dd id="ecPay"></dd>
+                                <dt>Your clients there</dt><dd id="ecClients"></dd>
+                            </dl>
+                        </div>
+                        <p class="muted small" id="employerNone" hidden>
+                            No employer on your list matches. Choose <strong>Add a new employer</strong> above.
+                        </p>
+                    </div>
+
+                    <div data-mode="new" hidden="@(mode != "new")">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label asp-for="EmployerName"></label>
+                                <input asp-for="EmployerName" autocomplete="off" />
+                                <span asp-validation-for="EmployerName" class="field-error"></span>
+                                <span class="hint" id="employerTwin" hidden></span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="PayPoint"></label>
+                                <input asp-for="PayPoint" />
+                                <span class="hint">The branch or site that pays, if the employer has more than one.</span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="NewEmployerTelephone"></label>
+                                <input asp-for="NewEmployerTelephone" type="tel" />
+                                <span class="hint">The number your staff phone to confirm someone works there.</span>
+                            </div>
+                            <div class="field">
+                                <label asp-for="NewEmployerContact"></label>
+                                <input asp-for="NewEmployerContact" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h2>The client at this employer</h2></div>
+                <div class="card-body">
                     <div class="form-grid">
                         <div class="field">
-                            <label asp-for="EmployerName"></label>
-                            <input asp-for="EmployerName" />
-                            @if (employers.Count == 0)
-                            {
-                                <span class="hint">Saved to your employer list, so the next client at the same company can simply pick it.</span>
-                            }
-                        </div>
-                        <div class="field">
-                            <label asp-for="PayPoint"></label>
-                            <input asp-for="PayPoint" />
-                            <span class="hint">The branch or site that pays, if the employer has more than one.</span>
+                            <label asp-for="EmployeeNumber"></label>
+                            <input asp-for="EmployeeNumber" />
                         </div>
                         <div class="field">
                             <label asp-for="PayPointNumber"></label>
                             <input asp-for="PayPointNumber" />
-                        </div>
-                        <div class="field">
-                            <label asp-for="EmployeeNumber"></label>
-                            <input asp-for="EmployeeNumber" />
                         </div>
                         <div class="field">
                             <label asp-for="OtherEmployerReference"></label>
@@ -111,10 +158,12 @@
                             <label asp-for="EmployedSince"></label>
                             <input asp-for="EmployedSince" type="date" />
                         </div>
-                        <div class="field">
+                        @* Only fixed-term work ends on a date: shown for Contract and Temporary alone. *@
+                        <div class="field" id="contractExpiryField"
+                             hidden="@(!AMPay.Web.Models.EmploymentStepModel.FixedTermTypes.Contains(Model.EmploymentType))">
                             <label asp-for="ContractExpiryDate"></label>
                             <input asp-for="ContractExpiryDate" type="date" />
-                            <span class="hint">For contract and temporary staff. A loan should not run past it.</span>
+                            <span class="hint">When the contract ends. A loan should not run past it.</span>
                         </div>
                         <div class="field">
                             <label asp-for="YearsAtPreviousEmployer"></label>
@@ -159,39 +208,91 @@
     </div>
 </div>
 
-@if (employers.Count > 0)
-{
 <script>
 (function () {
-    var pick = document.getElementById('EmployerId'), search = document.getElementById('employerSearch');
-    var name = document.getElementById('EmployerName'), point = document.getElementById('PayPoint');
-    var tel = document.getElementById('WorkTelephone'), freq = document.getElementById('PayFrequency');
-    var day = document.getElementById('SalaryDay');
+    var $ = function (id) { return document.getElementById(id); };
+    var name = $('EmployerName'), point = $('PayPoint'), tel = $('WorkTelephone');
+    var freq = $('PayFrequency'), day = $('SalaryDay');
+
+    // ---- the contract expiry date belongs to fixed-term work only
+    var type = $('EmploymentType'), expiryField = $('contractExpiryField'), expiry = $('ContractExpiryDate');
+    var fixedTerm = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(AMPay.Web.Models.EmploymentStepModel.FixedTermTypes));
+    function showExpiry() {
+        var on = fixedTerm.indexOf(type.value) >= 0;
+        expiryField.hidden = !on;
+        if (!on) expiry.value = '';
+    }
+    type.addEventListener('change', showExpiry);
+
+    // ---- select an employer, or add a new one
+    var pick = $('EmployerId');
+    if (!pick) return;
+    var search = $('employerSearch'), card = $('employerCard'), none = $('employerNone'), twin = $('employerTwin');
     var all = Array.prototype.slice.call(pick.options, 1);
+    var panes = document.querySelectorAll('[data-mode]');
+
+    function mode() { var m = document.querySelector('input[name="EmployerMode"]:checked'); return m ? m.value : 'new'; }
+    function showMode() {
+        var m = mode();
+        panes.forEach(function (p) { p.hidden = p.dataset.mode !== m; });
+        if (m === 'new') { pick.value = ''; card.hidden = true; name.focus(); }
+        else { showCard(); search.focus(); }
+    }
+    document.querySelectorAll('input[name="EmployerMode"]').forEach(function (r) { r.addEventListener('change', showMode); });
 
     // Rebuilding the list, not hiding options: a hidden option still shows on a phone.
     search.addEventListener('input', function () {
         var term = search.value.trim().toLowerCase(), chosen = pick.value;
         all.forEach(function (o) { if (o.parentNode) pick.removeChild(o); });
-        all.filter(function (o) { return !term || o.value === chosen || o.text.toLowerCase().indexOf(term) >= 0; })
-           .forEach(function (o) { pick.appendChild(o); });
+        var shown = all.filter(function (o) { return !term || o.value === chosen || o.text.toLowerCase().indexOf(term) >= 0; });
+        shown.forEach(function (o) { pick.appendChild(o); });
+        none.hidden = shown.length > 0;
+        // One match: pick it, saving a click.
+        if (term && shown.length === 1 && pick.value !== shown[0].value) { pick.value = shown[0].value; choose(); }
     });
 
-    pick.addEventListener('change', function () {
+    function showCard() {
         var o = pick.options[pick.selectedIndex];
+        if (!o || !o.value) { card.hidden = true; return; }
+        var d = o.dataset, n = +d.clients || 0;
+        $('ecName').textContent = o.text;
+        $('ecVerified').innerHTML = d.verified ? '<span class="badge badge-green">Confirmed</span>' : '<span class="badge badge-amber">Not confirmed</span>';
+        $('ecTel').textContent = (d.tel || 'No number on file') + (d.contact ? ' (' + d.contact + ')' : '');
+        $('ecPay').textContent = (d.freq || 'Pay cycle not on file') + (d.day ? ', day ' + d.day : '');
+        $('ecClients').textContent = n === 0 ? 'None yet' : n === 1 ? '1 client' : n + ' clients';
+        card.hidden = false;
+    }
+
+    function choose() {
+        var o = pick.options[pick.selectedIndex];
+        showCard();
         if (!o || !o.value) return;
         name.value = o.dataset.name || '';
         point.value = o.dataset.paypoint || '';
         if (!tel.value && o.dataset.tel) tel.value = o.dataset.tel;
         if (o.dataset.freq) freq.value = o.dataset.freq;
         if (o.dataset.day) day.value = o.dataset.day;
+    }
+    pick.addEventListener('change', choose);
+
+    // Adding one that is already on the list would make a duplicate: offer the existing one.
+    name.addEventListener('input', function () {
+        var v = name.value.trim().toLowerCase();
+        var match = v.length >= 3 && all.find(function (o) { return (o.dataset.name || '').toLowerCase() === v; });
+        twin.hidden = !match;
+        if (match) {
+            twin.innerHTML = '';
+            twin.append('Already on your list: ' + match.text + '. ');
+            var a = document.createElement('a'); a.href = '#'; a.textContent = 'Select it instead';
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector('input[name="EmployerMode"][value="select"]').checked = true;
+                showMode(); pick.value = match.value; choose();
+            });
+            twin.append(a);
+        }
     });
 
-    // Typing a different name means a different employer: let go of the one picked.
-    name.addEventListener('input', function () {
-        var o = pick.options[pick.selectedIndex];
-        if (o && o.value && (o.dataset.name || '') !== name.value) pick.value = '';
-    });
+    showCard();
 })();
 </script>
-}

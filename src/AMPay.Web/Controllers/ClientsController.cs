@@ -295,6 +295,17 @@ public partial class ClientsController : Controller
         var client = await LoadClientAsync(model.ClientId, c => c.Employment);
         if (client is null) return NotFound();
 
+        var adding = model.EmployerMode == "new";
+        if (adding && string.IsNullOrWhiteSpace(model.EmployerName))
+            ModelState.AddModelError(nameof(model.EmployerName), "Enter the new employer's name.");
+        // Someone in a job works for someone: in select mode that someone must be picked.
+        if (!adding && model.EmployerId is null && model.EmploymentType is "Permanent" or "Contract" or "Temporary"
+            && await _db.Employers.AnyAsync(x => x.TenantId == client.TenantId && x.IsActive))
+            ModelState.AddModelError(nameof(model.EmployerId), "Select the employer, or choose Add a new employer.");
+
+        // Only fixed-term work ends on a date. A permanent job carries no expiry, whatever was typed before.
+        if (!EmploymentStepModel.FixedTermTypes.Contains(model.EmploymentType)) model.ContractExpiryDate = null;
+
         if (!ModelState.IsValid)
         {
             await PopulateWizardAsync(model.ClientId);
@@ -306,14 +317,21 @@ public partial class ClientsController : Controller
             () => new ClientEmployment { ClientId = client.Id });
         client.Employment = e;
 
-        // Picked from the list, matched to it by name, or added to it - so the next client at
-        // the same company picks it instead of typing it.
+        // Picked from the list, or added to it (matched first, so the same company is never on
+        // the list twice) - the next client at the same company picks it instead of typing it.
         var employer = await EmployerDirectory.ResolveAsync(
-            _db, client.TenantId, model.EmployerId, model.EmployerName, model.PayPoint);
+            _db, client.TenantId, adding ? null : model.EmployerId, model.EmployerName, model.PayPoint);
         if (employer is not null && _db.Entry(employer).State == EntityState.Added)
         {
             employer.PayFrequency = model.PayFrequency;
             employer.SalaryDay = model.SalaryDay;
+            employer.Telephone = model.NewEmployerTelephone?.Trim();
+            employer.ContactPerson = model.NewEmployerContact?.Trim();
+            TempData["Info"] = $"{employer.DisplayName} added to your employer list.";
+        }
+        else if (adding && employer is not null)
+        {
+            TempData["Info"] = $"{employer.DisplayName} was already on your employer list, so that entry was used.";
         }
 
         e.EmployerId = employer?.Id;
@@ -1474,11 +1492,20 @@ public partial class ClientsController : Controller
     }
 
     /// <summary>The lender's employer list for the Employment step's picker.</summary>
-    private async Task PopulateEmployersAsync(Guid tenantId, Guid? selected) =>
+    private async Task PopulateEmployersAsync(Guid tenantId, Guid? selected)
+    {
         ViewBag.Employers = await _db.Employers.AsNoTracking()
             .Where(e => e.TenantId == tenantId && (e.IsActive || e.Id == selected))
             .OrderBy(e => e.Name).ThenBy(e => e.PayPoint)
             .ToListAsync();
+
+        // How many of the lender's clients work at each employer: shown when one is selected.
+        ViewBag.EmployerClients = await _db.ClientEmployments.AsNoTracking()
+            .Where(x => x.EmployerId != null && x.Client!.TenantId == tenantId)
+            .GroupBy(x => x.EmployerId!.Value)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count);
+    }
 
     private async Task PopulateBanksAsync()
     {

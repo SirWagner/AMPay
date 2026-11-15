@@ -1536,3 +1536,13 @@ a.badge:hover { filter: brightness(.96); text-decoration: none; }
 .id-autofilled { background-color: #fff8e1 !important; }
 .hint.id-status-good { color: #1d7a46; }
 .hint.id-status-bad { color: #b42318; }
+
+/* ---- Employment step: select or add an employer ---- */
+.employer-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: .6rem; margin-bottom: 1rem; }
+.employer-mode-option { display: flex; gap: .6rem; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius); padding: .7rem .85rem; cursor: pointer; }
+.employer-mode-option:has(input:checked) { border-color: var(--navy); background: #f3f6fc; }
+.employer-mode-option:has(input:disabled) { opacity: .55; cursor: default; }
+.employer-mode-option input { margin-top: .2rem; }
+.employer-mode-option > span { display: grid; gap: .1rem; }
+.employer-card { border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem .9rem; background: #fafbfd; margin-top: .25rem; }
+.employer-card .detail-list { margin: .5rem 0 0; }

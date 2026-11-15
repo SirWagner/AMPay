@@ -215,9 +215,23 @@ public class EmploymentStepModel
 {
     public Guid ClientId { get; set; }
 
-    /// <summary>The employer picked from the lender's list. Empty when a new one is typed.</summary>
+    /// <summary>"select" to pick from the lender's employer list, "new" to add an employer to it.</summary>
+    public string EmployerMode { get; set; } = "select";
+
+    /// <summary>The employer picked from the lender's list. Empty when a new one is added.</summary>
     [Display(Name = "Employer")]
     public Guid? EmployerId { get; set; }
+
+    // A new employer's own details, saved to the list for the next client who works there.
+
+    [Display(Name = "HR / payroll telephone"), StringLength(20)]
+    public string? NewEmployerTelephone { get; set; }
+
+    [Display(Name = "Contact person at the employer"), StringLength(200)]
+    public string? NewEmployerContact { get; set; }
+
+    /// <summary>The only kinds of work that end on a date. The expiry date is asked for these alone.</summary>
+    public static readonly string[] FixedTermTypes = { "Contract", "Temporary" };
 
     [Display(Name = "Employer name"), StringLength(200)]
     public string? EmployerName { get; set; }
