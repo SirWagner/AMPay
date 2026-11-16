@@ -205,6 +205,16 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("Nationality")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("PortalAccessUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PortalPublishedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PortalStatementHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("PreferredLanguage")
                         .HasColumnType("nvarchar(max)");
 

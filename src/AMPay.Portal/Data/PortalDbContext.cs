@@ -15,6 +15,7 @@ public class PortalDbContext : DbContext
     public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
     public DbSet<LenderLogo> LenderLogos => Set<LenderLogo>();
     public DbSet<LinkEvent> LinkEvents => Set<LinkEvent>();
+    public DbSet<ClientAccount> ClientAccounts => Set<ClientAccount>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -106,6 +107,18 @@ public class PortalDbContext : DbContext
         {
             e.HasIndex(x => new { x.LenderId, x.OccurredUtc });
             e.HasOne<Lender>().WithMany().HasForeignKey(x => x.LenderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ClientAccount>(e =>
+        {
+            e.HasIndex(x => new { x.LenderId, x.AmpayClientId }).IsUnique();
+            e.HasIndex(x => new { x.LenderId, x.Mobile });
+            e.Property(x => x.ClientNumber).HasMaxLength(50).IsRequired();
+            e.Property(x => x.FullName).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Mobile).HasMaxLength(15).IsRequired();
+            e.Property(x => x.IdNumberHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.StatementJson).IsRequired();
+            e.HasOne(x => x.Lender).WithMany().HasForeignKey(x => x.LenderId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<OtpChallenge>(e =>

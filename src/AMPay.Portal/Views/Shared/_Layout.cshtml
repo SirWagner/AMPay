@@ -46,10 +46,17 @@
         </div>
         @if (signedIn)
         {
-            <form method="post" action="/a/@lender!.PublicCode/signout">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="linkish">Sign out</button>
-            </form>
+            var path = Context.Request.Path.Value ?? "";
+            <div class="top-actions">
+                <nav class="account-nav" aria-label="Your pages">
+                    <a href="/a/@lender!.PublicCode/account" aria-current="@(path.Contains("/account") ? "page" : null)">My loans</a>
+                    <a href="/a/@lender.PublicCode/application" aria-current="@(path.Contains("/application") ? "page" : null)">Application</a>
+                </nav>
+                <form method="post" action="/a/@lender.PublicCode/signout">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="linkish">Sign out</button>
+                </form>
+            </div>
         }
     </div>
 </header>

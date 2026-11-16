@@ -1343,6 +1343,10 @@ public partial class ClientsController : Controller
         ViewBag.RecentNotes = await _db.ClientNotes.AsNoTracking()
             .Where(n => n.ClientId == id).OrderByDescending(n => n.CreatedUtc).Take(4).ToListAsync();
 
+        var publisher = HttpContext.RequestServices.GetRequiredService<AMPay.Web.Services.ClientPortalPublisher>();
+        ViewBag.PortalConfigured = publisher.IsConfigured;
+        ViewBag.PortalLink = AccountLinkFor(publisher, client.TenantId);
+
         await PopulateWizardAsync(id);
         return View(client);
     }

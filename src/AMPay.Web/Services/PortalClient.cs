@@ -38,6 +38,12 @@ public interface IPortalApi
     Task<IReadOnlyList<PortalCallback>> CallbacksAsync(Guid tenantId, CancellationToken ct = default);
     Task MarkCallbackHandledAsync(Guid tenantId, Guid id, CancellationToken ct = default);
     Task<PortalFunnel?> FunnelAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+
+    /// <summary>Replaces the client's account view on the portal: loans, schedule and payments.</summary>
+    Task PutClientAsync(PortalClientStatement statement, CancellationToken ct = default) => throw new NotSupportedException();
+
+    /// <summary>Removes the client's account view; anyone signed in to it loses it.</summary>
+    Task DeleteClientAsync(Guid tenantId, Guid clientId, CancellationToken ct = default) => throw new NotSupportedException();
 }
 
 /// <summary>
@@ -116,6 +122,12 @@ public class PortalClient : IPortalApi
 
     public Task<PortalFunnel?> FunnelAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) =>
         GetAsync<PortalFunnel>($"{PortalApi.FunnelPath}?tenantId={tenantId}&fromUtc={fromUtc:O}&toUtc={toUtc:O}", ct);
+
+    public Task PutClientAsync(PortalClientStatement statement, CancellationToken ct = default) =>
+        SendAsync(() => _http.PutAsJsonAsync($"{PortalApi.ClientsPath}/{statement.AmpayClientId}?tenantId={statement.TenantId}", statement, ct));
+
+    public Task DeleteClientAsync(Guid tenantId, Guid clientId, CancellationToken ct = default) =>
+        SendAsync(() => _http.DeleteAsync($"{PortalApi.ClientsPath}/{clientId}?tenantId={tenantId}", ct));
 
     // ---------------------------------------------------------------- plumbing
 

@@ -1,0 +1,116 @@
+@using AMPay.Domain.Portal
+@model PortalClientStatement
+@{
+    var client = (Client)ViewBag.Client;
+    var link = ViewBag.Link as string;
+    string R(decimal? v) => v is null ? "-" : "R " + v.Value.ToString("N2");
+    string D(DateTime? v) => v is null ? "-" : v.Value.ToString("d MMM yyyy");
+    string Badge(string s) => s switch
+    {
+        "Paid" or "Received" or "Active" or "Paid up" => "badge-green",
+        "Overdue" or "Part paid - overdue" or "Unpaid" or "Not approved" or "Written off" or "Declined" => "badge-red",
+        "Due today" or "Part paid" or "Waiting for your approval" or "Pending at the bank" or "Being assessed" or "Approved - not yet paid out" or "Being set up" => "badge-amber",
+        _ => ""
+    };
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>What @client.FullName sees online</h1>
+        <p class="lede" style="margin:0;">
+            The same figures the client's online account shows@(link is null ? "" : " at " + link).
+            @if (client.PortalAccessUtc is null) { <text>The client has no access yet.</text> }
+        </p>
+    </div>
+    <a asp-action="Details" asp-route-id="@client.Id" class="btn btn-outline">Back to the client</a>
+</div>
+
+@if (string.IsNullOrEmpty(Model.Mobile))
+{
+    <div class="alert alert-warn">There is no cell number on file, so the client cannot sign in. Capture one on the Address step.</div>
+}
+
+@if (!Model.Loans.Any())
+{
+    <div class="card"><div class="empty">No loans to show yet. Draft loans are not shown to the client.</div></div>
+}
+
+@foreach (var loan in Model.Loans)
+{
+    <div class="card">
+        <div class="card-head flex-between">
+            <h3>Loan @loan.LoanNumber</h3>
+            <span class="badge @Badge(loan.Status)">@loan.Status</span>
+        </div>
+        <div class="card-body">
+            <div class="stat-grid">
+                <div class="stat"><div class="label">Paid so far</div><div class="value tnum">@R(loan.PaidToDate)</div><div class="note">@loan.InstalmentsPaid of @loan.Schedule.Count instalments</div></div>
+                <div class="stat"><div class="label">Remaining instalments</div><div class="value tnum">@R(loan.RemainingInstalments)</div><div class="note">next @R(loan.NextDueAmount) on @D(loan.NextDueDate)</div></div>
+                <div class="stat"><div class="label">Overdue</div><div class="value tnum @(loan.ArrearsAmount > 0 ? "warn" : "")">@R(loan.ArrearsAmount)</div><div class="note">@(loan.DaysPastDue > 0 ? $"oldest {loan.DaysPastDue} days" : "nothing past due")</div></div>
+            </div>
+
+            <h4 style="margin-top:16px;">Cost of credit, as shown</h4>
+            <div class="table-wrap">
+                <table class="data">
+                    <tbody>
+                        <tr><td>Amount received</td><td class="num">@R(loan.Principal)</td></tr>
+                        <tr><td>Initiation fee</td><td class="num">@R(loan.InitiationFee)</td></tr>
+                        <tr><td>Interest (@((loan.MonthlyInterestRate * 100).ToString("0.##"))% a month)</td><td class="num">@R(loan.TotalInterest)</td></tr>
+                        <tr><td>Service fees</td><td class="num">@R(loan.TotalServiceFees)</td></tr>
+                        <tr><td>VAT</td><td class="num">@R(loan.TotalVat)</td></tr>
+                        <tr><td>Credit life</td><td class="num">@R(loan.TotalCreditLife)</td></tr>
+                        @if (loan.FuneralCover > 0) { <tr><td>Funeral cover</td><td class="num">@R(loan.FuneralCover)</td></tr> }
+                        <tr><td><strong>Total cost of credit</strong></td><td class="num"><strong>@R(loan.TotalCostOfCredit)</strong></td></tr>
+                        <tr><td><strong>Total repayable</strong></td><td class="num"><strong>@R(loan.TotalRepayable)</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            @if (loan.DebitOrder is { } m)
+            {
+                <p class="small" style="margin-top:12px;">
+                    <strong>Debit order:</strong> <span class="badge @Badge(m.Status)">@m.Status</span>
+                    @R(m.Amount) @m.Frequency.ToLowerInvariant()@(m.Bank is null ? "" : $" from {m.Bank} {m.MaskedAccount}")
+                </p>
+            }
+
+            <h4 style="margin-top:16px;">Payments and debits (@loan.Payments.Count)</h4>
+            @if (loan.Payments.Any())
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Date</th><th>How</th><th class="num">Amount</th><th>Result</th></tr></thead>
+                        <tbody>
+                            @foreach (var p in loan.Payments)
+                            {
+                                <tr>
+                                    <td>@D(p.Date)</td>
+                                    <td>@p.Method</td>
+                                    <td class="num">@R(p.Amount)</td>
+                                    <td><span class="badge @Badge(p.Status)">@p.Status</span> <span class="small">@p.Reason</span>@if (p.RecoveredLater) {<span class="small muted"> · paid later</span>}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="muted small">None yet.</p>
+            }
+
+            <h4 style="margin-top:16px;">Schedule (@loan.Schedule.Count instalments)</h4>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>#</th><th>Due</th><th class="num">Instalment</th><th class="num">Paid</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in loan.Schedule)
+                        {
+                            <tr><td>@e.Number</td><td>@D(e.DueDate)</td><td class="num">@R(e.Total)</td><td class="num">@R(e.Paid)</td><td><span class="badge @Badge(e.Status)">@e.Status</span></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

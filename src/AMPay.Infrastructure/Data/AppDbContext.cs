@@ -197,6 +197,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             e.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             e.Property(x => x.Surname).HasMaxLength(100).IsRequired();
             e.Property(x => x.IdNumber).HasMaxLength(20).IsRequired();
+            e.Property(x => x.PortalStatementHash).HasMaxLength(64);
 
             // Field 101 must be unique in the tenant Netcash masterfile, so enforce it here too.
             e.HasIndex(x => new { x.TenantId, x.ClientNumber }).IsUnique();

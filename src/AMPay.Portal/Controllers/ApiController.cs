@@ -198,6 +198,63 @@ public class ApiController : ControllerBase
         return NoContent();
     }
 
+    // ---------------------------------------------------------------- client accounts
+
+    /// <summary>
+    /// Creates or replaces one client's account view: loans, schedule and payments. AM-Pay
+    /// sends the whole statement each time, so nothing here is ever patched.
+    /// </summary>
+    [HttpPut("clients/{clientId:guid}")]
+    [RequestSizeLimit(4 * 1024 * 1024)]
+    public async Task<IActionResult> PutClient(Guid clientId, Guid tenantId, PortalClientStatement body)
+    {
+        if (body.AmpayClientId != clientId || body.TenantId != tenantId) return BadRequest("The statement is for a different client.");
+
+        var mobile = PortalApi.NormaliseMobile(body.Mobile);
+        if (mobile is null) return BadRequest("The client has no cell number to sign in with.");
+        if (body.IdNumberHash is not { Length: 64 }) return BadRequest("The ID number fingerprint is missing.");
+
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return NotFound("This lender has no self-service link yet.");
+
+        var account = await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender.Id && a.AmpayClientId == clientId);
+        if (account is null)
+        {
+            account = new ClientAccount { LenderId = lender.Id, AmpayClientId = clientId };
+            _db.ClientAccounts.Add(account);
+        }
+
+        // A statement older than the one held arrives late: keep the newer.
+        if (account.GeneratedUtc > body.GeneratedUtc) return NoContent();
+
+        account.ClientNumber = body.ClientNumber;
+        account.FullName = body.FullName;
+        account.Mobile = mobile;
+        account.IdNumberHash = body.IdNumberHash;
+        account.StatementJson = JsonSerializer.Serialize(body);
+        account.GeneratedUtc = body.GeneratedUtc;
+        account.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>The lender withdrew the client's access. Anyone linked to it is unlinked.</summary>
+    [HttpDelete("clients/{clientId:guid}")]
+    public async Task<IActionResult> DeleteClient(Guid clientId, Guid tenantId)
+    {
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return NoContent();
+
+        var account = await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender.Id && a.AmpayClientId == clientId);
+        if (account is null) return NoContent();
+
+        await _db.Applicants.Where(a => a.ClientAccountId == account.Id)
+            .ForEachAsync(a => { a.ClientAccountId = null; a.AccountLinkedUtc = null; });
+        _db.ClientAccounts.Remove(account);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // ---------------------------------------------------------------- funnel
 
     /// <summary>Counts for the lender's dashboard: link opens, applications started and submitted.</summary>

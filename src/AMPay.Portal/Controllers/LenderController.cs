@@ -158,7 +158,12 @@ public class LenderController : PortalControllerBase
         }, ApplicantClaims.Scheme);
 
         await HttpContext.SignInAsync(ApplicantClaims.Scheme, new ClaimsPrincipal(identity));
-        return RedirectToAction("Index", "Application", new { code });
+
+        // An existing client lands on their loans; anyone else on their application.
+        var isClient = await Db.ClientAccounts.AnyAsync(a => a.LenderId == lender.Id && a.Mobile == applicant.Mobile);
+        return isClient
+            ? RedirectToAction("Index", "Account", new { code })
+            : RedirectToAction("Index", "Application", new { code });
     }
 
     [HttpPost("signout")]

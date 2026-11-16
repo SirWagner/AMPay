@@ -49,6 +49,17 @@ public class Client
     public DateTime? UpdatedUtc { get; set; }
     public string? CreatedByUserId { get; set; }
 
+    // ---- The client's own account on the self-service portal ----
+
+    /// <summary>When the lender gave the client access to their account online. Null: no access.</summary>
+    public DateTime? PortalAccessUtc { get; set; }
+
+    /// <summary>When the client's statement last reached the portal.</summary>
+    public DateTime? PortalPublishedUtc { get; set; }
+
+    /// <summary>Fingerprint of the statement last sent, so an unchanged account is not sent again.</summary>
+    public string? PortalStatementHash { get; set; }
+
     public string FullName => string.Join(' ',
         new[] { FirstName, MiddleNames, Surname }.Where(s => !string.IsNullOrWhiteSpace(s)));
 

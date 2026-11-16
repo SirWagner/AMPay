@@ -1,0 +1,18 @@
+@{
+    var l = (Lender)ViewData["Lender"]!;
+}
+
+<div class="card">
+    <h1>My loans</h1>
+    <p class="lede">
+        @l.DisplayName has not opened an online account for this cell number yet.
+    </p>
+    <p>
+        Your account appears here once @l.DisplayName gives you access - usually when your loan is approved.
+        If you were sent a link and still see this, the lender may have a different cell number for you.
+    </p>
+    <div class="actions">
+        <a class="btn btn-primary" href="/a/@l.PublicCode/application">Apply or continue an application</a>
+        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask the lender to call me</a>
+    </div>
+</div>

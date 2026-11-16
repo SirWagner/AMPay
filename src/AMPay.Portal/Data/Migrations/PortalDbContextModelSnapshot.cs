@@ -28,8 +28,17 @@ namespace AMPay.Portal.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("AccountLinkedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ClientAccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("FailedIdAttempts")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("LastSignInUtc")
                         .HasColumnType("datetime2");
@@ -139,6 +148,58 @@ namespace AMPay.Portal.Data.Migrations
                     b.HasIndex("LenderId", "HandledUtc");
 
                     b.ToTable("Callbacks");
+                });
+
+            modelBuilder.Entity("AMPay.Portal.Data.ClientAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AmpayClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClientNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime>("GeneratedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IdNumberHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("LenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Mobile")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("nvarchar(15)");
+
+                    b.Property<string>("StatementJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LenderId", "AmpayClientId")
+                        .IsUnique();
+
+                    b.HasIndex("LenderId", "Mobile");
+
+                    b.ToTable("ClientAccounts");
                 });
 
             modelBuilder.Entity("AMPay.Portal.Data.Lender", b =>
@@ -485,6 +546,17 @@ namespace AMPay.Portal.Data.Migrations
                         .WithMany()
                         .HasForeignKey("LenderId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Lender");
+                });
+
+            modelBuilder.Entity("AMPay.Portal.Data.ClientAccount", b =>
+                {
+                    b.HasOne("AMPay.Portal.Data.Lender", "Lender")
+                        .WithMany()
+                        .HasForeignKey("LenderId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Lender");

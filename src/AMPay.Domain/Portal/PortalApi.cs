@@ -23,6 +23,7 @@ public static class PortalApi
     public const string ApplicationsPath = "api/v1/applications";
     public const string CallbacksPath = "api/v1/callbacks";
     public const string FunnelPath = "api/v1/funnel";
+    public const string ClientsPath = "api/v1/clients";
 
     /// <summary>
     /// A lender's short public code: six characters from an alphabet without look-alikes,
