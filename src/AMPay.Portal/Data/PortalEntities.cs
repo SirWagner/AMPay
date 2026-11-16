@@ -56,12 +56,34 @@ public class Applicant
     public Guid? ClientAccountId { get; set; }
     public DateTime? AccountLinkedUtc { get; set; }
 
+    /// <summary>
+    /// The lender confirmed this person is their client although the cell number differs from
+    /// the one on file (an approved <see cref="AccountLinkRequest"/>).
+    /// </summary>
+    public bool LinkApprovedByLender { get; set; }
+
     /// <summary>Wrong ID numbers typed in a row. Five locks the account view until the lender helps.</summary>
     public int FailedIdAttempts { get; set; }
 
     public ICollection<LoanApplication> Applications { get; set; } = new List<LoanApplication>();
 
     public const int MaxIdAttempts = 5;
+}
+
+public enum LinkRequestStatus { Pending = 0, Approved = 1, Rejected = 2 }
+
+/// <summary>"I am already a client": waits for the lender to confirm before any account is shown.</summary>
+public class AccountLinkRequest
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid LenderId { get; set; }
+    public Guid ApplicantId { get; set; }
+    public string Mobile { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string? FullName { get; set; }
+    public LinkRequestStatus Status { get; set; }
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? DecidedUtc { get; set; }
 }
 
 /// <summary>

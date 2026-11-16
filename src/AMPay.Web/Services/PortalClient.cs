@@ -44,6 +44,13 @@ public interface IPortalApi
 
     /// <summary>Removes the client's account view; anyone signed in to it loses it.</summary>
     Task DeleteClientAsync(Guid tenantId, Guid clientId, CancellationToken ct = default) => throw new NotSupportedException();
+
+    /// <summary>"I am already a client" requests waiting for the lender.</summary>
+    Task<IReadOnlyList<PortalLinkRequest>> LinkRequestsAsync(Guid tenantId, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<PortalLinkRequest>>(Array.Empty<PortalLinkRequest>());
+
+    Task ApproveLinkRequestAsync(Guid tenantId, Guid requestId, PortalLinkApproval body, CancellationToken ct = default) => throw new NotSupportedException();
+    Task RejectLinkRequestAsync(Guid tenantId, Guid requestId, CancellationToken ct = default) => throw new NotSupportedException();
 }
 
 /// <summary>
@@ -128,6 +135,15 @@ public class PortalClient : IPortalApi
 
     public Task DeleteClientAsync(Guid tenantId, Guid clientId, CancellationToken ct = default) =>
         SendAsync(() => _http.DeleteAsync($"{PortalApi.ClientsPath}/{clientId}?tenantId={tenantId}", ct));
+
+    public async Task<IReadOnlyList<PortalLinkRequest>> LinkRequestsAsync(Guid tenantId, CancellationToken ct = default) =>
+        await GetAsync<List<PortalLinkRequest>>($"{PortalApi.LinkRequestsPath}?tenantId={tenantId}", ct) ?? new();
+
+    public Task ApproveLinkRequestAsync(Guid tenantId, Guid requestId, PortalLinkApproval body, CancellationToken ct = default) =>
+        SendAsync(() => _http.PostAsJsonAsync($"{PortalApi.LinkRequestsPath}/{requestId}/approve?tenantId={tenantId}", body, ct));
+
+    public Task RejectLinkRequestAsync(Guid tenantId, Guid requestId, CancellationToken ct = default) =>
+        SendAsync(() => _http.PostAsync($"{PortalApi.LinkRequestsPath}/{requestId}/reject?tenantId={tenantId}", null, ct));
 
     // ---------------------------------------------------------------- plumbing
 

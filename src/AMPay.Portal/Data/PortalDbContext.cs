@@ -16,6 +16,7 @@ public class PortalDbContext : DbContext
     public DbSet<LenderLogo> LenderLogos => Set<LenderLogo>();
     public DbSet<LinkEvent> LinkEvents => Set<LinkEvent>();
     public DbSet<ClientAccount> ClientAccounts => Set<ClientAccount>();
+    public DbSet<AccountLinkRequest> LinkRequests => Set<AccountLinkRequest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -119,6 +120,15 @@ public class PortalDbContext : DbContext
             e.Property(x => x.IdNumberHash).HasMaxLength(64).IsRequired();
             e.Property(x => x.StatementJson).IsRequired();
             e.HasOne(x => x.Lender).WithMany().HasForeignKey(x => x.LenderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<AccountLinkRequest>(e =>
+        {
+            e.HasIndex(x => new { x.LenderId, x.Status });
+            e.HasIndex(x => x.ApplicantId);
+            e.Property(x => x.Mobile).HasMaxLength(15).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(254).IsRequired();
+            e.Property(x => x.FullName).HasMaxLength(200);
         });
 
         b.Entity<OtpChallenge>(e =>

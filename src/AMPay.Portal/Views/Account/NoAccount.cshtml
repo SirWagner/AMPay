@@ -1,18 +1,56 @@
 @{
     var l = (Lender)ViewData["Lender"]!;
+    var request = ViewBag.Request as AccountLinkRequest;
 }
 
-<div class="card">
-    <h1>My loans</h1>
-    <p class="lede">
-        @l.DisplayName has not opened an online account for this cell number yet.
-    </p>
-    <p>
-        Your account appears here once @l.DisplayName gives you access - usually when your loan is approved.
-        If you were sent a link and still see this, the lender may have a different cell number for you.
-    </p>
-    <div class="actions">
-        <a class="btn btn-primary" href="/a/@l.PublicCode/application">Apply or continue an application</a>
-        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask the lender to call me</a>
+@if (request?.Status == LinkRequestStatus.Pending)
+{
+    <div class="card">
+        <h1>Client already exists</h1>
+        <p class="status-big">Wait for login validation</p>
+        <p>
+            You asked to see your account as an existing client of @l.DisplayName (@request.Email).
+            They will confirm it is you, and your loans will then show here when you sign in. Nothing is shown before that.
+        </p>
+        <p class="small muted">Asked on @request.CreatedUtc.AddHours(2).ToString("d MMM yyyy HH:mm").</p>
+        <div class="actions">
+            <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask the lender to call me</a>
+        </div>
     </div>
-</div>
+}
+else
+{
+    <div class="card">
+        <h1>My loans</h1>
+        @if (request?.Status == LinkRequestStatus.Rejected)
+        {
+            <div class="alert alert-error" role="alert">@l.DisplayName could not confirm your last request. Check the email address, or contact them.</div>
+        }
+        <p class="lede">@l.DisplayName has no online account for this cell number yet.</p>
+
+        <h2>Already a client of @l.DisplayName?</h2>
+        <p class="small muted">Give the email address they have for you. They confirm it is you before your loans show here.</p>
+        <form method="post" action="/a/@l.PublicCode/account/claim" autocomplete="on">
+            @Html.AntiForgeryToken()
+            <div class="field">
+                <label for="fullName">Your name</label>
+                <input id="fullName" name="fullName" maxlength="200" autocomplete="name" />
+            </div>
+            <div class="field">
+                <label for="email">Email address</label>
+                <input id="email" name="email" type="email" maxlength="254" required autocomplete="email" />
+            </div>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">I am already a client</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>New here?</h2>
+        <div class="actions" style="margin-top:0;">
+            <a class="btn btn-outline" href="/a/@l.PublicCode/application">Apply or continue an application</a>
+            <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask the lender to call me</a>
+        </div>
+    </div>
+}

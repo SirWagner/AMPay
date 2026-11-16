@@ -53,6 +53,7 @@ public class ApplicationsController : Controller
             {
                 model.Applications = await _portal.ApplicationsAsync(tenantId);
                 model.Callbacks = await _portal.CallbacksAsync(tenantId);
+                model.LinkRequests = await _portal.LinkRequestsAsync(tenantId);
             }
             catch (PortalUnavailableException ex)
             {
@@ -66,7 +67,69 @@ public class ApplicationsController : Controller
                 .ToDictionaryAsync(c => c.IdNumber, c => (c.Id, c.ClientNumber));
         }
 
+        // Login requests from existing clients: matched by email first, then by cell number.
+        foreach (var r in model.LinkRequests)
+        {
+            var email = r.Email.ToLower();
+            var display = PortalApi.DisplayMobile(r.Mobile);
+            model.LinkMatches[r.Id] = await _db.Clients.AsNoTracking()
+                .Where(c => c.TenantId == tenantId && c.Addresses.Any(a =>
+                    (a.EmailAddress != null && a.EmailAddress.ToLower() == email) || a.MobileNumber == display || a.MobileNumber == r.Mobile))
+                .Select(c => new LinkMatch(c.Id, c.ClientNumber, c.FirstName + " " + c.Surname,
+                    c.Addresses.Any(a => a.EmailAddress != null && a.EmailAddress.ToLower() == email)))
+                .Take(5)
+                .ToListAsync();
+        }
+
         return View(model);
+    }
+
+    /// <summary>The lender confirms who is asking: the client's account opens for that cell number.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveLink(Guid id, Guid clientId, [FromServices] ClientPortalPublisher publisher)
+    {
+        await _tenant.LoadAsync();
+        if (_tenant.TenantId is null) return RedirectToAction(nameof(Index));
+
+        var client = await _db.Clients.Include(c => c.Addresses)
+            .FirstOrDefaultAsync(c => c.Id == clientId && c.TenantId == _tenant.TenantId);
+        if (client is null) return NotFound();
+
+        client.PortalAccessUtc ??= DateTime.UtcNow;
+        var error = await publisher.PublishAsync(client, force: true);
+        if (error is null)
+        {
+            try
+            {
+                await _portal.ApproveLinkRequestAsync(client.TenantId, id, new PortalLinkApproval(client.Id));
+                _db.ClientNotes.Add(new Domain.Entities.ClientNote
+                {
+                    ClientId = client.Id, Category = "Client portal",
+                    Body = "Existing client's online login validated; account opened.", CreatedByUserId = User.Identity?.Name
+                });
+                await _db.SaveChangesAsync();
+                TempData["Success"] = $"Login validated. {client.FirstName} {client.Surname} now sees their loans online.";
+            }
+            catch (PortalUnavailableException ex) { error = ex.Message; }
+        }
+        if (error is not null) TempData["Error"] = error;
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectLink(Guid id)
+    {
+        await _tenant.LoadAsync();
+        if (_tenant.TenantId is null) return RedirectToAction(nameof(Index));
+        try
+        {
+            await _portal.RejectLinkRequestAsync(_tenant.TenantId.Value, id);
+            TempData["Success"] = "Login request rejected.";
+        }
+        catch (PortalUnavailableException ex) { TempData["Error"] = ex.Message; }
+        return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Details(Guid id)
@@ -175,4 +238,8 @@ public class ApplicationsPage
     public IReadOnlyList<PortalApplicationSummary> Applications { get; set; } = Array.Empty<PortalApplicationSummary>();
     public IReadOnlyList<PortalCallback> Callbacks { get; set; } = Array.Empty<PortalCallback>();
     public Dictionary<string, (Guid Id, string ClientNumber)> ExistingClients { get; set; } = new();
+    public IReadOnlyList<PortalLinkRequest> LinkRequests { get; set; } = Array.Empty<PortalLinkRequest>();
+    public Dictionary<Guid, List<LinkMatch>> LinkMatches { get; set; } = new();
 }
+
+public record LinkMatch(Guid ClientId, string ClientNumber, string Name, bool EmailMatches);

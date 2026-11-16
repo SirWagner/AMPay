@@ -290,3 +290,14 @@ public static class ClientStatementBuilder
         _ => "Monthly"
     };
 }
+
+// ------------------------------------------------------------------ an existing client asks to see their account
+
+/// <summary>
+/// Someone signed in on the portal says they are already the lender's client, but no account
+/// is tied to their cell number. The lender matches them (by email or cell) and approves or
+/// rejects - until then the portal tells them to wait for login validation.
+/// </summary>
+public record PortalLinkRequest(Guid Id, Guid TenantId, string Mobile, string Email, string? FullName, DateTime CreatedUtc);
+
+public record PortalLinkApproval(Guid AmpayClientId);

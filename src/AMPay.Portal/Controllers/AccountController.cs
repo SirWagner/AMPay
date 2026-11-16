@@ -67,6 +67,10 @@ public class AccountController : PortalControllerBase
         if (!await HasAccountForNumberAsync())
         {
             ViewData["Title"] = "My loans";
+            ViewBag.Request = await Db.LinkRequests.AsNoTracking()
+                .Where(r => r.ApplicantId == _applicant.Id)
+                .OrderByDescending(r => r.CreatedUtc)
+                .FirstOrDefaultAsync();
             return View("NoAccount");
         }
 
@@ -105,6 +109,35 @@ public class AccountController : PortalControllerBase
         return RedirectToAction(nameof(Index), new { code });
     }
 
+    /// <summary>"I am already a client": the lender confirms who this is before anything is shown.</summary>
+    [HttpPost("claim")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(PortalRateLimits.Codes)]
+    public async Task<IActionResult> Claim([FromRoute] string code, string? email, string? fullName)
+    {
+        email = email?.Trim();
+        if (string.IsNullOrEmpty(email) || email.Length > 254 || !email.Contains('@'))
+        {
+            TempData["Error"] = "Enter the email address you gave " + _lender.DisplayName + ".";
+            return RedirectToAction(nameof(Index), new { code });
+        }
+
+        var pending = await Db.LinkRequests.FirstOrDefaultAsync(r => r.ApplicantId == _applicant.Id && r.Status == LinkRequestStatus.Pending);
+        if (pending is null)
+        {
+            pending = new AccountLinkRequest { LenderId = _lender.Id, ApplicantId = _applicant.Id, Mobile = _applicant.Mobile };
+            Db.LinkRequests.Add(pending);
+        }
+        pending.Email = email.ToLowerInvariant();
+        var name = fullName?.Trim();
+        pending.FullName = string.IsNullOrEmpty(name) ? null : name[..Math.Min(name.Length, 200)];
+        pending.CreatedUtc = DateTime.UtcNow;
+        await Db.SaveChangesAsync();
+
+        TempData["Success"] = "Client already exists - wait for login validation. " + _lender.DisplayName + " will confirm it is you.";
+        return RedirectToAction(nameof(Index), new { code });
+    }
+
     // ---------------------------------------------------------------- one loan
 
     [HttpGet("loan/{loanNumber}")]
@@ -130,8 +163,10 @@ public class AccountController : PortalControllerBase
     private async Task<ClientAccount?> LinkedAccountAsync()
     {
         if (_applicant.ClientAccountId is not { } id) return null;
+        // An approved request ties a number the lender does not hold on file; otherwise the numbers must agree.
+        var approved = _applicant.LinkApprovedByLender;
         return await Db.ClientAccounts.AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == id && a.LenderId == _lender.Id && a.Mobile == _applicant.Mobile);
+            .FirstOrDefaultAsync(a => a.Id == id && a.LenderId == _lender.Id && (approved || a.Mobile == _applicant.Mobile));
     }
 
     private Task<bool> HasAccountForNumberAsync() =>

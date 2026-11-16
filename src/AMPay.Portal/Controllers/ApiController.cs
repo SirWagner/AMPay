@@ -255,6 +255,59 @@ public class ApiController : ControllerBase
         return NoContent();
     }
 
+    // ---------------------------------------------------------------- "I am already a client"
+
+    [HttpGet("link-requests")]
+    public async Task<IReadOnlyList<PortalLinkRequest>> LinkRequests(Guid tenantId)
+    {
+        var lender = await _db.Lenders.AsNoTracking().FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return Array.Empty<PortalLinkRequest>();
+
+        return await _db.LinkRequests.AsNoTracking()
+            .Where(r => r.LenderId == lender.Id && r.Status == LinkRequestStatus.Pending)
+            .OrderBy(r => r.CreatedUtc)
+            .Take(200)
+            .Select(r => new PortalLinkRequest(r.Id, tenantId, r.Mobile, r.Email, r.FullName, r.CreatedUtc))
+            .ToListAsync();
+    }
+
+    /// <summary>The lender confirmed who this is. AM-Pay has already sent that client's account.</summary>
+    [HttpPost("link-requests/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveLink(Guid id, Guid tenantId, PortalLinkApproval body)
+    {
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        var request = lender is null ? null : await _db.LinkRequests.FirstOrDefaultAsync(r => r.Id == id && r.LenderId == lender.Id);
+        if (request is null) return NotFound();
+
+        var account = await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender!.Id && a.AmpayClientId == body.AmpayClientId);
+        if (account is null) return Conflict("Send the client's account to the portal before approving.");
+
+        var applicant = await _db.Applicants.FirstOrDefaultAsync(a => a.Id == request.ApplicantId && a.LenderId == lender!.Id);
+        if (applicant is null) return NotFound();
+
+        applicant.ClientAccountId = account.Id;
+        applicant.AccountLinkedUtc = DateTime.UtcNow;
+        applicant.LinkApprovedByLender = true;
+        applicant.FailedIdAttempts = 0;
+        request.Status = LinkRequestStatus.Approved;
+        request.DecidedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPost("link-requests/{id:guid}/reject")]
+    public async Task<IActionResult> RejectLink(Guid id, Guid tenantId)
+    {
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        var request = lender is null ? null : await _db.LinkRequests.FirstOrDefaultAsync(r => r.Id == id && r.LenderId == lender.Id);
+        if (request is null) return NotFound();
+
+        request.Status = LinkRequestStatus.Rejected;
+        request.DecidedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // ---------------------------------------------------------------- funnel
 
     /// <summary>Counts for the lender's dashboard: link opens, applications started and submitted.</summary>

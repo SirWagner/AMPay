@@ -29,6 +29,52 @@ else if (!Model.HasLink)
     <div class="alert alert-error">@Model.Error</div>
 }
 
+@if (Model.LinkRequests.Count > 0)
+{
+    <div class="card">
+        <div class="card-head"><h3>Client already exists - login validation <span class="muted small">(@Model.LinkRequests.Count waiting)</span></h3></div>
+        <div class="card-body">
+            <p class="small muted">Someone signed in on your self-service link says they are already your client. Check it is them, then validate - they see that client's loans from then on.</p>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Asked</th><th>Cell</th><th>Email</th><th>Matching client</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var r in Model.LinkRequests)
+                        {
+                            var matches = Model.LinkMatches.TryGetValue(r.Id, out var m) ? m : new List<AMPay.Web.Controllers.LinkMatch>();
+                            <tr>
+                                <td>@r.CreatedUtc.AddHours(2).ToString("d MMM HH:mm")<br /><span class="small muted">@r.FullName</span></td>
+                                <td>@AMPay.Domain.Portal.PortalApi.DisplayMobile(r.Mobile)</td>
+                                <td>@r.Email</td>
+                                <td>
+                                    @if (matches.Count == 0)
+                                    {
+                                        <span class="badge badge-amber">No client with this email or cell</span>
+                                    }
+                                    @foreach (var c in matches)
+                                    {
+                                        <form asp-action="ApproveLink" asp-route-id="@r.Id" method="post" style="display:flex;gap:8px;align-items:center;margin:0 0 6px;">
+                                            <input type="hidden" name="clientId" value="@c.ClientId" />
+                                            <a asp-controller="Clients" asp-action="Details" asp-route-id="@c.ClientId">@c.Name</a>
+                                            <span class="small muted">@c.ClientNumber · @(c.EmailMatches ? "email matches" : "cell matches")</span>
+                                            <button type="submit" class="btn btn-primary btn-sm">Validate login</button>
+                                        </form>
+                                    }
+                                </td>
+                                <td>
+                                    <form asp-action="RejectLink" asp-route-id="@r.Id" method="post" style="margin:0;">
+                                        <button type="submit" class="btn btn-outline btn-sm">Reject</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
 <div class="card">
     <div class="card-head"><h3>Call-back requests <span class="muted small">(@Model.Callbacks.Count open)</span></h3></div>
     @if (Model.Callbacks.Count == 0)
