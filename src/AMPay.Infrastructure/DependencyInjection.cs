@@ -21,10 +21,14 @@ public static class DependencyInjection
     public static IServiceCollection AddAMPayInfrastructure(
         this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<AppDbContext>(options =>
+        // Interceptors registered by the host (the web app's portal change tracker) join in.
+        services.AddDbContext<AppDbContext>((sp, options) =>
+        {
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.EnableRetryOnFailure()));
+                sql => sql.EnableRetryOnFailure());
+            options.AddInterceptors(sp.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>());
+        });
 
         services.Configure<NetcashOptions>(configuration.GetSection(NetcashOptions.SectionName));
 

@@ -262,3 +262,60 @@ h2 { color: var(--ink); font-size: 1.15rem; margin: 0 0 12px; }
 .hint.id-status-bad { color: #b42318; }
 
 .id-reader-box { border: 1px dashed #c9d2e3; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; }
+
+
+/* ==========================================================================
+   My loans: the client's own account. Nothing hidden - every cost, instalment
+   and payment, failed debits included.
+   ========================================================================== */
+.account-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.account-nav a { color: #fff; text-decoration: none; font-size: .85rem; padding: 5px 10px; border-radius: 6px; border: 1px solid transparent; }
+.account-nav a:hover, .account-nav a[aria-current=page] { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.08); }
+.top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.pill-bad { background: var(--danger-soft); color: var(--danger); }
+.pill-warn { background: var(--warn-soft); color: var(--warn); }
+.text-bad { color: var(--danger); }
+
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 4px; }
+.kpi { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kpi-label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.kpi-value { font-size: 1.3rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi-sub { font-size: .8rem; color: var(--muted); }
+.kpi-bad { border-color: var(--danger); background: var(--danger-soft); }
+.kpi-bad .kpi-value { color: var(--danger); }
+
+.loan-list { list-style: none; margin: 0; padding: 0; }
+.loan-list li + li { border-top: 1px solid var(--line); }
+.loan-list a { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; color: inherit; text-decoration: none; }
+.loan-list a:hover strong { text-decoration: underline; }
+.loan-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.progress { display: block; height: 8px; border-radius: 999px; background: #eef0f4; overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+table.grid { width: 100%; border-collapse: collapse; font-size: .88rem; }
+table.grid th, table.grid td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.grid thead th { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+table.grid tfoot th, table.grid tfoot td { font-weight: 600; border-bottom: 0; }
+table.schedule td { white-space: nowrap; }
+.num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+table.money { width: 100%; border-collapse: collapse; }
+table.money th { text-align: left; font-weight: normal; padding: 6px 0; color: var(--body); }
+table.money td { text-align: right; padding: 6px 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.money tr.sub th, table.money tr.sub td { font-weight: 600; border-top: 1px solid var(--line); }
+table.money tr.total th, table.money tr.total td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--ink); font-size: 1.05rem; }
+
+@media (max-width: 560px) {
+    .kpis { grid-template-columns: 1fr; }
+}
+
+@media print {
+    .stage, .foot, .test-banner, .no-print, .network-bg { display: none !important; }
+    .stage + .wrap { margin-top: 0; }
+    body { background: #fff; font-size: 12px; }
+    .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    .table-scroll { overflow: visible; }
+    table.schedule td { white-space: normal; }
+}

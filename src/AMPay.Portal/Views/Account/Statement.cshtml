@@ -1,0 +1,94 @@
+@model StatementModel
+@{
+    var l = (Lender)ViewData["Lender"]!;
+    var loan = Model.Loan;
+    var s = Model.Statement;
+}
+
+<div class="no-print" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+    <a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber">&larr; Loan @loan.LoanNumber</a>
+    <form method="get" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0;">
+        <label class="small">From <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" /></label>
+        <label class="small">to <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" /></label>
+        <button type="submit" class="btn btn-outline btn-sm">Show</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="loan-head">
+        <h1 style="margin:0;">Statement of account</h1>
+        <button type="button" class="btn btn-primary btn-sm no-print" onclick="window.print()">Print or save as PDF</button>
+    </div>
+    <p class="small">
+        <strong>@l.Name</strong>@(string.IsNullOrWhiteSpace(l.NcrNumber) ? "" : $" · registered credit provider {l.NcrNumber}")
+        @if (l.ContactNumber is not null) { <text> · @l.ContactNumber</text> }
+    </p>
+    <dl class="summary">
+        <dt>Client</dt><dd>@s.FullName (client @s.ClientNumber)</dd>
+        <dt>Loan</dt><dd>@loan.LoanNumber · @loan.Status</dd>
+        <dt>Period</dt><dd>@Fmt.D(Model.From) to @Fmt.D(Model.To)</dd>
+        <dt>Issued</dt><dd>@Fmt.Sast(Model.UpdatedUtc)</dd>
+    </dl>
+</div>
+
+<div class="card">
+    <h2>Summary</h2>
+    <table class="money">
+        <tbody>
+            <tr><th scope="row">Total repayable under the agreement</th><td>@Fmt.R(loan.TotalRepayable)</td></tr>
+            <tr><th scope="row">Received before @Fmt.D(Model.From)</th><td>@Fmt.R(Model.ReceivedBefore)</td></tr>
+            <tr class="sub"><th scope="row">Opening balance</th><td>@Fmt.R(Model.OpeningBalance)</td></tr>
+            <tr><th scope="row">Received in this period</th><td>@Fmt.R(Model.ReceivedInPeriod)</td></tr>
+            <tr class="total"><th scope="row">Closing balance</th><td>@Fmt.R(Model.ClosingBalance)</td></tr>
+        </tbody>
+    </table>
+    <p class="small muted">Balances are what remains of the total repayable, including interest and fees still to come. Overdue at the end of the period: @Fmt.R(loan.ArrearsAmount). A settlement amount to pay the loan off early is lower - ask @l.DisplayName for one.</p>
+</div>
+
+<div class="card">
+    <h2>Instalments due in this period</h2>
+    @if (!Model.Due.Any()) { <p class="muted">None.</p> }
+    else
+    {
+        <div class="table-scroll">
+            <table class="grid">
+                <thead><tr><th>#</th><th>Due</th><th class="num">Interest</th><th class="num">Capital</th><th class="num">Fees and insurance</th><th class="num">Instalment</th><th class="num">Paid</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var e in Model.Due)
+                    {
+                        <tr>
+                            <td>@e.Number</td><td>@Fmt.D(e.DueDate)</td>
+                            <td class="num">@Fmt.R(e.Interest)</td><td class="num">@Fmt.R(e.Capital)</td>
+                            <td class="num">@Fmt.R(e.ServiceFee + e.CreditLife + e.Vat)</td>
+                            <td class="num">@Fmt.R(e.Total)</td><td class="num">@Fmt.R(e.Paid)</td>
+                            <td>@e.Status</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <h2>Payments and debits in this period</h2>
+    @if (!Model.Payments.Any()) { <p class="muted">None.</p> }
+    else
+    {
+        <div class="table-scroll">
+            <table class="grid">
+                <thead><tr><th>Date</th><th>How</th><th>Reference</th><th class="num">Amount</th><th>Result</th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.Payments)
+                    {
+                        <tr>
+                            <td>@Fmt.D(p.Date)</td><td>@p.Method</td><td>@p.Reference</td>
+                            <td class="num">@Fmt.R(p.Amount)</td>
+                            <td>@p.Status@(p.Reason is null ? "" : " - " + p.Reason)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

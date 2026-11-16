@@ -198,6 +198,150 @@ public class ApiController : ControllerBase
         return NoContent();
     }
 
+    // ---------------------------------------------------------------- client accounts
+
+    /// <summary>
+    /// Creates or replaces one client's account view: loans, schedule and payments. AM-Pay
+    /// sends the whole statement each time, so nothing here is ever patched.
+    /// </summary>
+    [HttpPut("clients/{clientId:guid}")]
+    [RequestSizeLimit(4 * 1024 * 1024)]
+    public async Task<IActionResult> PutClient(Guid clientId, Guid tenantId, PortalClientStatement body)
+    {
+        if (body.AmpayClientId != clientId || body.TenantId != tenantId) return BadRequest("The statement is for a different client.");
+
+        var mobile = PortalApi.NormaliseMobile(body.Mobile);
+        if (mobile is null) return BadRequest("The client has no cell number to sign in with.");
+        if (body.IdNumberHash is not { Length: 64 }) return BadRequest("The ID number fingerprint is missing.");
+
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return NotFound("This lender has no self-service link yet.");
+
+        var account = await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender.Id && a.AmpayClientId == clientId);
+        if (account is null)
+        {
+            account = new ClientAccount { LenderId = lender.Id, AmpayClientId = clientId };
+            _db.ClientAccounts.Add(account);
+        }
+
+        // A statement older than the one held arrives late: keep the newer.
+        if (account.GeneratedUtc > body.GeneratedUtc) return NoContent();
+
+        account.ClientNumber = body.ClientNumber;
+        account.FullName = body.FullName;
+        account.Mobile = mobile;
+        account.IdNumberHash = body.IdNumberHash;
+        account.StatementJson = JsonSerializer.Serialize(body);
+        account.GeneratedUtc = body.GeneratedUtc;
+        account.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>Stores or replaces one file in the client's account, e.g. a signed agreement (PDF only).</summary>
+    [HttpPut("clients/{clientId:guid}/documents/{key}")]
+    [RequestSizeLimit(15 * 1024 * 1024)]
+    public async Task<IActionResult> PutClientDocument(Guid clientId, string key, Guid tenantId, PortalDocumentUpload body)
+    {
+        if (key.Length is 0 or > 80 || !key.All(c => char.IsLetterOrDigit(c) || c == '-')) return BadRequest("Invalid document key.");
+
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        var account = lender is null ? null
+            : await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender.Id && a.AmpayClientId == clientId);
+        if (account is null) return NotFound("Send the client's account first.");
+
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(body.Base64); }
+        catch (FormatException) { return BadRequest("The file is not valid base64."); }
+        if (bytes.Length is 0 or > 10 * 1024 * 1024 || !bytes.AsSpan().StartsWith("%PDF"u8))
+            return BadRequest("Only a PDF of 10 MB or less is accepted.");
+
+        var doc = await _db.AccountDocuments.FirstOrDefaultAsync(d => d.ClientAccountId == account.Id && d.Key == key);
+        if (doc is null)
+        {
+            doc = new ClientAccountDocument { ClientAccountId = account.Id, Key = key };
+            _db.AccountDocuments.Add(doc);
+        }
+        doc.Title = body.Title.Length > 200 ? body.Title[..200] : body.Title;
+        doc.LoanNumber = body.LoanNumber;
+        doc.ContentType = "application/pdf";
+        doc.Data = bytes;
+        doc.DatedUtc = body.DatedUtc;
+        doc.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>The lender withdrew the client's access. Anyone linked to it is unlinked.</summary>
+    [HttpDelete("clients/{clientId:guid}")]
+    public async Task<IActionResult> DeleteClient(Guid clientId, Guid tenantId)
+    {
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return NoContent();
+
+        var account = await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender.Id && a.AmpayClientId == clientId);
+        if (account is null) return NoContent();
+
+        await _db.Applicants.Where(a => a.ClientAccountId == account.Id)
+            .ForEachAsync(a => { a.ClientAccountId = null; a.AccountLinkedUtc = null; });
+        _db.ClientAccounts.Remove(account);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    // ---------------------------------------------------------------- "I am already a client"
+
+    [HttpGet("link-requests")]
+    public async Task<IReadOnlyList<PortalLinkRequest>> LinkRequests(Guid tenantId)
+    {
+        var lender = await _db.Lenders.AsNoTracking().FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        if (lender is null) return Array.Empty<PortalLinkRequest>();
+
+        return await _db.LinkRequests.AsNoTracking()
+            .Where(r => r.LenderId == lender.Id && r.Status == LinkRequestStatus.Pending)
+            .OrderBy(r => r.CreatedUtc)
+            .Take(200)
+            .Select(r => new PortalLinkRequest(r.Id, tenantId, r.Mobile, r.Email, r.FullName, r.CreatedUtc))
+            .ToListAsync();
+    }
+
+    /// <summary>The lender confirmed who this is. AM-Pay has already sent that client's account.</summary>
+    [HttpPost("link-requests/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveLink(Guid id, Guid tenantId, PortalLinkApproval body)
+    {
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        var request = lender is null ? null : await _db.LinkRequests.FirstOrDefaultAsync(r => r.Id == id && r.LenderId == lender.Id);
+        if (request is null) return NotFound();
+
+        var account = await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender!.Id && a.AmpayClientId == body.AmpayClientId);
+        if (account is null) return Conflict("Send the client's account to the portal before approving.");
+
+        var applicant = await _db.Applicants.FirstOrDefaultAsync(a => a.Id == request.ApplicantId && a.LenderId == lender!.Id);
+        if (applicant is null) return NotFound();
+
+        applicant.ClientAccountId = account.Id;
+        applicant.AccountLinkedUtc = DateTime.UtcNow;
+        applicant.LinkApprovedByLender = true;
+        applicant.FailedIdAttempts = 0;
+        request.Status = LinkRequestStatus.Approved;
+        request.DecidedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPost("link-requests/{id:guid}/reject")]
+    public async Task<IActionResult> RejectLink(Guid id, Guid tenantId)
+    {
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        var request = lender is null ? null : await _db.LinkRequests.FirstOrDefaultAsync(r => r.Id == id && r.LenderId == lender.Id);
+        if (request is null) return NotFound();
+
+        request.Status = LinkRequestStatus.Rejected;
+        request.DecidedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // ---------------------------------------------------------------- funnel
 
     /// <summary>Counts for the lender's dashboard: link opens, applications started and submitted.</summary>

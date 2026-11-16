@@ -61,6 +61,19 @@ public class PortalImporter
             .Include(c => c.Documents)
             .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.IdNumber == idNumber, ct);
 
+        // Same person, same email at this lender: one client, never two.
+        var email = app.Email?.Trim().ToLowerInvariant();
+        if (client is null && !string.IsNullOrEmpty(email))
+            client = await _db.Clients
+                .Include(c => c.Employment)
+                .Include(c => c.Financial)
+                .Include(c => c.Addresses)
+                .Include(c => c.OtherDetails)
+                .Include(c => c.Payback)
+                .Include(c => c.Documents)
+                .FirstOrDefaultAsync(c => c.TenantId == tenantId &&
+                    c.Addresses.Any(a => a.EmailAddress != null && a.EmailAddress.ToLower() == email), ct);
+
         var created = client is null;
         if (client is null)
         {

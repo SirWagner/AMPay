@@ -3,6 +3,7 @@
 @using AMPay.Web.Services
 @using Microsoft.Extensions.Options
 @inject ICurrentTenant CurrentTenant
+@inject AMPay.Web.Services.NotificationCounter NotificationCounter
 @inject AMPay.Infrastructure.Data.AppDbContext Db
 @using Microsoft.EntityFrameworkCore
 @inject IOptions<NetcashOptions> NetcashOptions
@@ -89,6 +90,11 @@
 
         <div class="sidebar-section">@(isPlatform ? $"Loan Flow · {CurrentTenant.TenantName ?? "no customer selected"}" : "Loan Flow")</div>
         <a class="nav-link @Active("Home")" asp-controller="Home" asp-action="Index">Dashboard</a>
+        @{
+            var unread = await NotificationCounter.UnreadAsync(
+                User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, CurrentTenant.TenantId);
+        }
+        <a class="nav-link @Active("Notifications")" asp-controller="Notifications" asp-action="Index">Notifications@if (unread > 0) {<span class="badge badge-red" style="margin-left:6px;">@(unread > 99 ? "99+" : unread.ToString())</span>}</a>
         @if (!isReviewerOnly)
         {
             <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>

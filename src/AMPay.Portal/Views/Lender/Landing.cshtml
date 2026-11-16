@@ -23,11 +23,13 @@
         @if (Model.SignedIn)
         {
             <a class="btn btn-primary" href="/a/@l.PublicCode/application">Continue my application</a>
+            <a class="btn btn-outline" href="/a/@l.PublicCode/account">My loans</a>
         }
         else
         {
             <a class="btn btn-primary" href="/a/@l.PublicCode/start">Apply now</a>
             <a class="btn btn-outline" href="/a/@l.PublicCode/start">Continue an application</a>
+            <a class="btn btn-outline" href="/a/@l.PublicCode/start">Already a client? See my loans</a>
         }
     </div>
 </div>

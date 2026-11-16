@@ -1,0 +1,83 @@
+@model AMPay.Web.Controllers.NotificationsPage
+@using AMPay.Web.Controllers
+@{
+    var waiting = Model.PortalApplications + Model.PortalCallbacks + Model.PortalLoginRequests;
+    string Url(string? kind, bool attention) => $"/Notifications?kind={kind}&attention={attention.ToString().ToLower()}&days={Model.Days}";
+}
+
+<div class="page-head">
+    <h1>Notifications</h1>
+    <p class="lede">Everything happening in the business, newest first: payments, unpaid debits, loan decisions, signed agreements, debit orders and new clients.</p>
+</div>
+
+@if (waiting > 0 || Model.PortalError)
+{
+    <div class="card">
+        <div class="card-head"><h3>Waiting for you on the self-service portal</h3></div>
+        <div class="card-body">
+            @if (Model.PortalError)
+            {
+                <p class="small muted">The portal could not be reached just now.</p>
+            }
+            else
+            {
+                <div class="stat-grid">
+                    <a class="stat" asp-controller="Applications" asp-action="Index"><div class="label">New applications</div><div class="value tnum">@Model.PortalApplications</div><div class="note">to import</div></a>
+                    <a class="stat" asp-controller="Applications" asp-action="Index"><div class="label">Call-back requests</div><div class="value tnum">@Model.PortalCallbacks</div><div class="note">clients asking to be phoned</div></a>
+                    <a class="stat" asp-controller="Applications" asp-action="Index"><div class="label">Login validation</div><div class="value tnum @(Model.PortalLoginRequests > 0 ? "warn" : "")">@Model.PortalLoginRequests</div><div class="note">existing clients waiting</div></a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-head flex-between">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="@Url(null, false)" class="badge @(Model.Kind is null && !Model.Attention ? "badge-navy" : "")">All</a>
+            <a href="@Url(null, true)" class="badge @(Model.Attention ? "badge-red" : "")">Needs attention</a>
+            @foreach (var (kind, label) in NotificationsController.Kinds)
+            {
+                <a href="@Url(kind, false)" class="badge @(Model.Kind == kind ? "badge-navy" : "")">@label (@(Model.Counts.TryGetValue(kind, out var c) ? c : 0))</a>
+            }
+        </div>
+        <form method="get" style="margin:0;">
+            <input type="hidden" name="kind" value="@Model.Kind" />
+            <input type="hidden" name="attention" value="@Model.Attention.ToString().ToLower()" />
+            <select name="days" onchange="this.form.submit()">
+                @foreach (var d in new[] { 1, 7, 30, 90, 365 })
+                {
+                    <option value="@d" selected="@(d == Model.Days)">Last @(d == 1 ? "day" : d + " days")</option>
+                }
+            </select>
+        </form>
+    </div>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="empty">Nothing in this period yet. Activity appears here as it happens.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <tbody>
+                    @foreach (var n in Model.Items)
+                    {
+                        var isNew = Model.LastSeenUtc is null || n.CreatedUtc > Model.LastSeenUtc;
+                        <tr>
+                            <td style="white-space:nowrap;width:1%;" class="small muted">@n.CreatedUtc.AddHours(2).ToString("d MMM HH:mm")</td>
+                            <td style="width:1%;">
+                                <span class="badge @(n.Tone == NotificationTone.Attention ? "badge-red" : n.Tone == NotificationTone.Good ? "badge-green" : "")">@(NotificationsController.Kinds.FirstOrDefault(k => k.Kind == n.Kind).Label ?? n.Kind)</span>
+                            </td>
+                            <td>
+                                @if (isNew) { <span class="badge badge-amber">New</span> }
+                                @if (n.Link is not null) { <a href="@n.Link"><strong>@n.Title</strong></a> } else { <strong>@n.Title</strong> }
+                                @if (n.Body is not null) { <div class="small muted">@n.Body</div> }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

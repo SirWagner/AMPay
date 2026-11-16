@@ -1,0 +1,91 @@
+@model AccountOverviewModel
+@{
+    var l = (Lender)ViewData["Lender"]!;
+    var s = Model.Statement;
+    var next = Model.NextPayment;
+}
+
+<div class="card">
+    <h1>Hello @s.FullName</h1>
+    <p class="muted small">Client number <strong>@s.ClientNumber</strong> with @l.DisplayName · figures as at @Fmt.Sast(Model.UpdatedUtc)</p>
+
+    @if (Model.TotalArrears > 0)
+    {
+        <div class="alert alert-error" role="alert">
+            You are behind by <strong>@Fmt.R(Model.TotalArrears)</strong>. Contact @l.DisplayName to arrange payment -
+            the sooner you do, the fewer costs you face.
+        </div>
+    }
+
+    <div class="kpis">
+        <div class="kpi">
+            <span class="kpi-label">Next payment</span>
+            <span class="kpi-value">@(next is { } n ? Fmt.R(n.Amount) : "None due")</span>
+            @if (next is { } nx) { <span class="kpi-sub">@Fmt.D(nx.Date) · @nx.LoanNumber</span> }
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">Still to pay</span>
+            <span class="kpi-value">@Fmt.R(Model.TotalRemaining)</span>
+            <span class="kpi-sub">all remaining instalments</span>
+        </div>
+        <div class="kpi @(Model.TotalArrears > 0 ? "kpi-bad" : "")">
+            <span class="kpi-label">Overdue</span>
+            <span class="kpi-value">@Fmt.R(Model.TotalArrears)</span>
+            <span class="kpi-sub">@(Model.TotalArrears > 0 ? "please pay or call" : "nothing overdue")</span>
+        </div>
+    </div>
+</div>
+
+@if (!s.Loans.Any())
+{
+    <div class="card">
+        <p>You have no loans with @l.DisplayName yet.</p>
+    </div>
+}
+
+@foreach (var group in new[] { ("Active loans", Model.Active), ("Waiting for a decision or pay-out", Model.Pending), ("Closed loans", Model.Closed) })
+{
+    if (!group.Item2.Any()) continue;
+    <div class="card">
+        <h2>@group.Item1</h2>
+        <ul class="loan-list">
+            @foreach (var loan in group.Item2)
+            {
+                var done = loan.Schedule.Count == 0 ? 0 : (int)Math.Round(100.0 * loan.InstalmentsPaid / loan.Schedule.Count);
+                <li>
+                    <a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber">
+                        <span class="loan-head">
+                            <span><strong>@loan.LoanNumber</strong> · @Fmt.R(loan.Principal) over @loan.NumberOfInstalments instalment@(loan.NumberOfInstalments == 1 ? "" : "s")</span>
+                            <span class="pill @Fmt.StatusClass(loan.Status)">@loan.Status</span>
+                        </span>
+                        @if (loan.Stage == "Active")
+                        {
+                            <span class="progress" role="img" aria-label="@loan.InstalmentsPaid of @loan.Schedule.Count instalments paid"><span style="width:@done%"></span></span>
+                            <span class="small muted">
+                                @loan.InstalmentsPaid of @loan.Schedule.Count paid · @Fmt.R(loan.RemainingInstalments) to go
+                                @if (loan.NextDueDate is not null) { <text> · next @Fmt.R(loan.NextDueAmount) on @Fmt.D(loan.NextDueDate)</text> }
+                                @if (loan.ArrearsAmount > 0) { <strong class="text-bad"> · @Fmt.R(loan.ArrearsAmount) overdue</strong> }
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="small muted">Total repayable @Fmt.R(loan.TotalRepayable) · paid @Fmt.R(loan.PaidToDate)</span>
+                        }
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="card">
+    <h2>Questions or a complaint?</h2>
+    <p class="muted small">
+        You may ask @l.DisplayName at any time for a statement, a settlement amount or a copy of your agreement - the National Credit Act gives you that right.
+        If a complaint is not resolved, you may approach the National Credit Regulator or the Credit Ombud.
+    </p>
+    <div class="actions" style="margin-top:0;">
+        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask a question</a>
+        @if (l.ContactNumber is not null) { <a class="btn btn-outline" href="tel:@l.ContactNumber">Call @l.ContactNumber</a> }
+    </div>
+</div>

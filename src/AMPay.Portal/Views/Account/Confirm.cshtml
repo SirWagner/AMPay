@@ -1,0 +1,42 @@
+@model ConfirmIdModel
+@{
+    var l = (Lender)ViewData["Lender"]!;
+}
+
+<div class="card">
+    <h1>Confirm it is you</h1>
+    @if (Model.AttemptsLeft <= 0)
+    {
+        <div class="alert alert-error" role="alert">
+            Your account view is locked after too many wrong ID numbers. Please contact @l.DisplayName
+            @(l.ContactNumber is null ? "" : $"on {l.ContactNumber}") to unlock it.
+        </div>
+    }
+    else
+    {
+        <p class="lede">
+            @l.DisplayName has an account for this cell number. To keep it private, type your ID number once.
+            After this, the code to your phone is enough.
+        </p>
+        <form method="post" action="/a/@l.PublicCode/account/confirm" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <div class="field">
+                <label asp-for="IdNumber"></label>
+                <input asp-for="IdNumber" inputmode="numeric" maxlength="20" autofocus />
+                <span asp-validation-for="IdNumber" class="field-error"></span>
+            </div>
+            <p class="small muted">@Model.AttemptsLeft attempt@(Model.AttemptsLeft == 1 ? "" : "s") left. Your ID number is checked, not stored again.</p>
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Show my loans</button>
+            </div>
+        </form>
+    }
+</div>
+
+<div class="card">
+    <h2>Not your account?</h2>
+    <p class="muted">If this cell number is no longer yours, sign out and contact @l.DisplayName.</p>
+    <div class="actions" style="margin-top:0;">
+        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Talk to an advisor</a>
+    </div>
+</div>
