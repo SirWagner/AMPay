@@ -1,6 +1,7 @@
 @model List<Client>
 @{
     ViewData["Title"] = "Clients";
+    var flags = ViewBag.Flags as Dictionary<Guid, ScreeningOutcome> ?? new Dictionary<Guid, ScreeningOutcome>();
 }
 
 <div class="page-head flex-between">
@@ -61,6 +62,7 @@
                     <th>Name</th>
                     <th>ID number</th>
                     <th>Status</th>
+                    <th>Good to go</th>
                     <th>Mandates</th>
                     <th>Captured</th>
                     <th></th>
@@ -77,6 +79,16 @@
                         </td>
                         <td class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(c.IdNumber)</td>
                         <td><partial name="_ClientStatus" model="c.Status" /></td>
+                        <td>
+                            @if (flags.TryGetValue(c.Id, out var flag))
+                            {
+                                <a asp-action="GoodToGo" asp-route-id="@c.Id" class="badge @ScreeningDisplay.Tone(flag)">@AMPay.Domain.Credit.GoodToGo.Label(flag)</a>
+                            }
+                            else
+                            {
+                                <span class="muted small">Not screened</span>
+                            }
+                        </td>
                         <td>
                             @if (c.Mandates.Count == 0)
                             {

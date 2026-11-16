@@ -40,7 +40,7 @@
                         <div class="field">
                             <label asp-for="NetMonthlyIncome"></label>
                             <input asp-for="NetMonthlyIncome" type="number" step="0.01" min="0" />
-                            <span class="hint">Own salary: take-home pay after deductions.</span>
+                            <span class="hint">Own salary: take-home pay. List the payslip deductions in the budget below.</span>
                             <span asp-validation-for="NetMonthlyIncome" class="field-error"></span>
                         </div>
                         <div class="field">
@@ -56,17 +56,29 @@
                 </div>
             </div>
 
+            @{
+                var groups = AMPay.Domain.Credit.BudgetCategories.Groups;
+                string GroupOf(AMPay.Web.Models.BudgetLineModel l) => l.IsCustom ? "Added for this client" : l.Group ?? "Other";
+                var order = groups.Concat(new[] { "Added for this client" }).ToList();
+                var empty = Model.Budget.Count(l => !(l.Amount > 0) && !l.IsMain && !l.IsCustom);
+                string GroupId(string g) => "bg-" + new string(g.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+            }
             <div class="card" id="budget">
-                <div class="card-head"><h2>Budget</h2></div>
+                <div class="card-head flex-between">
+                    <h2>Budget</h2>
+                    <button type="button" class="btn btn-outline btn-sm" id="budgetFold" aria-pressed="false"
+                            data-empty="@empty">Hide the @empty empty lines</button>
+                </div>
                 <div class="card-body">
                     <p class="muted small mt-0">
-                        Monthly amounts. Add anything else the client pays from the list below &mdash; including credit card,
-                        loan and vehicle instalments, which are debt: deducted on top of living expenses, never counted
-                        towards the Regulation 23A minimum.
+                        Monthly amounts. Go through every line with the client: each is saved, a zero included, so the file
+                        shows it was asked about. Payslip deductions explain how gross pay becomes net pay and are not taken
+                        off again. Debt instalments are deducted on top of living expenses, never counted towards the
+                        Regulation 23A minimum.
                     </p>
 
                     <div class="table-wrap">
-                        <table class="data budget-table">
+                        <table class="data budget-table" id="budgetTable">
                             <thead>
                             <tr>
                                 <th>Description</th>
@@ -76,66 +88,85 @@
                                 <th></th>
                             </tr>
                             </thead>
-                            <tbody>
-                            @for (var i = 0; i < Model.Budget.Count; i++)
+                            @foreach (var g in order)
                             {
-                                var line = Model.Budget[i];
-
-                                // Lines off screen are simply not posted; the server rebuilds
-                                // them empty. Budget.Index lets the rest bind despite the gaps.
-                                if (!line.IsVisible) continue;
-
-                                <tr>
-                                    <td>
-                                        <input type="hidden" name="Budget.Index" value="@i" />
-                                        <input type="hidden" asp-for="Budget[i].Shown" />
-                                        <input type="hidden" asp-for="Budget[i].Id" />
-                                        <input type="hidden" asp-for="Budget[i].Category" />
-                                        @if (line.IsCustom)
+                                var rows = Enumerable.Range(0, Model.Budget.Count).Where(i => GroupOf(Model.Budget[i]) == g).ToList();
+                                if (rows.Count == 0) { continue; }
+                                <tbody class="budget-group" id="@GroupId(g)">
+                                <tr class="budget-group-head">
+                                    <th colspan="3">
+                                        @g
+                                        @if (g == AMPay.Domain.Credit.BudgetCategories.Payslip)
                                         {
-                                            <input asp-for="Budget[i].Description" placeholder="What is it for?" aria-label="Expense description" />
-                                            <span asp-validation-for="Budget[i].Description" class="field-error"></span>
+                                            <span class="muted small" style="font-weight:400;">&middot; already out of net pay</span>
                                         }
-                                        else
-                                        {
-                                            <text>@line.Description</text>
-                                            @if (line.Hint is not null)
-                                            {
-                                                <div class="muted small">@line.Hint</div>
-                                            }
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (line.Kind == BudgetLineKind.DebtInstalment)
-                                        {
-                                            <span class="badge badge-navy">Debt</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge badge-grey">Expense</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        <input asp-for="Budget[i].Note" aria-label="Note for @(line.Description ?? "expense")" />
-                                    </td>
-                                    <td class="num">
-                                        <input asp-for="Budget[i].Amount" type="number" step="0.01" min="0"
-                                               class="budget-amount" data-kind="@line.Kind"
-                                               aria-label="Amount for @(line.Description ?? "expense")" />
-                                        <span asp-validation-for="Budget[i].Amount" class="field-error"></span>
-                                    </td>
-                                    <td>
-                                        @if (!line.IsMain)
-                                        {
-                                            <button type="submit" name="command" value="remove:@i" formnovalidate
-                                                    class="btn btn-danger btn-sm"
-                                                    aria-label="Remove @(line.Description ?? "expense")">Remove</button>
-                                        }
-                                    </td>
+                                    </th>
+                                    <th class="num budget-subtotal"></th>
+                                    <th></th>
                                 </tr>
+                                @foreach (var i in rows)
+                                {
+                                    var line = Model.Budget[i];
+                                    <tr class="budget-row @(line.IsMain || line.IsCustom ? "is-main" : "") @(line.Amount > 0 ? "" : "is-empty")">
+                                        <td>
+                                            <input type="hidden" name="Budget.Index" value="@i" />
+                                            <input type="hidden" asp-for="Budget[i].Id" />
+                                            <input type="hidden" asp-for="Budget[i].Category" />
+                                            @if (line.IsCustom)
+                                            {
+                                                <input asp-for="Budget[i].Description" placeholder="What is it for?" aria-label="Expense description" />
+                                                <span asp-validation-for="Budget[i].Description" class="field-error"></span>
+                                            }
+                                            else
+                                            {
+                                                <text>@line.Description</text>
+                                                @if (line.Hint is not null)
+                                                {
+                                                    <div class="muted small">@line.Hint</div>
+                                                }
+                                            }
+                                        </td>
+                                        <td>
+                                            @switch (line.Kind)
+                                            {
+                                                case BudgetLineKind.DebtInstalment: <span class="badge badge-navy">Debt</span> break;
+                                                case BudgetLineKind.PayslipDeduction: <span class="badge badge-amber">Payslip</span> break;
+                                                default: <span class="badge badge-grey">Expense</span> break;
+                                            }
+                                        </td>
+                                        <td>
+                                            <input asp-for="Budget[i].Note" aria-label="Note for @(line.Description ?? "expense")" />
+                                        </td>
+                                        <td class="num">
+                                            <input asp-for="Budget[i].Amount" type="number" step="0.01" min="0" placeholder="0.00"
+                                                   class="budget-amount" data-kind="@line.Kind"
+                                                   aria-label="Amount for @(line.Description ?? "expense")" />
+                                            <span asp-validation-for="Budget[i].Amount" class="field-error"></span>
+                                        </td>
+                                        <td>
+                                            @if (line.IsCustom)
+                                            {
+                                                <button type="submit" name="command" value="remove:@i" formnovalidate
+                                                        class="btn btn-danger btn-sm"
+                                                        aria-label="Remove @(line.Description ?? "expense")">Remove</button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                                @if (g == AMPay.Domain.Credit.BudgetCategories.Payslip)
+                                {
+                                    <tr class="budget-check">
+                                        <td colspan="5" class="small" id="payslipCheck"></td>
+                                    </tr>
+                                }
+                                </tbody>
                             }
-                            </tbody>
                             <tfoot>
+                            <tr class="total">
+                                <td colspan="3">Payslip deductions <span class="muted small">(explain gross to net; not deducted again)</span></td>
+                                <td class="num" id="totalPayslip">@R(Model.TotalPayslipDeductions)</td>
+                                <td></td>
+                            </tr>
                             <tr class="total">
                                 <td colspan="3">Living expenses</td>
                                 <td class="num" id="totalExpense">@R(Model.TotalExpenses)</td>
@@ -151,35 +182,9 @@
                     </div>
 
                     <div class="row-actions budget-add" style="margin-top:1rem;">
-                        <label for="addLine" class="small">Add a budget line</label>
-                        <select id="addLine" name="addLine">
-                            @{
-                                var hidden = Model.Budget.Where(l => !l.IsVisible).ToList();
-                                var hiddenExpenses = hidden.Where(l => l.Kind == BudgetLineKind.Expense).ToList();
-                                var hiddenDebt = hidden.Where(l => l.Kind == BudgetLineKind.DebtInstalment).ToList();
-                            }
-                            @if (hiddenExpenses.Count > 0)
-                            {
-                                <optgroup label="Expenses">
-                                    @foreach (var l in hiddenExpenses)
-                                    {
-                                        <option value="@l.Category">@l.Description</option>
-                                    }
-                                </optgroup>
-                            }
-                            @if (hiddenDebt.Count > 0)
-                            {
-                                <optgroup label="Debt instalments">
-                                    @foreach (var l in hiddenDebt)
-                                    {
-                                        <option value="@l.Category">@l.Description</option>
-                                    }
-                                </optgroup>
-                            }
-                            <option value="@AMPay.Domain.Credit.BudgetCategories.Custom">Something else&hellip;</option>
-                        </select>
+                        <input type="hidden" name="addLine" value="@AMPay.Domain.Credit.BudgetCategories.Custom" />
                         <button type="submit" name="command" value="add" formnovalidate class="btn btn-outline btn-sm">
-                            + Add
+                            + Add something else
                         </button>
                         <button type="submit" name="command" value="recalculate" formnovalidate class="btn btn-outline btn-sm">
                             Recalculate NET of NET
@@ -288,13 +293,68 @@
                 return 'R ' + fmt.format(sum);
             }
 
-            form.addEventListener('input', function (e) {
-                if (e.target.type !== 'number') return;
+            function num(el) { var v = parseFloat(el && el.value); return isNaN(v) ? 0 : v; }
+            function rand(v) { return 'R ' + fmt.format(v); }
+
+            // Each group's subtotal, and whether a line is empty (for folding).
+            function groups() {
+                form.querySelectorAll('tbody.budget-group').forEach(function (g) {
+                    var sum = 0;
+                    g.querySelectorAll('.budget-amount').forEach(function (el) {
+                        sum += num(el);
+                        el.closest('tr').classList.toggle('is-empty', !(num(el) > 0));
+                    });
+                    g.querySelector('.budget-subtotal').textContent = sum > 0 ? rand(sum) : '';
+                });
+            }
+
+            // Gross less the payslip deductions should come to about the net pay captured.
+            function payslip() {
+                var cell = document.getElementById('payslipCheck');
+                if (!cell) return;
+                var gross = num(document.getElementById('GrossMonthlyIncome')), net = num(document.getElementById('NetMonthlyIncome'));
+                var ded = 0;
+                form.querySelectorAll('.budget-amount[data-kind="PayslipDeduction"]').forEach(function (el) { ded += num(el); });
+                if (!(gross > 0) || !(net > 0) || !(ded > 0)) {
+                    cell.textContent = 'Enter the deductions from the payslip: gross less deductions should equal the net pay above.';
+                    cell.className = 'small muted'; return;
+                }
+                var gap = gross - ded - net;
+                cell.textContent = 'Gross ' + rand(gross) + ' less deductions ' + rand(ded) + ' = ' + rand(gross - ded) +
+                    (Math.abs(gap) <= 100 ? '. Agrees with the net pay captured.'
+                        : '; net pay captured is ' + rand(net) + '. ' + rand(Math.abs(gap)) + (gap > 0 ? ' of deductions is missing' : ' too much is deducted') + ': check the payslip.');
+                cell.className = 'small ' + (Math.abs(gap) <= 100 ? 'budget-ok' : 'budget-warn');
+            }
+
+            function refresh() {
                 document.getElementById('totalExpense').textContent = total('Expense');
                 document.getElementById('totalDebt').textContent = total('DebtInstalment');
+                document.getElementById('totalPayslip').textContent = total('PayslipDeduction');
+                groups(); payslip();
+            }
+
+            form.addEventListener('input', function (e) {
+                if (e.target.type !== 'number') return;
+                refresh();
                 var stale = document.getElementById('netOfNetStale');
                 if (stale) stale.hidden = false;
             });
+
+            // Folding hides empty lines on screen only: they are still posted and saved as zero.
+            var table = document.getElementById('budgetTable'), fold = document.getElementById('budgetFold');
+            function setFold(on) {
+                table.classList.toggle('folded', on);
+                fold.setAttribute('aria-pressed', on ? 'true' : 'false');
+                var n = table.querySelectorAll('tr.budget-row.is-empty:not(.is-main)').length;
+                fold.textContent = on ? 'Show every line (' + n + ' empty)' : 'Hide the ' + n + ' empty lines';
+                try { localStorage.setItem('ampay.budget.folded', on ? '1' : '0'); } catch (e) { }
+            }
+            fold.addEventListener('click', function () { setFold(!table.classList.contains('folded')); });
+
+            refresh();
+            var saved = null;
+            try { saved = localStorage.getItem('ampay.budget.folded'); } catch (e) { }
+            setFold(saved === '1');
         })();
     </script>
 }

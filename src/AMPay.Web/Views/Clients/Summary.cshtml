@@ -12,6 +12,7 @@
     bool Done(OnboardingStep s) => wizard.CompletedSteps.Contains(s);
     var steps = OnboardingSteps.All.Where(s => s.Step != OnboardingStep.Summary).ToList();
     var canOnboard = missing.Count == 0 && Model.Status is ClientStatus.Draft or ClientStatus.Captured;
+    var screening = ViewBag.Screening as ClientScreening;
 }
 
 <div class="page-head">
@@ -42,10 +43,22 @@
                         Client <span class="mono">@Model.ClientNumber</span> &middot;
                         ID <span class="mono">@AMPay.Domain.Validation.SaIdNumber.Mask(Model.IdNumber)</span> &middot;
                         <partial name="_ClientStatus" model="Model.Status" />
+                        @if (screening is not null)
+                        {
+                            <a asp-action="GoodToGo" asp-route-id="@Model.Id" class="badge @ScreeningDisplay.Tone(screening.Outcome)">@AMPay.Domain.Credit.GoodToGo.Label(screening.Outcome) &middot; @screening.Score</a>
+                        }
                     </p>
                 </div>
             </div>
         </div>
+
+        @if (screening is { Outcome: ScreeningOutcome.NotGoodToGo })
+        {
+            <div class="alert alert-error">
+                <strong>Not good to go.</strong> Your own check flags this client.
+                <a asp-action="GoodToGo" asp-route-id="@Model.Id">See why</a> before going any further.
+            </div>
+        }
 
         @if (missing.Count > 0)
         {
@@ -151,6 +164,7 @@
                     </form>
                 }
                 <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline">Client file</a>
+                <a asp-action="Report" asp-route-id="@Model.Id" target="_blank" rel="noopener" class="btn btn-outline">Report for the client</a>
                 @if (Model.Photo is null)
                 {
                     <a asp-action="Photo" asp-route-id="@Model.Id" class="btn btn-outline">Add photograph</a>

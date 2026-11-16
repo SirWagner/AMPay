@@ -179,8 +179,12 @@ public class ContractService
         (AffordabilityInput, AffordabilityResult)? budget =
             input is null ? null : (input, _affordability.Assess(input));
 
+        var ownWording = await _db.LoanWordings.AsNoTracking()
+            .Where(w => w.LoanId == loan.Id)
+            .ToDictionaryAsync(w => w.Kind, ct);
+
         return ContractSnapshotBuilder.Build(new ContractSnapshotBuilder.Inputs(
-            loan, client, tenant, templates, budget, reference, now));
+            loan, client, tenant, templates, budget, reference, now, ownWording));
     }
 
     // ---------------------------------------------------------------- send

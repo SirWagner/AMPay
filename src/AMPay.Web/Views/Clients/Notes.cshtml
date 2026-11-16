@@ -1,0 +1,97 @@
+@model ClientNotesModel
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var today = DateTime.UtcNow.AddHours(2).Date;
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">
+        @OnboardingSteps.Caption(OnboardingStep.Notes) &mdash; notes. Every call, message and visit, and when to get
+        back to the client.
+    </p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <form asp-action="AddNote" asp-route-id="@Model.ClientId" method="post" class="card">
+            <div class="card-head"><h2>Add a note</h2></div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="channel">How</label>
+                        <select id="channel" name="channel">
+                            @foreach (var c in ContactChannels.All)
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="followUpOn">Follow up on</label>
+                        <input type="date" id="followUpOn" name="followUpOn" min="@today.ToString("yyyy-MM-dd")" />
+                        <span class="hint">Leave empty if nothing more is needed. Open follow-ups are listed under Follow-ups.</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="body">What was said or done</label>
+                    <textarea id="body" name="body" rows="3" maxlength="4000" required></textarea>
+                </div>
+            </div>
+            <div class="card-foot">
+                <button type="submit" class="btn btn-primary">Save note</button>
+                <a asp-action="GoodToGo" asp-route-id="@Model.ClientId" class="btn btn-outline">Next: good to go &rarr;</a>
+            </div>
+        </form>
+
+        <div class="card">
+            <div class="card-head"><h3>Contact history</h3></div>
+            @if (Model.Notes.Count == 0)
+            {
+                <div class="empty">No notes yet.</div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th style="width:9rem;">When</th><th style="width:7rem;">How</th><th>Note</th><th style="width:12rem;">Follow-up</th></tr></thead>
+                        <tbody>
+                        @foreach (var n in Model.Notes)
+                        {
+                            <tr>
+                                <td class="muted small">
+                                    @n.CreatedUtc.AddHours(2).ToString("d MMM yyyy HH:mm")
+                                    <div>@n.CreatedByUserId</div>
+                                </td>
+                                <td><span class="badge badge-navy">@(n.Category ?? "Note")</span></td>
+                                <td style="white-space:pre-line;">@n.Body</td>
+                                <td>
+                                    @if (n.FollowUpOn is null)
+                                    {
+                                        <span class="muted small">-</span>
+                                    }
+                                    else if (n.FollowUpDoneUtc is not null)
+                                    {
+                                        <span class="badge badge-green">Done</span>
+                                        <div class="muted small">@n.FollowUpDoneUtc.Value.AddHours(2).ToString("d MMM") by @n.FollowUpDoneBy</div>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge @(n.FollowUpOn < today ? "badge-red" : "badge-amber")">@n.FollowUpOn.Value.ToString("d MMM yyyy")</span>
+                                        <form asp-action="CompleteFollowUp" asp-route-id="@Model.ClientId" method="post" style="margin-top:.35rem;">
+                                            <input type="hidden" name="noteId" value="@n.Id" />
+                                            <button type="submit" class="btn btn-outline btn-sm">Mark done</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

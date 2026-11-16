@@ -9,14 +9,28 @@ public class ClientEmployment
     public Guid ClientId { get; set; }
     public Client? Client { get; set; }
 
+    /// <summary>The employer picked from the lender's list. <see cref="EmployerName"/> keeps a copy, so the client file reads the same if the list entry is later renamed.</summary>
+    public Guid? EmployerId { get; set; }
+    public Employer? Employer { get; set; }
+
     public string? EmployerName { get; set; }
+    public string? PayPoint { get; set; }
+    public string? PayPointNumber { get; set; }
+    public string? OtherEmployerReference { get; set; }
     public string? Occupation { get; set; }
     public string? Department { get; set; }
     public string? EmployeeNumber { get; set; }
     public string? EmploymentType { get; set; }
     public DateTime? EmployedSince { get; set; }
 
+    /// <summary>A fixed-term contract's end date. A loan should not outlast the job paying for it.</summary>
+    public DateTime? ContractExpiryDate { get; set; }
+    public int? YearsAtPreviousEmployer { get; set; }
+
     public string? WorkTelephone { get; set; }
+
+    /// <summary>Ticked when the client has no work number, so a blank one is not taken for an oversight.</summary>
+    public bool WorkTelephoneNotAvailable { get; set; }
     public string? SupervisorName { get; set; }
     public string? PayFrequency { get; set; }
 

@@ -60,6 +60,11 @@
             }
         </div>
         <div class="card-foot contract-actions">
+            @if (User.IsInRole(AppRoles.TenantAdmin) || User.IsInRole(AppRoles.SuperAdmin))
+            {
+                <a asp-controller="LoanWording" asp-action="Index" asp-route-loanId="@Model.LoanId" class="btn btn-outline"
+                   title="Change a section of the contract for this client only">Wording for this client</a>
+            }
             @if (current is not null)
             {
                 <a asp-controller="Contracts" asp-action="Details" asp-route-id="@current.Id" class="btn btn-primary">

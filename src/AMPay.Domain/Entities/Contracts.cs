@@ -39,6 +39,40 @@ public class ContractTemplate
 }
 
 /// <summary>
+/// Wording changed for one borrower's agreement: one section of the pack, for one loan, in
+/// place of the lender's standard <see cref="ContractTemplate"/>. Used when the contract is
+/// issued and frozen into it; the lender's standard wording is not touched.
+/// </summary>
+public class LoanWording
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid LoanId { get; set; }
+    public Loan? Loan { get; set; }
+
+    public ContractTemplateKind Kind { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Plain text, as <see cref="ContractTemplate.Body"/>.</summary>
+    public string Body { get; set; } = string.Empty;
+
+    /// <summary>Why this client's wording differs. Kept: a one-off term has to be explainable later.</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>
+    /// Someone with authority confirmed this wording may be used with this client. Without it
+    /// the contract issued from it is a draft, as with unapproved standard wording.
+    /// </summary>
+    public bool IsApproved { get; set; }
+    public DateTime? ApprovedUtc { get; set; }
+    public string? ApprovedByUserId { get; set; }
+
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+    public string? UpdatedByUserId { get; set; }
+}
+
+/// <summary>
 /// The contract pack for one loan: credit agreement, debit order authorisation, budget
 /// acknowledgement and credit life disclosure, frozen at issue.
 /// <para>

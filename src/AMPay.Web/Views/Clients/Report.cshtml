@@ -1,0 +1,107 @@
+@using AMPay.Domain.Credit
+@model ClientReportModel
+@{
+    Layout = "_PublicLayout";
+    var s = Model.Screening;
+    var n = Model.NetOfNet;
+    string R(decimal v) => "R " + v.ToString("N2");
+}
+
+<div class="page-head flex-between no-print">
+    <p class="lede" style="margin:0;">This is what the client receives. Print it, or choose "Save as PDF" in the print window to send it.</p>
+    <button type="button" class="btn btn-primary" onclick="window.print()">Print or save as PDF</button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h1 style="font-size:1.35rem;margin-top:0;">Your application with @Model.Lender</h1>
+        <p class="muted">
+            @Model.Client.FullName &middot; client number <span class="mono">@Model.Client.ClientNumber</span> &middot;
+            @DateTime.UtcNow.AddHours(2).ToString("d MMMM yyyy")
+        </p>
+
+        @if (s.Outcome == ScreeningOutcome.NotGoodToGo)
+        {
+            <h2 style="font-size:1.1rem;">We cannot offer you credit at this time</h2>
+            <p>Thank you for applying. We assessed your application and cannot take it further for now. The reason@(Model.Reasons.Count == 1 ? "" : "s"):</p>
+            <ul>
+                @foreach (var r in Model.Reasons) { <li>@r</li> }
+                @if (Model.Reasons.Count == 0) { <li>Your application did not meet our lending requirements.</li> }
+            </ul>
+            <p>You are welcome to apply again when your circumstances change.</p>
+        }
+        else if (s.AllowsCreditCheck)
+        {
+            <h2 style="font-size:1.1rem;">Your application has passed our first assessment</h2>
+            <p>
+                Based on what you told us, you qualify to go on to the next step. This is not yet an offer of credit:
+                we still check your supporting documents and your credit record, and you will receive a quotation
+                showing the full cost before anything is signed.
+            </p>
+        }
+        else
+        {
+            <h2 style="font-size:1.1rem;">We need a little more before we can decide</h2>
+            <p>Your application is in progress. To finish assessing it we still need:</p>
+            <ul>
+                @foreach (var r in Model.StillNeeded) { <li>@r</li> }
+                @if (Model.StillNeeded.Count == 0) { <li>To complete our own checks. We will contact you.</li> }
+            </ul>
+        }
+    </div>
+</div>
+
+@if (n is not null)
+{
+    <div class="card">
+        <div class="card-head"><h3>What you can afford, from the figures you gave us</h3></div>
+        <div class="card-body">
+            <table class="data">
+                <tbody>
+                <tr><td>Your income after deductions</td><td class="num">@R(n.NetIncome + n.OtherIncome)</td></tr>
+                <tr>
+                    <td>
+                        Living expenses
+                        @if (n.StatutoryMinimumApplied)
+                        {
+                            <div class="muted small">The law sets a minimum for your income level (National Credit Regulations, 23A). It is higher than what you declared, so we must use it.</div>
+                        }
+                    </td>
+                    <td class="num">&minus; @R(n.AppliedExpenses)</td>
+                </tr>
+                <tr><td>Repayments on debt you already have</td><td class="num">&minus; @R(n.DebtInstalments)</td></tr>
+                <tr><td><strong>Left each month</strong></td><td class="num"><strong>@R(n.NetOfNet)</strong></td></tr>
+                </tbody>
+            </table>
+            <p class="muted small mb-0">A loan instalment has to fit inside what is left each month.</p>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-head"><h3>Your rights</h3></div>
+    <div class="card-body">
+        @if (Model.Bureau is not null)
+        {
+            <p>
+                We obtained your credit record from <strong>@Model.Bureau</strong>@(Model.BureauCheckedUtc is { } d ? " on " + d.AddHours(2).ToString("d MMMM yyyy") : "").
+                You may ask that bureau for a free copy of your record once a year, and challenge anything on it that is wrong.
+            </p>
+        }
+        <p>
+            You may ask us for the reasons for our decision in writing (National Credit Act, section 62).
+            If you are unhappy with how your application was handled, speak to us first@(Model.LenderContact is null ? "" : " on " + Model.LenderContact).
+            You may also approach the National Credit Regulator.
+        </p>
+        <p class="muted small mb-0">
+            @Model.Lender@(Model.LenderNcr is null ? "" : ", registered credit provider " + Model.LenderNcr).
+        </p>
+    </div>
+</div>
+
+<style>
+    @@media print {
+        .no-print, .public-top span { display: none !important; }
+        .card { box-shadow: none !important; break-inside: avoid; }
+    }
+</style>

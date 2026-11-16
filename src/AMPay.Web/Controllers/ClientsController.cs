@@ -3,6 +3,7 @@ using AMPay.Domain.Entities;
 using AMPay.Domain.Enums;
 using AMPay.Domain.Netcash;
 using AMPay.Domain.Validation;
+using AMPay.Infrastructure.Credit;
 using AMPay.Infrastructure.Data;
 using AMPay.Infrastructure.Identity;
 using AMPay.Web.Models;
@@ -10,6 +11,7 @@ using AMPay.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AMPay.Web.Controllers;
 
@@ -23,7 +25,7 @@ namespace AMPay.Web.Controllers;
 /// </para>
 /// </summary>
 [Authorize(Policy = AppPolicies.CanCapture)]
-public class ClientsController : Controller
+public partial class ClientsController : Controller
 {
     private readonly AppDbContext _db;
     private readonly ICurrentTenant _tenant;
@@ -31,6 +33,7 @@ public class ClientsController : Controller
     private readonly IAffordabilityService _affordability;
     private readonly AMPay.Domain.Documents.IDocumentStore _store;
     private readonly ICreditBureauClient _bureau;
+    private readonly ScreeningService _screening;
     private readonly ILogger<ClientsController> _log;
 
     public ClientsController(
@@ -40,8 +43,10 @@ public class ClientsController : Controller
         IAffordabilityService affordability,
         AMPay.Domain.Documents.IDocumentStore store,
         ICreditBureauClient bureau,
+        ScreeningService screening,
         ILogger<ClientsController> log)
     {
+        _screening = screening;
         _db = db;
         _tenant = tenant;
         _validation = validation;
@@ -53,13 +58,26 @@ public class ClientsController : Controller
 
     // ---------------------------------------------------------------- list
 
-    public async Task<IActionResult> Index(string? q, ClientStatus? status)
+    public async Task<IActionResult> Index(string? q, ClientStatus? status,
+        [FromServices] IMemoryCache cache)
     {
         ViewData["Title"] = "Clients";
         await _tenant.LoadAsync();
 
         if (_tenant.TenantId is null && !_tenant.IsPlatformUser)
             return TenantNotSelected();
+
+        // The automatic recheck, for a system whose daily job is off because the database sleeps:
+        // opening the client list works through the stale results a few at a time instead.
+        if (_tenant.TenantId is { } recheckTenant)
+        {
+            var key = $"screening-recheck:{recheckTenant}";
+            if (!cache.TryGetValue(key, out _))
+            {
+                cache.Set(key, true, TimeSpan.FromHours(1));
+                await _screening.RecheckStaleAsync(recheckTenant, DateTime.UtcNow, max: 25);
+            }
+        }
 
         var query = _db.Clients.AsNoTracking().AsQueryable();
 
@@ -87,6 +105,15 @@ public class ClientsController : Controller
             .Include(c => c.Mandates)
             .ToListAsync();
 
+        // The latest good-to-go flag of each client listed.
+        var ids = clients.Select(c => c.Id).ToList();
+        var screenings = await _db.ClientScreenings.AsNoTracking()
+            .Where(s => ids.Contains(s.ClientId))
+            .Select(s => new { s.ClientId, s.CheckedUtc, s.Outcome })
+            .ToListAsync();
+        ViewBag.Flags = screenings.GroupBy(s => s.ClientId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(s => s.CheckedUtc).First().Outcome);
+
         return View(clients);
     }
 
@@ -108,7 +135,8 @@ public class ClientsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> General(GeneralStepModel model)
+    [RequestSizeLimit(MaxPhotoBytes * 2)]
+    public async Task<IActionResult> General(GeneralStepModel model, IFormFile? photo, string? captured)
     {
         ViewData["Title"] = model.ClientId is null ? "New client" : "General details";
         await _tenant.LoadAsync();
@@ -177,9 +205,20 @@ public class ClientsController : Controller
                 client.DateOfBirth = dob;
 
             client.Gender ??= SaIdNumber.GetGender(client.IdNumber);
+
+            // Digit 11 says citizen or permanent resident. A resident is not "South African" by nationality.
+            var citizen = SaIdNumber.IsCitizen(client.IdNumber);
+            if (citizen == true && string.IsNullOrWhiteSpace(client.Nationality)) client.Nationality = "South African";
+            else if (citizen == false && client.Nationality == "South African") client.Nationality = null;
         }
 
         await _db.SaveChangesAsync();
+
+        // The photograph is optional here: taken at registration while the client is at the desk,
+        // or later on its own step. A bad picture never loses the details just saved.
+        var (photoBytes, photoType, photoError) = await ReadPhotoAsync(photo, captured);
+        if (photoBytes is not null) await StorePhotoAsync(client, photoBytes, photoType!);
+        if (photoError is not null) TempData["Error"] = photoError;
 
         TempData["Success"] = "General details saved.";
         return RedirectToAction(nameof(Employment), new { id = client.Id });
@@ -222,11 +261,19 @@ public class ClientsController : Controller
         if (client is null) return NotFound();
 
         await PopulateWizardAsync(id);
+        await PopulateEmployersAsync(client.TenantId, client.Employment?.EmployerId);
 
         var e = client.Employment;
         return View(new EmploymentStepModel
         {
             ClientId = id,
+            EmployerId = e?.EmployerId,
+            PayPoint = e?.PayPoint,
+            PayPointNumber = e?.PayPointNumber,
+            OtherEmployerReference = e?.OtherEmployerReference,
+            ContractExpiryDate = e?.ContractExpiryDate,
+            YearsAtPreviousEmployer = e?.YearsAtPreviousEmployer,
+            WorkTelephoneNotAvailable = e?.WorkTelephoneNotAvailable ?? false,
             EmployerName = e?.EmployerName,
             Occupation = e?.Occupation,
             Department = e?.Department,
@@ -248,15 +295,55 @@ public class ClientsController : Controller
         var client = await LoadClientAsync(model.ClientId, c => c.Employment);
         if (client is null) return NotFound();
 
+        var adding = model.EmployerMode == "new";
+        if (adding && string.IsNullOrWhiteSpace(model.EmployerName))
+            ModelState.AddModelError(nameof(model.EmployerName), "Enter the new employer's name.");
+        // Someone in a job works for someone: in select mode that someone must be picked.
+        if (!adding && model.EmployerId is null && model.EmploymentType is "Permanent" or "Contract" or "Temporary"
+            && await _db.Employers.AnyAsync(x => x.TenantId == client.TenantId && x.IsActive))
+            ModelState.AddModelError(nameof(model.EmployerId), "Select the employer, or choose Add a new employer.");
+
+        // Only fixed-term work ends on a date. A permanent job carries no expiry, whatever was typed before.
+        if (!EmploymentStepModel.FixedTermTypes.Contains(model.EmploymentType)) model.ContractExpiryDate = null;
+
         if (!ModelState.IsValid)
         {
             await PopulateWizardAsync(model.ClientId);
+            await PopulateEmployersAsync(client.TenantId, model.EmployerId);
             return View(model);
         }
 
         var e = GetOrCreate(client.Employment, _db.ClientEmployments,
             () => new ClientEmployment { ClientId = client.Id });
         client.Employment = e;
+
+        // Picked from the list, or added to it (matched first, so the same company is never on
+        // the list twice) - the next client at the same company picks it instead of typing it.
+        var employer = await EmployerDirectory.ResolveAsync(
+            _db, client.TenantId, adding ? null : model.EmployerId, model.EmployerName, model.PayPoint);
+        if (employer is not null && _db.Entry(employer).State == EntityState.Added)
+        {
+            employer.PayFrequency = model.PayFrequency;
+            employer.SalaryDay = model.SalaryDay;
+            employer.Telephone = model.NewEmployerTelephone?.Trim();
+            employer.ContactPerson = model.NewEmployerContact?.Trim();
+            TempData["Info"] = $"{employer.DisplayName} added to your employer list.";
+        }
+        else if (adding && employer is not null)
+        {
+            TempData["Info"] = $"{employer.DisplayName} was already on your employer list, so that entry was used.";
+        }
+
+        e.EmployerId = employer?.Id;
+        e.PayPoint = model.PayPoint?.Trim() ?? employer?.PayPoint;
+        e.PayPointNumber = model.PayPointNumber?.Trim();
+        e.OtherEmployerReference = model.OtherEmployerReference?.Trim();
+        e.ContractExpiryDate = model.ContractExpiryDate;
+        e.YearsAtPreviousEmployer = model.YearsAtPreviousEmployer;
+        e.WorkTelephoneNotAvailable = model.WorkTelephoneNotAvailable;
+        model.EmployerName = employer?.Name ?? model.EmployerName;
+        model.PayFrequency ??= employer?.PayFrequency;
+        model.SalaryDay ??= employer?.SalaryDay;
 
         e.EmployerName = model.EmployerName;
         e.Occupation = model.Occupation;
@@ -429,7 +516,8 @@ public class ClientsController : Controller
                 Description = c.Label,
                 Amount = row?.Amount,
                 Note = row?.Notes,
-                Hint = c.Hint
+                Hint = c.Hint,
+                Group = c.Group
             };
 
             if (carryOver && financial is not null)
@@ -483,6 +571,7 @@ public class ClientsController : Controller
             line.Kind = c.Kind;
             line.Description = c.Label;
             line.Hint = c.Hint;
+            line.Group = c.Group;
             return line;
         });
 
@@ -904,7 +993,7 @@ public class ClientsController : Controller
         await _db.SaveChangesAsync();
 
         TempData["Success"] = "Other details saved.";
-        return RedirectToAction(nameof(Details), new { id = client.Id });
+        return RedirectToAction(nameof(GoodToGo), new { id = client.Id });
     }
 
     // ------------------------------------------------------------- credit check
@@ -921,6 +1010,7 @@ public class ClientsController : Controller
             await CollectReportAsync(client, pending);
 
         ViewData["Title"] = "Credit check";
+        ViewBag.Screening = await _screening.EvaluateAsync(id, ScreeningTrigger.DetailsChanged, User.Identity?.Name);
         await PopulateWizardAsync(id, OnboardingStep.CreditCheck);
         ViewBag.Client = client;
         return View(client.CreditEnquiries.OrderByDescending(e => e.EnquiryDate).ToList());
@@ -936,6 +1026,15 @@ public class ClientsController : Controller
     {
         var client = await LoadClientAsync(id, c => c.CreditEnquiries);
         if (client is null) return NotFound();
+
+        // The bureau report is paid for, so it is the final check: only a client the lender's
+        // own screening has passed (or an administrator has let through) gets one.
+        var screening = await _screening.EvaluateAsync(id, ScreeningTrigger.DetailsChanged, User.Identity?.Name);
+        if (screening?.AllowsCreditCheck != true)
+        {
+            TempData["Error"] = "The credit check is the final check. The client must be Good to go first.";
+            return RedirectToAction(nameof(GoodToGo), new { id });
+        }
 
         if (!consent)
         {
@@ -1051,53 +1150,72 @@ public class ClientsController : Controller
         var client = await LoadClientAsync(id, c => c.Photo);
         if (client is null) return NotFound();
 
-        byte[]? bytes = null;
+        var (bytes, contentType, error) = await ReadPhotoAsync(file, captured);
+        if (bytes is null)
+        {
+            TempData["Error"] = error ?? PhotoHelp;
+            return RedirectToAction(nameof(Photo), new { id });
+        }
+
+        await StorePhotoAsync(client, bytes, contentType!);
+
+        TempData["Success"] = "Photograph saved.";
+        return RedirectToAction(nameof(Summary), new { id });
+    }
+
+    private const string PhotoHelp = "Take a photo with the camera, or upload a JPG, PNG or WebP picture of 5 MB or less.";
+
+    /// <summary>
+    /// The picture from the camera (a data URL the page captured) or the upload. All null when
+    /// neither was given; an error when what was given is not a usable picture.
+    /// </summary>
+    private static async Task<(byte[]? Bytes, string? ContentType, string? Error)> ReadPhotoAsync(IFormFile? file, string? captured)
+    {
+        byte[] bytes;
         if (!string.IsNullOrWhiteSpace(captured))
         {
             var comma = captured.IndexOf(',');
             try { bytes = Convert.FromBase64String(comma >= 0 ? captured[(comma + 1)..] : captured); }
-            catch (FormatException) { bytes = null; }
+            catch (FormatException) { return (null, null, PhotoHelp); }
         }
         else if (file is { Length: > 0 })
         {
             if (file.Length > MaxPhotoBytes)
-            {
-                TempData["Error"] = "That photo is over 5 MB. Use a smaller one or take it with the camera.";
-                return RedirectToAction(nameof(Photo), new { id });
-            }
+                return (null, null, "That photo is over 5 MB. Use a smaller one or take it with the camera.");
             await using var s = file.OpenReadStream();
             using var ms = new MemoryStream();
             await s.CopyToAsync(ms);
             bytes = ms.ToArray();
         }
+        else
+        {
+            return (null, null, null);
+        }
 
         var contentType = bytes is { Length: > 0 and <= MaxPhotoBytes } ? TenantLogo.SniffContentType(bytes) : null;
-        if (contentType is null)
-        {
-            TempData["Error"] = "Take a photo with the camera, or upload a JPG, PNG or WebP picture of 5 MB or less.";
-            return RedirectToAction(nameof(Photo), new { id });
-        }
+        return contentType is null ? (null, null, PhotoHelp) : (bytes, contentType, null);
+    }
 
+    private async Task StorePhotoAsync(Client client, byte[] bytes, string contentType)
+    {
         var extension = contentType switch { "image/png" => ".png", "image/webp" => ".webp", _ => ".jpg" };
-        var stored = await _store.SaveAsync(client.TenantId, client.Id, "photo" + extension, new MemoryStream(bytes!));
+        var stored = await _store.SaveAsync(client.TenantId, client.Id, "photo" + extension, new MemoryStream(bytes));
 
-        var oldPath = client.Photo?.StoragePath;
-        if (client.Photo is null)
+        var photo = await _db.ClientPhotos.FirstOrDefaultAsync(p => p.ClientId == client.Id);
+        var oldPath = photo?.StoragePath;
+        if (photo is null)
         {
-            client.Photo = new ClientPhoto { ClientId = client.Id };
-            _db.ClientPhotos.Add(client.Photo);
+            photo = new ClientPhoto { ClientId = client.Id };
+            _db.ClientPhotos.Add(photo);
         }
-        client.Photo.StoragePath = stored.StoragePath;
-        client.Photo.ContentType = contentType;
-        client.Photo.CapturedUtc = DateTime.UtcNow;
-        client.Photo.CapturedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        photo.StoragePath = stored.StoragePath;
+        photo.ContentType = contentType;
+        photo.CapturedUtc = DateTime.UtcNow;
+        photo.CapturedByUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         client.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
         if (oldPath is not null && oldPath != stored.StoragePath) await _store.DeleteAsync(oldPath);
-
-        TempData["Success"] = "Photograph saved.";
-        return RedirectToAction(nameof(Summary), new { id });
     }
 
     /// <summary>The client's photo, for signed-in staff of that business only; never cached by the browser.</summary>
@@ -1152,6 +1270,7 @@ public class ClientsController : Controller
                 missing.Add($"an accepted {DocumentsController.Describe(required).ToLowerInvariant()}");
 
         ViewBag.Missing = missing;
+        ViewBag.Screening = await _screening.EvaluateAsync(id, ScreeningTrigger.DetailsChanged, User.Identity?.Name);
         var f = client.Financial;
         ViewBag.NetOfNet = f is null ? null
             : NetOfNetFor(f.GrossMonthlyIncome, f.NetMonthlyIncome, f.OtherIncome,
@@ -1219,6 +1338,10 @@ public class ClientsController : Controller
         ViewBag.NetOfNet = f is null ? null
             : NetOfNetFor(f.GrossMonthlyIncome, f.NetMonthlyIncome, f.OtherIncome,
                 f.TotalMonthlyExpenses ?? 0m, f.TotalMonthlyDebtRepayments ?? 0m);
+
+        ViewBag.Screening = await _screening.EvaluateAsync(id, ScreeningTrigger.DetailsChanged, User.Identity?.Name);
+        ViewBag.RecentNotes = await _db.ClientNotes.AsNoTracking()
+            .Where(n => n.ClientId == id).OrderByDescending(n => n.CreatedUtc).Take(4).ToListAsync();
 
         await PopulateWizardAsync(id);
         return View(client);
@@ -1349,8 +1472,10 @@ public class ClientsController : Controller
         if (await _db.ClientPhotos.AnyAsync(p => p.ClientId == clientId)) done.Add(OnboardingStep.Photo);
         if (await _db.ClientCreditEnquiries.AnyAsync(e => e.ClientId == clientId && e.Status == CreditEnquiryStatus.ReportReceived))
             done.Add(OnboardingStep.CreditCheck);
-        if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0))
+        if (await _db.ClientBudgets.AnyAsync(b => b.ClientId == clientId && b.Amount > 0 && b.Kind != BudgetLineKind.PayslipDeduction))
             done.Add(OnboardingStep.Budgets);
+        if (await _db.ClientNotes.AnyAsync(n => n.ClientId == clientId)) done.Add(OnboardingStep.Notes);
+        if ((await _screening.LatestAsync(clientId))?.AllowsCreditCheck == true) done.Add(OnboardingStep.GoodToGo);
 
         // Documents count as done only once the required ones are actually accepted -
         // uploading a file is not the same as having it pass.
@@ -1366,6 +1491,22 @@ public class ClientsController : Controller
             CurrentStep = step ?? OnboardingStep.General,
             CompletedSteps = done
         };
+    }
+
+    /// <summary>The lender's employer list for the Employment step's picker.</summary>
+    private async Task PopulateEmployersAsync(Guid tenantId, Guid? selected)
+    {
+        ViewBag.Employers = await _db.Employers.AsNoTracking()
+            .Where(e => e.TenantId == tenantId && (e.IsActive || e.Id == selected))
+            .OrderBy(e => e.Name).ThenBy(e => e.PayPoint)
+            .ToListAsync();
+
+        // How many of the lender's clients work at each employer: shown when one is selected.
+        ViewBag.EmployerClients = await _db.ClientEmployments.AsNoTracking()
+            .Where(x => x.EmployerId != null && x.Client!.TenantId == tenantId)
+            .GroupBy(x => x.EmployerId!.Value)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count);
     }
 
     private async Task PopulateBanksAsync()

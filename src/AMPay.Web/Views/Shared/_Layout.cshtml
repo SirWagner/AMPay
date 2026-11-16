@@ -40,8 +40,7 @@
         }
         else
         {
-            <text>Netcash integration is running on stubs &mdash; no live payment calls are being made.
-            Set <span class="mono">Netcash:UseStubs</span> to false once the live clients are implemented.</text>
+            <text>Test mode: Netcash is simulated &mdash; no real bank checks, debit orders or payments are made.</text>
         }
     </div>
 }
@@ -93,6 +92,10 @@
         @if (!isReviewerOnly)
         {
             <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
+            @if (User.IsInRole(AppRoles.SuperAdmin) || User.IsInRole(AppRoles.TenantAdmin) || User.IsInRole(AppRoles.Capturer))
+            {
+                <a class="nav-link @Active("FollowUps")" asp-controller="FollowUps" asp-action="Index">Follow-ups</a>
+            }
         }
         @if (canReview)
         {
@@ -114,6 +117,7 @@
             <div class="sidebar-section">Settings</div>
             <a class="nav-link @Active("CreditPackages")" asp-controller="CreditPackages" asp-action="Index">Credit packages</a>
             <a class="nav-link @Active("SelfService")" asp-controller="SelfService" asp-action="Index">Self-service link</a>
+            <a class="nav-link @Active("Employers")" asp-controller="Employers" asp-action="Index">Employers</a>
             <a class="nav-link @Active("LendingSettings")" asp-controller="LendingSettings" asp-action="Index">Lending settings</a>
             <a class="nav-link @Active("Branding")" asp-controller="Branding" asp-action="Index">Branding</a>
             <a class="nav-link @Active("ContractTemplates")" asp-controller="ContractTemplates" asp-action="Index">Contract wording</a>

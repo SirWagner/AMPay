@@ -27,6 +27,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<ClientNote> ClientNotes => Set<ClientNote>();
     public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
     public DbSet<ClientPhoto> ClientPhotos => Set<ClientPhoto>();
+    public DbSet<ClientScreening> ClientScreenings => Set<ClientScreening>();
+    public DbSet<ClientVerification> ClientVerifications => Set<ClientVerification>();
+    public DbSet<BankStatementAssessment> BankStatementAssessments => Set<BankStatementAssessment>();
+    public DbSet<StatementReview> StatementReviews => Set<StatementReview>();
+    public DbSet<Employer> Employers => Set<Employer>();
 
     public DbSet<CreditPackage> CreditPackages => Set<CreditPackage>();
     public DbSet<RegulatoryCap> RegulatoryCaps => Set<RegulatoryCap>();
@@ -38,6 +43,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
 
     public DbSet<ContractTemplate> ContractTemplates => Set<ContractTemplate>();
     public DbSet<LoanContract> LoanContracts => Set<LoanContract>();
+    public DbSet<LoanWording> LoanWordings => Set<LoanWording>();
     public DbSet<CreditQuote> CreditQuotes => Set<CreditQuote>();
     public DbSet<OutboundMessage> OutboundMessages => Set<OutboundMessage>();
 
@@ -235,8 +241,96 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         });
         b.Entity<ClientCreditEnquiry>().HasOne(x => x.Client).WithMany(c => c.CreditEnquiries)
             .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
-        b.Entity<ClientNote>().HasOne(x => x.Client).WithMany(c => c.Notes)
-            .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<ClientNote>(e =>
+        {
+            e.Property(x => x.FollowUpDoneBy).HasMaxLength(256);
+            e.Ignore(x => x.FollowUpOpen);
+            e.HasIndex(x => new { x.FollowUpOn, x.FollowUpDoneUtc });
+            e.HasOne(x => x.Client).WithMany(c => c.Notes)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<LoanWording>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Body).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.ApprovedByUserId).HasMaxLength(64);
+            e.Property(x => x.UpdatedByUserId).HasMaxLength(64);
+            e.HasIndex(x => new { x.LoanId, x.Kind }).IsUnique();
+            e.HasOne(x => x.Loan).WithMany()
+                .HasForeignKey(x => x.LoanId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Employer>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.PayPoint).HasMaxLength(100);
+            e.Property(x => x.Telephone).HasMaxLength(20);
+            e.Property(x => x.ContactPerson).HasMaxLength(200);
+            e.Property(x => x.EmailAddress).HasMaxLength(200);
+            e.Property(x => x.Address).HasMaxLength(300);
+            e.Property(x => x.PayFrequency).HasMaxLength(20);
+            e.Ignore(x => x.DisplayName);
+            e.HasIndex(x => new { x.TenantId, x.Name });
+            e.HasOne(x => x.Tenant).WithMany()
+                .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ClientEmployment>(e =>
+        {
+            e.Property(x => x.PayPoint).HasMaxLength(100);
+            e.Property(x => x.PayPointNumber).HasMaxLength(50);
+            e.Property(x => x.OtherEmployerReference).HasMaxLength(50);
+            // Removing a list entry must not touch client files: they keep their own copy of the name.
+            e.HasOne(x => x.Employer).WithMany()
+                .HasForeignKey(x => x.EmployerId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        b.Entity<ClientScreening>(e =>
+        {
+            e.Property(x => x.CheckedBy).HasMaxLength(256);
+            e.Property(x => x.OverrideReason).HasMaxLength(500);
+            e.Property(x => x.OverriddenBy).HasMaxLength(256);
+            e.Ignore(x => x.AllowsCreditCheck);
+            e.HasIndex(x => new { x.ClientId, x.CheckedUtc });
+            e.HasOne(x => x.Client).WithMany(c => c.Screenings)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ClientVerification>(e =>
+        {
+            e.Property(x => x.Method).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Reference).HasMaxLength(200);
+            e.Property(x => x.Notes).HasMaxLength(1000);
+            e.Property(x => x.CheckedBy).HasMaxLength(256);
+            e.HasIndex(x => new { x.ClientId, x.Kind, x.CheckedUtc });
+            e.HasOne(x => x.Client).WithMany(c => c.Verifications)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<StatementReview>(e =>
+        {
+            e.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.Findings).HasMaxLength(4000).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(256);
+            e.HasIndex(x => new { x.ClientId, x.CreatedUtc });
+            e.HasOne(x => x.Client).WithMany(c => c.StatementReviews)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<BankStatementAssessment>(e =>
+        {
+            e.Property(x => x.Summary).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.Observations).HasMaxLength(4000);
+            e.Property(x => x.Model).HasMaxLength(60).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(256);
+            e.HasOne(x => x.Client).WithMany(c => c.StatementAssessments)
+                .HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
+            // A second cascade path from Clients is not allowed; removing a document removes its assessments in code.
+            e.HasOne(x => x.Document).WithMany()
+                .HasForeignKey(x => x.DocumentId).OnDelete(DeleteBehavior.NoAction);
+        });
         b.Entity<ClientDocument>(e =>
         {
             e.Property(x => x.FileName).HasMaxLength(260).IsRequired();

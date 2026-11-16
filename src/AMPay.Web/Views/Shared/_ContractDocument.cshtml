@@ -69,6 +69,11 @@
         </div>
     </section>
 
+    @if (Terms(ContractTemplateKind.BorrowerDeclarations) is { } declarations)
+    {
+        <section class="contract-terms"><h3>@declarations.Title</h3>@Paras(declarations.Body)</section>
+    }
+
     <section>
         <h3>2. Quote and cost of credit</h3>
         <p class="muted small">Quote dated @Date(q.QuoteDate). This quote is binding on the credit provider for five business days.</p>
@@ -95,7 +100,7 @@
                 @if (budget.OtherIncome > 0) { <tr><td>Other income</td><td class="num">@Money(budget.OtherIncome)</td></tr> }
                 @foreach (var l in budget.Lines)
                 {
-                    <tr><td>@l.Description@(l.Kind == "Instalment" ? " (credit instalment)" : "")</td><td class="num">@Money(l.Amount)</td></tr>
+                    <tr><td>@l.Description@(l.Kind == "Instalment" ? " (credit instalment)" : l.Kind == "Payslip" ? " (deducted from salary)" : "")</td><td class="num">@Money(l.Amount)</td></tr>
                 }
                 <tr class="sub"><td>Declared living expenses</td><td class="num">@Money(budget.DeclaredLivingExpenses)</td></tr>
                 <tr><td>Minimum living expenses under the regulations</td><td class="num">@Money(budget.StatutoryMinimum)</td></tr>

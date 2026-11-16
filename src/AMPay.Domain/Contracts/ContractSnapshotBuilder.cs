@@ -17,7 +17,8 @@ public static class ContractSnapshotBuilder
         IReadOnlyDictionary<ContractTemplateKind, ContractTemplate> Templates,
         (AffordabilityInput Input, AffordabilityResult Result)? Budget,
         string Reference,
-        DateTime IssuedUtc);
+        DateTime IssuedUtc,
+        IReadOnlyDictionary<ContractTemplateKind, LoanWording>? LoanWording = null);
 
     public static ContractSnapshot Build(Inputs i)
     {
@@ -34,6 +35,7 @@ public static class ContractSnapshotBuilder
 
         var templates = new[]
             {
+                ContractTemplateKind.BorrowerDeclarations,
                 ContractTemplateKind.CreditAgreementTerms,
                 ContractTemplateKind.DebitOrderAuthorisation,
                 ContractTemplateKind.BudgetAcknowledgement,
@@ -45,11 +47,40 @@ public static class ContractSnapshotBuilder
                 : throw new InvalidOperationException($"The {k} template is missing for {tenant.Name}."))
             .ToList();
 
+        // Wording changed for this borrower replaces the lender's standard section, and carries
+        // its own approval: the attorney approved the standard text, not the one-off.
+        var sections = templates
+            .Select(t => i.LoanWording is not null && i.LoanWording.TryGetValue(t.Kind, out var own)
+                ? (t.Kind, own.Title, own.Body, own.IsApproved, Custom: true)
+                : (t.Kind, t.Title, t.Body, t.IsApproved, Custom: false))
+            .ToList();
+
+        var fields = new Dictionary<string, string?>
+        {
+            ["Lender.RegisteredName"] = tenant.Name,
+            ["Lender.TradingName"] = tenant.TradingName ?? tenant.Name,
+            ["Lender.NcrRegNo"] = tenant.NcrNumber,
+            ["Lender.ContactNo"] = tenant.ContactNumber,
+            ["Client.FullNames"] = string.Join(' ', new[] { client.FirstName, client.MiddleNames }.Where(n => !string.IsNullOrWhiteSpace(n))),
+            ["Client.Surname"] = client.Surname,
+            ["Client.Number"] = client.ClientNumber,
+            ["Client.Language"] = client.PreferredLanguage,
+            ["Loan.ContractNo"] = i.Reference,
+            ["Cost.Principal"] = ContractFormat.Money(loan.Principal),
+            ["Cost.TotalRepayable"] = ContractFormat.Money(loan.TotalRepayable),
+            ["Rate.MonthlyPct"] = ContractFormat.Percent(loan.MonthlyInterestRate),
+            ["Rate.AnnualPct"] = ContractFormat.Percent(loan.MonthlyInterestRate * 12),
+            ["Rate.PenaltyMonthlyPct"] = ContractFormat.Percent(loan.MonthlyInterestRate),
+            ["Schedule.InstalmentCount"] = loan.NumberOfInstalments.ToString(),
+            ["Schedule.InstalmentAmount"] = ContractFormat.Money(loan.FirstInstalment),
+            ["Schedule.PaymentMethod"] = "DebiCheck debit order"
+        };
+
         return new ContractSnapshot
         {
             Reference = i.Reference,
             IssuedUtc = i.IssuedUtc,
-            TemplatesApproved = templates.All(t => t.IsApproved),
+            TemplatesApproved = sections.All(t => t.IsApproved),
 
             Provider = new ProviderDetails(
                 RegisteredName: tenant.Name,
@@ -131,7 +162,8 @@ public static class ContractSnapshotBuilder
                 CommencementDate: (loan.AgreementDate ?? loan.CreatedUtc).Date,
                 TerminationDate: schedule[^1].DueDate),
 
-            Terms = templates.Select(t => new TermsSection(t.Kind.ToString(), t.Title, t.Body)).ToList()
+            Terms = sections.Select(t => new TermsSection(
+                t.Kind.ToString(), t.Title, ContractMergeFields.Resolve(t.Body, fields), t.Custom)).ToList()
         };
     }
 
@@ -142,7 +174,12 @@ public static class ContractSnapshotBuilder
             .OrderBy(b => b.Kind).ThenBy(b => b.DisplayOrder)
             .Select(b => new BudgetDetailsLine(
                 b.Description,
-                b.Kind == BudgetLineKind.DebtInstalment ? "Instalment" : "Expense",
+                b.Kind switch
+                {
+                    BudgetLineKind.DebtInstalment => "Instalment",
+                    BudgetLineKind.PayslipDeduction => "Payslip",
+                    _ => "Expense"
+                },
                 b.Amount))
             .ToList();
 

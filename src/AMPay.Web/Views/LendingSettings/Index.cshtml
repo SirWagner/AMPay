@@ -30,6 +30,17 @@
                 </span>
             </div>
 
+            <div class="field">
+                <label asp-for="ScreeningRecheckDays"></label>
+                <input asp-for="ScreeningRecheckDays" type="number" min="0" max="365" inputmode="numeric" />
+                <span asp-validation-for="ScreeningRecheckDays" class="field-error"></span>
+                <span class="hint">
+                    A client's good-to-go flag is rechecked by itself once it is this many days old, because things
+                    change without anyone touching the file: a contract ends, an instalment goes unpaid. A flag that
+                    gets worse lands on your follow-up list. Enter 0 to switch the automatic recheck off.
+                </span>
+            </div>
+
             <button type="submit" class="btn btn-primary">Save</button>
             <a asp-controller="Home" asp-action="Index" class="btn btn-outline">Back to dashboard</a>
         </form>

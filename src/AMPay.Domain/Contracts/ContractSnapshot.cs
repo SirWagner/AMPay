@@ -206,4 +206,5 @@ public record CreditLifeDetails(
     DateTime CommencementDate,
     DateTime TerminationDate);
 
-public record TermsSection(string Kind, string Title, string Body);
+/// <param name="Custom">True when this section was worded for this borrower, not taken from the lender's standard wording.</param>
+public record TermsSection(string Kind, string Title, string Body, bool Custom = false);

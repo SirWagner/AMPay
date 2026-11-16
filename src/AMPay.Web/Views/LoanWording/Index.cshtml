@@ -1,0 +1,90 @@
+@using AMPay.Web.Controllers
+@model LoanWordingIndexModel
+@{
+    var loan = Model.Loan;
+    var changed = Model.Sections.Count(s => s.Own is not null);
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Wording for @loan.Client!.FullName</h1>
+        <p class="lede">
+            Loan <span class="mono">@loan.LoanNumber</span>. Each section of this client's contract uses your standard
+            wording unless you change it here. A change applies to this loan only.
+        </p>
+    </div>
+    <a asp-controller="Loans" asp-action="Details" asp-route-id="@loan.Id" class="btn btn-outline">Back to the loan</a>
+</div>
+
+@if (Model.LockedReason is not null)
+{
+    <div class="alert alert-info">@Model.LockedReason</div>
+}
+else if (Model.OpenContract is not null && changed > 0)
+{
+    <div class="alert alert-warn">
+        Contract <span class="mono">@Model.OpenContract</span> is already issued and keeps the wording it was issued with.
+        Issue the contract again from the loan to use what is here.
+    </div>
+}
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data">
+            <thead><tr><th>Section</th><th>Wording</th><th>Approved</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var s in Model.Sections)
+            {
+                <tr>
+                    <td>
+                        <strong>@s.Title</strong>
+                        <div class="muted small">@ContractTemplatesController.Describe(s.Kind)</div>
+                    </td>
+                    <td>
+                        @if (s.Own is null)
+                        {
+                            <span class="badge badge-grey">Your standard wording</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-navy">Changed for this client</span>
+                            <div class="muted small">@s.Own.Reason</div>
+                            <div class="muted small">@s.Own.UpdatedUtc.AddHours(2).ToString("d MMM yyyy HH:mm")</div>
+                        }
+                    </td>
+                    <td>
+                        @if (s.Own?.IsApproved ?? s.StandardApproved)
+                        {
+                            <span class="badge badge-green">Approved</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-amber">Draft</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="row-actions">
+                            <a asp-action="Edit" asp-route-loanId="@loan.Id" asp-route-kind="@s.Kind" class="btn btn-outline btn-sm">
+                                @(Model.LockedReason is null ? "Change for this client" : "View")
+                            </a>
+                            @if (s.Own is not null && Model.LockedReason is null)
+                            {
+                                <form asp-action="Reset" asp-route-loanId="@loan.Id" asp-route-kind="@s.Kind" method="post">
+                                    <button type="submit" class="btn btn-outline btn-sm"
+                                            onclick="return confirm('Go back to your standard wording for this section?');">Use standard</button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<p class="muted small">
+    To change the wording for every client, use
+    <a asp-controller="ContractTemplates" asp-action="Index">Contract wording</a> under Settings.
+    If any section is a draft, the contract is watermarked DRAFT.
+</p>

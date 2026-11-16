@@ -36,6 +36,18 @@ public static class DependencyInjection
         services.AddScoped<ILoanPricingService, LoanPricingService>();
         services.AddScoped<IAffordabilityService, AffordabilityService>();
 
+        // Screening before the credit check. Home Affairs has no provider yet, so the stub answers
+        // (and says so). The AI statement assessment goes live when StatementAnalysis:ApiKey is set.
+        services.AddScoped<ScreeningService>();
+        services.AddScoped<ILifeStatusVerifier, StubLifeStatusVerifier>();
+        services.Configure<StatementAnalysisOptions>(configuration.GetSection(StatementAnalysisOptions.SectionName));
+        var statements = configuration.GetSection(StatementAnalysisOptions.SectionName).Get<StatementAnalysisOptions>()
+                         ?? new StatementAnalysisOptions();
+        if (statements.IsConfigured)
+            services.AddScoped<IBankStatementAnalyst, ClaudeBankStatementAnalyst>();
+        else
+            services.AddScoped<IBankStatementAnalyst, StubBankStatementAnalyst>();
+
         // Supporting documents. Local disk today; swap in a blob implementation for
         // anything running on more than one server.
         services.Configure<DocumentStorageOptions>(

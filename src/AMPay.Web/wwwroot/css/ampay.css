@@ -1513,3 +1513,49 @@ label.check.consent input { margin-top: .25rem; flex: none; }
 .quote-decline { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: .75rem; }
 .quote-decline summary { cursor: pointer; color: var(--text-muted); }
 .quote-decline form { margin-top: .75rem; max-width: 28rem; }
+
+/* ---- Good to go ---- */
+.gtg-head { display: flex; align-items: center; gap: 1rem 1.5rem; flex-wrap: wrap; }
+.gtg-head > .muted { flex: 1 1 16rem; }
+.gtg-flag { font-size: 1rem; padding: .4rem .9rem; }
+.gtg-score strong { font-family: var(--font-heading); font-size: 1.6rem; color: var(--navy-deeper); font-variant-numeric: tabular-nums; }
+.gtg-statement { border-top: 1px solid var(--border); padding: .9rem 0; }
+.gtg-statement:first-of-type { border-top: 0; padding-top: 0; }
+a.badge { text-decoration: none; }
+a.badge:hover { filter: brightness(.96); text-decoration: none; }
+.employer-pick { padding-bottom: .9rem; margin-bottom: .9rem; border-bottom: 1px solid var(--border); }
+.photo-field { display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: flex-start; }
+.photo-field .photo-stage { width: min(240px, 100%); }
+.photo-field > div:last-child { flex: 1 1 16rem; }
+/* The hidden attribute must win over a component's own display (a .btn is inline-flex). */
+[hidden] { display: none !important; }
+
+/* ---- Reading the ID (id-reader.js) ---- */
+.id-reader { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-bottom: .4rem; }
+.id-reader input[type=file] { flex: 1 1 14rem; min-width: 0; }
+.id-autofilled { background-color: #fff8e1 !important; }
+.hint.id-status-good { color: #1d7a46; }
+.hint.id-status-bad { color: #b42318; }
+
+/* ---- Employment step: select or add an employer ---- */
+.employer-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: .6rem; margin-bottom: 1rem; }
+.employer-mode-option { display: flex; gap: .6rem; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius); padding: .7rem .85rem; cursor: pointer; }
+.employer-mode-option:has(input:checked) { border-color: var(--navy); background: #f3f6fc; }
+.employer-mode-option:has(input:disabled) { opacity: .55; cursor: default; }
+.employer-mode-option input { margin-top: .2rem; }
+.employer-mode-option > span { display: grid; gap: .1rem; }
+.employer-card { border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem .9rem; background: #fafbfd; margin-top: .25rem; }
+.employer-card .detail-list { margin: .5rem 0 0; }
+
+/* ---- Budget: grouped, every line captured, empty ones foldable ---- */
+.budget-table tr.budget-group-head th { background: #f3f6fc; color: var(--navy-deeper); text-align: left; font-size: .8rem; letter-spacing: .02em; padding-top: .55rem; padding-bottom: .55rem; }
+.budget-table tr.budget-group-head th.num { text-align: right; }
+.budget-table.folded tr.budget-row.is-empty:not(.is-main) { display: none; }
+.budget-table .budget-check td { background: #fffdf5; }
+.budget-ok { color: #1d7a46; }
+.budget-warn { color: #b42318; }
+
+/* ---- Pay Now test mode notice ---- */
+.paynow-test { background: #fff8e1; border: 1px solid #ecd9a4; color: #6b4e00; border-radius: var(--radius); padding: .75rem .9rem; margin: .75rem 0; font-size: .85rem; line-height: 1.45; }
+.paynow-test-cards { margin: .4rem 0; border-collapse: collapse; }
+.paynow-test-cards td { padding: .1rem .9rem .1rem 0; }

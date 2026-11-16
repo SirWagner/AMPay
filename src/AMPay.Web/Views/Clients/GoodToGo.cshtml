@@ -1,0 +1,322 @@
+@using AMPay.Domain.Credit
+@model GoodToGoPageModel
+@{
+    var wizard = (AMPay.Web.Models.WizardContext)ViewBag.Wizard;
+    var s = Model.Screening;
+    var id = Model.Client.Id;
+    string When(DateTime utc) => utc.AddHours(2).ToString("d MMM yyyy HH:mm");
+}
+
+<div class="page-head">
+    <h1>@wizard.ClientName</h1>
+    <p class="lede">
+        @OnboardingSteps.Caption(OnboardingStep.GoodToGo) &mdash; good to go. Your own check on what is already
+        on file. It costs nothing, and the paid credit bureau check stays locked until it passes.
+    </p>
+</div>
+
+<div class="wizard">
+    <partial name="_WizardNav" model="wizard" />
+
+    <div>
+        <div class="card">
+            <div class="card-body gtg-head">
+                <div>
+                    <span class="badge gtg-flag @ScreeningDisplay.Tone(s.Outcome)">@GoodToGo.Label(s.Outcome)</span>
+                    @if (s.OverrideReason is not null)
+                    {
+                        <span class="badge badge-navy">Let through by @s.OverriddenBy</span>
+                    }
+                </div>
+                <div class="gtg-score">
+                    <strong>@s.Score</strong><span class="muted small"> / 100</span>
+                </div>
+                <div class="muted small">
+                    @(s.IsFirstTimeApplicant ? "First time applying with you." : "Has borrowed from you before.")
+                    Checked @When(s.CheckedUtc).
+                    @if (Model.RecheckDays > 0)
+                    {
+                        <text>Rechecked by itself every @Model.RecheckDays days, and whenever this page opens.</text>
+                    }
+                </div>
+                <form asp-action="Recheck" asp-route-id="@id" method="post">
+                    <button type="submit" class="btn btn-outline btn-sm">Recheck now</button>
+                </form>
+            </div>
+
+            @if (s.Outcome == ScreeningOutcome.NotGoodToGo)
+            {
+                <div class="card-body" style="padding-top:0;">
+                    <div class="alert alert-error mb-0">
+                        Not good to go. The credit check is locked: do not spend money on a bureau report for this client.
+                        Fix what failed below if it was captured wrongly, otherwise decline.
+                    </div>
+                </div>
+            }
+            else if (s.Outcome == ScreeningOutcome.Review && s.OverrideReason is null)
+            {
+                <div class="card-body" style="padding-top:0;">
+                    <div class="alert alert-warn mb-0">
+                        Needs a look before the credit check. Clear the amber and grey lines below, or an administrator can let the client through with a reason.
+                    </div>
+                </div>
+            }
+
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th style="width:6rem;">Result</th><th style="width:11rem;">Check</th><th>What we found</th></tr></thead>
+                    <tbody>
+                    @foreach (var c in Model.Checks.OrderByDescending(c => c.Status))
+                    {
+                        <tr>
+                            <td><span class="badge @ScreeningDisplay.Tone(c.Status)">@ScreeningDisplay.Label(c.Status)</span></td>
+                            <td><strong>@c.Name</strong></td>
+                            <td>@c.Detail</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-foot">
+                @if (s.AllowsCreditCheck)
+                {
+                    <a asp-controller="Documents" asp-action="Client" asp-route-id="@id" class="btn btn-primary">Next: documents &rarr;</a>
+                    <a asp-action="CreditCheck" asp-route-id="@id" class="btn btn-outline">Credit check</a>
+                }
+                else if (Model.AffordabilityCaptured)
+                {
+                    <a asp-controller="Documents" asp-action="Client" asp-route-id="@id" class="btn btn-outline">Documents &rarr;</a>
+                }
+                else
+                {
+                    <a asp-action="Financial" asp-route-id="@id" class="btn btn-primary">Capture income and budget</a>
+                }
+                <a asp-action="Report" asp-route-id="@id" target="_blank" rel="noopener" class="btn btn-outline">Report for the client</a>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="card">
+                <div class="card-head"><h3>Home Affairs: is the client alive?</h3></div>
+                <div class="card-body">
+                    @if (Model.Life is null)
+                    {
+                        <p class="muted">Not checked yet.</p>
+                    }
+                    else
+                    {
+                        <p>
+                            <span class="badge @ScreeningDisplay.Tone(Model.Life.Result)">@Model.Life.Result</span>
+                            @if (Model.Life.Simulated) { <span class="badge badge-grey">Simulated</span> }
+                            <span class="muted small">@When(Model.Life.CheckedUtc) by @Model.Life.CheckedBy</span>
+                        </p>
+                        @if (!string.IsNullOrWhiteSpace(Model.Life.Notes)) { <p class="muted small">@Model.Life.Notes</p> }
+                    }
+                    <form asp-action="VerifyLife" asp-route-id="@id" method="post">
+                        <button type="submit" class="btn btn-primary btn-sm">@(Model.Life is null ? "Check with Home Affairs" : "Check again")</button>
+                    </form>
+                    <p class="muted small mb-0" style="margin-top:.6rem;">
+                        Sends the ID number to the population register and records whether the person is living or deceased.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3>Employment verification</h3></div>
+                <div class="card-body">
+                    @if (Model.Employment is not null)
+                    {
+                        <p>
+                            <span class="badge @ScreeningDisplay.Tone(Model.Employment.Result)">@Model.Employment.Result</span>
+                            <span class="muted small">
+                                @Model.Employment.Method@(Model.Employment.Reference is null ? "" : " · " + Model.Employment.Reference),
+                                @When(Model.Employment.CheckedUtc) by @Model.Employment.CheckedBy
+                            </span>
+                        </p>
+                    }
+                    <dl class="detail-list" style="margin-bottom:.75rem;">
+                        <dt>Employer</dt><dd>@(Model.Client.Employment?.EmployerName ?? "-")</dd>
+                        <dt>Phone</dt><dd class="mono">@(Model.EmployerTelephone ?? "-")</dd>
+                        <dt>Ask for</dt><dd>@(Model.EmployerContact ?? "-")</dd>
+                        <dt>Employee no.</dt><dd class="mono">@(Model.Client.Employment?.EmployeeNumber ?? "-")</dd>
+                    </dl>
+                    <form asp-action="VerifyEmployment" asp-route-id="@id" method="post">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="result">Outcome</label>
+                                <select id="result" name="result">
+                                    <option value="@VerificationResult.Confirmed">Confirmed: works there</option>
+                                    <option value="@VerificationResult.Inconclusive">Could not reach them yet</option>
+                                    <option value="@VerificationResult.Failed">Not confirmed</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="method">How</label>
+                                <select id="method" name="method">
+                                    @foreach (var m in GoodToGoPageModel.EmploymentMethods)
+                                    {
+                                        <option value="@m">@m</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="reference">Who confirmed it / which document</label>
+                                <input id="reference" name="reference" maxlength="200" />
+                            </div>
+                            <div class="field">
+                                <label for="notes">Notes</label>
+                                <input id="notes" name="notes" maxlength="1000" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Record verification</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <partial name="_StatementCheck" model="Model" />
+
+        @* Shown only when an AI model is connected. The lender chose not to start with AI. *@
+        @if (Model.AnalystLive)
+        {
+        <div class="card">
+            <div class="card-head flex-between">
+                <h3>Bank statement assessment</h3>
+                @if (!Model.AnalystLive) { <span class="badge badge-grey">Test mode: simulated</span> }
+            </div>
+            <div class="card-body">
+                <p class="muted small">
+                    An AI model reads the statement and reports how the client handles money: regular salary, bounced debit
+                    orders, other lenders, gambling, living on overdraft. It gives a Good, Warning or Bad flag and a short
+                    summary. It is advice, not a decision.
+                </p>
+                @if (Model.Statements.Count == 0)
+                {
+                    <p class="mb-0">
+                        No bank statement on file.
+                        @if (Model.AffordabilityCaptured)
+                        {
+                            <a asp-controller="Documents" asp-action="Client" asp-route-id="@id">Upload one under Documents</a><text> (type "Bank statement"), then come back here.</text>
+                        }
+                        else
+                        {
+                            <text>Capture the income and budget first; documents come after that.</text>
+                        }
+                    </p>
+                }
+                @foreach (var d in Model.Statements)
+                {
+                    Model.Assessments.TryGetValue(d.Id, out var a);
+                    <div class="gtg-statement">
+                        <div class="flex-between">
+                            <div>
+                                <a asp-controller="Documents" asp-action="Download" asp-route-id="@d.Id" target="_blank" rel="noopener">@d.FileName</a>
+                                <span class="muted small">uploaded @d.UploadedUtc.ToString("d MMM yyyy")</span>
+                            </div>
+                            @if (a is not null)
+                            {
+                                <span>
+                                    <span class="badge @ScreeningDisplay.Tone(a.Flag)">@a.Flag</span>
+                                    @if (a.Simulated) { <span class="badge badge-grey">Simulated</span> }
+                                </span>
+                            }
+                        </div>
+                        @if (a is not null)
+                        {
+                            <p style="margin:.5rem 0;">@a.Summary</p>
+                            @if (a.AverageMonthlyIncome is not null || a.AverageMonthlySpend is not null)
+                            {
+                                <p class="muted small" style="margin:.25rem 0;">
+                                    Average in: R @(a.AverageMonthlyIncome?.ToString("N2") ?? "-") a month &middot;
+                                    average out: R @(a.AverageMonthlySpend?.ToString("N2") ?? "-") a month
+                                </p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(a.Observations))
+                            {
+                                <ul class="small" style="margin:.25rem 0 .5rem 1.1rem;">
+                                    @foreach (var line in a.Observations.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        <li>@line</li>
+                                    }
+                                </ul>
+                            }
+                            <p class="muted small">Assessed @When(a.CreatedUtc) by @a.CreatedBy (@a.Model).</p>
+                        }
+                        <form asp-action="AssessStatement" asp-route-id="@id" method="post"
+                              onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Assessing - this can take a minute';">
+                            <input type="hidden" name="documentId" value="@d.Id" />
+                            <label class="check">
+                                <input type="checkbox" name="consent" value="true" required />
+                                <span>
+                                    @Model.Client.FullName agreed to this statement being sent to an AI service outside South Africa
+                                    for assessment (POPIA s72).
+                                </span>
+                            </label>
+                            <button type="submit" class="btn btn-outline btn-sm" style="margin-top:.5rem;">
+                                @(a is null ? "Assess this statement" : "Assess again")
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+
+        }
+
+        @if (s.Outcome == ScreeningOutcome.Review && s.OverrideReason is null && Model.CanOverride)
+        {
+            <form asp-action="OverrideScreening" asp-route-id="@id" method="post" class="card">
+                <div class="card-head"><h3>Let this client through to the credit check</h3></div>
+                <div class="card-body">
+                    <div class="field">
+                        <label for="reason">Why is it right to go on despite what is flagged above?</label>
+                        <textarea id="reason" name="reason" rows="2" maxlength="500" required minlength="10"></textarea>
+                        <span class="hint">Kept on the file with your name. It lapses if the client's details change.</span>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-navy">Let through</button>
+                </div>
+            </form>
+        }
+        else if (s.OverrideReason is not null)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <strong>Let through by @s.OverriddenBy</strong>
+                    <span class="muted small">@(s.OverriddenUtc is { } o ? When(o) : "")</span>
+                    <p class="mb-0">@s.OverrideReason</p>
+                </div>
+            </div>
+        }
+
+        @if (Model.History.Count > 1)
+        {
+            <div class="card">
+                <div class="card-head"><h3>How the flag has changed</h3></div>
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Last checked</th><th>Flag</th><th class="num">Score</th><th>Why it was checked</th><th>By</th></tr></thead>
+                        <tbody>
+                        @foreach (var h in Model.History)
+                        {
+                            <tr>
+                                <td class="muted small">@When(h.CheckedUtc)</td>
+                                <td><span class="badge @ScreeningDisplay.Tone(h.Outcome)">@GoodToGo.Label(h.Outcome)</span></td>
+                                <td class="num">@h.Score</td>
+                                <td class="small">@(h.Trigger switch
+                                                  {
+                                                      ScreeningTrigger.Manual => "Recheck pressed",
+                                                      ScreeningTrigger.Scheduled => "Automatic recheck",
+                                                      _ => "Details changed"
+                                                  })</td>
+                                <td class="muted small">@h.CheckedBy</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>

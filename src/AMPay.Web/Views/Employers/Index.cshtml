@@ -1,0 +1,75 @@
+@model List<EmployerRow>
+@{
+    ViewData["Title"] = "Employers";
+}
+
+<div class="page-head flex-between">
+    <div>
+        <h1>Employers</h1>
+        <p class="lede">
+            The companies your clients work for. An employer typed while capturing a client is added here by itself,
+            so the next client at the same company is picked from the list instead of being typed again.
+        </p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">Add an employer</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;">
+            <div class="field" style="flex:1 1 260px;">
+                <label for="q">Search</label>
+                <input type="text" id="q" name="q" value="@ViewBag.Query" placeholder="Employer or pay point" />
+            </div>
+            <button type="submit" class="btn btn-navy">Search</button>
+            @if (!string.IsNullOrWhiteSpace(ViewBag.Query as string))
+            {
+                <a asp-action="Index" class="btn btn-outline">Clear</a>
+            }
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <p>No employers yet. They appear here as clients are captured, or add one now.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Employer</th><th>Pay point</th><th>HR / payroll</th><th>Pay day</th>
+                    <th class="num">Clients</th><th>Status</th><th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model)
+                {
+                    var e = row.Employer;
+                    <tr>
+                        <td><a asp-action="Edit" asp-route-id="@e.Id"><strong>@e.Name</strong></a></td>
+                        <td>@(e.PayPoint ?? "-")</td>
+                        <td>
+                            <span class="mono">@(e.Telephone ?? "-")</span>
+                            @if (!string.IsNullOrWhiteSpace(e.ContactPerson)) { <div class="muted small">@e.ContactPerson</div> }
+                        </td>
+                        <td class="small">@(e.PayFrequency ?? "-")@(e.SalaryDay is null ? "" : $", day {e.SalaryDay}")</td>
+                        <td class="num">@row.Clients</td>
+                        <td>
+                            @if (!e.IsActive) { <span class="badge badge-grey">Hidden</span> }
+                            else if (e.IsVerified) { <span class="badge badge-green">Confirmed</span> }
+                            else { <span class="badge badge-amber">Not confirmed</span> }
+                        </td>
+                        <td><a asp-action="Edit" asp-route-id="@e.Id" class="btn btn-outline btn-sm">Edit</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

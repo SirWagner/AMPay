@@ -1,0 +1,128 @@
+@using AMPay.Domain.Credit
+@model GoodToGoPageModel
+@{
+    var r = Model.StatementReview;
+    var id = Model.Client.Id;
+    var findings = GoodToGoResult.ParseChecks(r?.Findings);
+}
+@* The bank-statement model: staff read the figures off the statement, the rules validate what
+   the client declared against them. No AI, nothing leaves the system. *@
+<div class="card">
+    <div class="card-head flex-between">
+        <h3>Bank statement check</h3>
+        @if (r is not null)
+        {
+            <span class="badge gtg-flag @ScreeningDisplay.Tone(r.Flag)">@r.Flag</span>
+        }
+    </div>
+    <div class="card-body">
+        <p class="muted small">
+            Read the figures off the client's statement and the model checks them against what the client declared:
+            is the income really there, is there debt that was not declared, and are there signs of not keeping up.
+            It gives a Good, Warning or Bad flag that feeds the good-to-go result above.
+        </p>
+
+        @if (r is not null)
+        {
+            <p style="margin:.25rem 0 .5rem;"><strong>@r.Summary</strong></p>
+            <table class="data" style="margin-bottom:.5rem;">
+                <tbody>
+                @foreach (var f in findings.OrderByDescending(f => f.Status))
+                {
+                    <tr>
+                        <td style="width:6rem;"><span class="badge @ScreeningDisplay.Tone(f.Status)">@ScreeningDisplay.Label(f.Status)</span></td>
+                        <td style="width:11rem;"><strong>@f.Name</strong></td>
+                        <td>@f.Detail</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <p class="muted small">Checked @r.CreatedUtc.AddHours(2).ToString("d MMM yyyy HH:mm") by @r.CreatedBy.</p>
+        }
+
+        <details open="@(r is null)">
+            <summary><strong>@(r is null ? "Enter the figures from the statement" : "Check again with new figures")</strong></summary>
+            <dl class="detail-list" style="margin:.75rem 0;">
+                <dt>Declared net income</dt>
+                <dd class="tnum">@(Model.DeclaredNetIncome is { } inc ? "R " + inc.ToString("N2") : "Not captured yet")</dd>
+                <dt>Declared debt instalments</dt>
+                <dd class="tnum">R @Model.DeclaredDebtInstalments.ToString("N2") a month</dd>
+            </dl>
+            <form asp-action="CheckStatement" asp-route-id="@id" method="post">
+                @if (Model.Statements.Count > 0)
+                {
+                    <div class="field">
+                        <label for="DocumentId">Statement on file</label>
+                        <select id="DocumentId" name="DocumentId">
+                            <option value="">&mdash; a paper statement, not uploaded &mdash;</option>
+                            @foreach (var d in Model.Statements)
+                            {
+                                <option value="@d.Id" selected="@(d.Id == (r?.DocumentId ?? Model.Statements[0].Id))">@d.FileName (@d.UploadedUtc.ToString("d MMM yyyy"))</option>
+                            }
+                        </select>
+                        <span class="hint">
+                            <a asp-controller="Documents" asp-action="Download" asp-route-id="@Model.Statements[0].Id" target="_blank" rel="noopener">Open the latest statement</a>
+                            in a new tab to read the figures.
+                        </span>
+                    </div>
+                }
+                else
+                {
+                    <p class="muted small">
+                        No statement is uploaded. You can still enter figures from a paper statement, or
+                        @if (Model.AffordabilityCaptured)
+                        {
+                            <a asp-controller="Documents" asp-action="Client" asp-route-id="@id">upload one under Documents</a><text> (type "Bank statement").</text>
+                        }
+                        else
+                        {
+                            <text>upload one once the income and budget are captured.</text>
+                        }
+                    </p>
+                }
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="MonthsCovered">Months the statement covers</label>
+                        <input type="number" id="MonthsCovered" name="MonthsCovered" min="1" max="12" value="@(r?.MonthsCovered ?? 3)" required />
+                    </div>
+                    <div class="field">
+                        <label for="SalaryDeposits">Salary deposits in that time</label>
+                        <input type="number" id="SalaryDeposits" name="SalaryDeposits" min="0" max="60" value="@(r?.SalaryDeposits ?? 3)" required />
+                    </div>
+                    <div class="field">
+                        <label for="AverageSalaryDeposit">Average salary deposit (R)</label>
+                        <input type="number" id="AverageSalaryDeposit" name="AverageSalaryDeposit" min="0" step="0.01" inputmode="decimal"
+                               value="@(r?.AverageSalaryDeposit.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" required />
+                        <span class="hint">What actually lands in the account each pay day.</span>
+                    </div>
+                    <div class="field">
+                        <label for="ReturnedDebitOrders">Debit orders returned unpaid</label>
+                        <input type="number" id="ReturnedDebitOrders" name="ReturnedDebitOrders" min="0" max="200" value="@(r?.ReturnedDebitOrders ?? 0)" required />
+                        <span class="hint">Over the whole statement.</span>
+                    </div>
+                    <div class="field">
+                        <label for="OtherLenders">Other lenders being repaid</label>
+                        <input type="number" id="OtherLenders" name="OtherLenders" min="0" max="50" value="@(r?.OtherLenders ?? 0)" required />
+                    </div>
+                    <div class="field">
+                        <label for="MonthlyLoanRepayments">Paid to those lenders a month (R)</label>
+                        <input type="number" id="MonthlyLoanRepayments" name="MonthlyLoanRepayments" min="0" step="0.01" inputmode="decimal"
+                               value="@((r?.MonthlyLoanRepayments ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" required />
+                    </div>
+                    <div class="field">
+                        <label for="MonthlyGambling">Gambling a month (R)</label>
+                        <input type="number" id="MonthlyGambling" name="MonthlyGambling" min="0" step="0.01" inputmode="decimal"
+                               value="@((r?.MonthlyGambling ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" required />
+                        <span class="hint">Betting, casino, lottery.</span>
+                    </div>
+                    <div class="field">
+                        <label for="DaysOverdrawn">Days the balance was below zero</label>
+                        <input type="number" id="DaysOverdrawn" name="DaysOverdrawn" min="0" max="366" value="@(r?.DaysOverdrawn ?? 0)" required />
+                        <span class="hint">Over the whole statement.</span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Check the statement</button>
+            </form>
+        </details>
+    </div>
+</div>

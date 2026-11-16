@@ -1,0 +1,17 @@
+@using AMPay.Domain.Contracts
+@* The fields wording may use, shown under the wording editors. *@
+<details class="card" style="padding:1rem 1.25rem;">
+    <summary><strong>Fields you can use in the wording</strong> <span class="muted small">(filled in for each client when the contract is issued)</span></summary>
+    <p class="muted small" style="margin:.75rem 0 .5rem;">
+        Type a field exactly as shown, double braces included. The contract then prints the client's or your own
+        details in its place, so the same wording works for everyone.
+    </p>
+    <table class="data">
+        <tbody>
+        @foreach (var (key, meaning) in ContractMergeFields.All)
+        {
+            <tr><td class="mono">{{@key}}</td><td class="small">@meaning</td></tr>
+        }
+        </tbody>
+    </table>
+</details>

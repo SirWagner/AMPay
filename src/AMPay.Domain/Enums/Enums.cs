@@ -183,6 +183,8 @@ public enum DocumentType
     Photograph = 7,
     /// <summary>A credit bureau report (Compuscan, Experian) attached to an enquiry.</summary>
     CreditReport = 8,
+    /// <summary>Three months of the client's bank statements, for the AI money-behaviour assessment.</summary>
+    BankStatement = 9,
     Other = 99
 }
 
@@ -253,7 +255,9 @@ public enum ContractTemplateKind
     CreditAgreementTerms = 0,
     DebitOrderAuthorisation = 1,
     BudgetAcknowledgement = 2,
-    CreditLifeDisclosure = 3
+    CreditLifeDisclosure = 3,
+    /// <summary>What the borrower declares on the face of the agreement, above the quote.</summary>
+    BorrowerDeclarations = 4
 }
 
 /// <summary>How a message reaches the client.</summary>
@@ -344,7 +348,13 @@ public enum BudgetLineKind
     /// An instalment to a credit provider. Deducted on top of living expenses, never in
     /// place of them: the Regulation 23A norm is a floor on living costs alone.
     /// </summary>
-    DebtInstalment = 2
+    DebtInstalment = 2,
+
+    /// <summary>
+    /// Taken off the salary before it is paid (tax, UIF, pension, payroll loans). Recorded to
+    /// explain gross against net; never deducted from net pay a second time.
+    /// </summary>
+    PayslipDeduction = 3
 }
 
 /// <summary>How money for an instalment arrived, or was attempted.</summary>

@@ -14,6 +14,8 @@
     // Status alone is not enough: clients onboarded before document review existed carry
     // the Onboarded status with no documents on file. Mirrors the check LoansController makes.
     var canRaiseLoan = ClientStatusInfo.CanBorrow(Model.Status) && idAccepted && payslipAccepted;
+    var screening = ViewBag.Screening as ClientScreening;
+    var recentNotes = ViewBag.RecentNotes as List<ClientNote> ?? new List<ClientNote>();
 }
 
 <div class="page-head flex-between">
@@ -35,6 +37,11 @@
         <p class="lede">
             Client <span class="mono">@Model.ClientNumber</span> &middot;
             <partial name="_ClientStatus" model="Model.Status" />
+            @if (screening is not null)
+            {
+                <a asp-action="GoodToGo" asp-route-id="@Model.Id" class="badge @ScreeningDisplay.Tone(screening.Outcome)"
+                   title="Your own pre-screen. Score @screening.Score of 100.">@AMPay.Domain.Credit.GoodToGo.Label(screening.Outcome)</a>
+            }
         </p>
         </div>
     </div>
@@ -52,6 +59,7 @@
                class="btn btn-primary">Raise a loan</a>
         }
         <a asp-controller="Documents" asp-action="Client" asp-route-id="@Model.Id" class="btn btn-outline">Documents</a>
+        <a asp-action="Notes" asp-route-id="@Model.Id" class="btn btn-outline">Notes</a>
         <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline">Edit</a>
     </div>
 </div>
@@ -176,6 +184,36 @@
                     }
                 </div>
             </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head flex-between">
+                <h3>Contact history</h3>
+                <a asp-action="Notes" asp-route-id="@Model.Id" class="small">Add a note</a>
+            </div>
+            @if (recentNotes.Count == 0)
+            {
+                <div class="empty">No notes yet. Log calls, messages and visits here, with a date to follow up.</div>
+            }
+            else
+            {
+                <div class="card-body">
+                    <ul class="plain-list">
+                        @foreach (var note in recentNotes)
+                        {
+                            <li>
+                                <span class="badge badge-navy">@(note.Category ?? "Note")</span>
+                                <span class="muted small">@note.CreatedUtc.AddHours(2).ToString("d MMM yyyy") &middot; @note.CreatedByUserId</span>
+                                @if (note.FollowUpOpen)
+                                {
+                                    <span class="badge badge-amber">Follow up @note.FollowUpOn!.Value.ToString("d MMM")</span>
+                                }
+                                <div style="white-space:pre-line;">@note.Body</div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
         </div>
 
         <div class="card">

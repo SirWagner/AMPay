@@ -110,7 +110,9 @@ public enum OnboardingStep
     Documents = 12,
     Photo = 13,
     /// <summary>The last step: everything captured, on one page, before the client is onboarded.</summary>
-    Summary = 14
+    Summary = 14,
+    /// <summary>The lender's own pre-screen, run before the paid credit check is allowed.</summary>
+    GoodToGo = 15
 }
 
 public static class OnboardingSteps
@@ -128,14 +130,17 @@ public static class OnboardingSteps
         (OnboardingStep.General,      "General",       "General"),
         (OnboardingStep.Employment,   "Employment",    "Employment"),
         (OnboardingStep.Financial,    "Financial",     "Financial"),
+        (OnboardingStep.Budgets,      "Budgets",       "Budgets"),
         (OnboardingStep.Banking,      "Banking",       "Banking"),
         (OnboardingStep.Address,      "Address",       "Address"),
         (OnboardingStep.OtherDetails, "Other details", "OtherDetails"),
         (OnboardingStep.References,   "References",    "References"),
-        (OnboardingStep.Budgets,      "Budgets",       "Budgets"),
-        (OnboardingStep.CreditCheck,  "Credit check",  "CreditCheck"),
         (OnboardingStep.Notes,        "Notes",         "Notes"),
+        // From here the order is the lender's rule, not Maxmoney's: score the client on what
+        // is on file, only then ask for documents, and run the paid bureau check last of all.
+        (OnboardingStep.GoodToGo,     "Good to go",    "GoodToGo"),
         (OnboardingStep.Documents,    "Documents",     "Documents"),
+        (OnboardingStep.CreditCheck,  "Credit check",  "CreditCheck"),
         (OnboardingStep.Photo,        "Photograph",    "Photo"),
         (OnboardingStep.Summary,      "Summary",       "Summary")
     };
@@ -210,8 +215,44 @@ public class EmploymentStepModel
 {
     public Guid ClientId { get; set; }
 
+    /// <summary>"select" to pick from the lender's employer list, "new" to add an employer to it.</summary>
+    public string EmployerMode { get; set; } = "select";
+
+    /// <summary>The employer picked from the lender's list. Empty when a new one is added.</summary>
+    [Display(Name = "Employer")]
+    public Guid? EmployerId { get; set; }
+
+    // A new employer's own details, saved to the list for the next client who works there.
+
+    [Display(Name = "HR / payroll telephone"), StringLength(20)]
+    public string? NewEmployerTelephone { get; set; }
+
+    [Display(Name = "Contact person at the employer"), StringLength(200)]
+    public string? NewEmployerContact { get; set; }
+
+    /// <summary>The only kinds of work that end on a date. The expiry date is asked for these alone.</summary>
+    public static readonly string[] FixedTermTypes = { "Contract", "Temporary" };
+
     [Display(Name = "Employer name"), StringLength(200)]
     public string? EmployerName { get; set; }
+
+    [Display(Name = "Pay point"), StringLength(100)]
+    public string? PayPoint { get; set; }
+
+    [Display(Name = "Pay-point number"), StringLength(50)]
+    public string? PayPointNumber { get; set; }
+
+    [Display(Name = "Other employer reference"), StringLength(50)]
+    public string? OtherEmployerReference { get; set; }
+
+    [Display(Name = "Contract expiry date"), DataType(DataType.Date)]
+    public DateTime? ContractExpiryDate { get; set; }
+
+    [Display(Name = "Years at previous employer"), Range(0, 60)]
+    public int? YearsAtPreviousEmployer { get; set; }
+
+    [Display(Name = "No work telephone")]
+    public bool WorkTelephoneNotAvailable { get; set; }
 
     [StringLength(100)]
     public string? Occupation { get; set; }
@@ -258,7 +299,7 @@ public class FinancialStepModel
     public string? OtherIncomeSource { get; set; }
 
     /// <summary>
-    /// The budget: every standard category in Maxmoney order, then any lines the operator
+    /// The budget: every standard category, grouped, then any lines the operator
     /// added. The expense and debt totals are always the sums of these lines - there is no
     /// separate total to type in and disagree with them.
     /// </summary>
@@ -275,6 +316,10 @@ public class FinancialStepModel
 
     public decimal TotalDebtInstalments =>
         Budget.Where(l => l.Kind == BudgetLineKind.DebtInstalment).Sum(l => l.Amount ?? 0m);
+
+    /// <summary>What comes off the payslip. Explains gross against net; never deducted from net pay.</summary>
+    public decimal TotalPayslipDeductions =>
+        Budget.Where(l => l.Kind == BudgetLineKind.PayslipDeduction).Sum(l => l.Amount ?? 0m);
 
     /// <summary>Set by the controller; null until there is income to work from.</summary>
     public NetOfNetView? NetOfNet { get; set; }
@@ -302,6 +347,9 @@ public class BudgetLineModel
 
     /// <summary>Display only: guidance for the standard category, if any.</summary>
     public string? Hint { get; set; }
+
+    /// <summary>Display only: the section of the budget the line sits in.</summary>
+    public string? Group { get; set; }
 
     /// <summary>
     /// Chosen from the "Add a budget line" list. Keeps an optional line on screen while it
@@ -650,6 +698,9 @@ public class ClientDocumentsModel
 
     public long MaxFileSizeBytes { get; set; }
     public string AcceptedExtensions { get; set; } = "";
+
+    /// <summary>Income and budget are in. Until then the upload form is not offered.</summary>
+    public bool AffordabilityCaptured { get; set; }
 
     public List<Row> Documents { get; set; } = new();
 

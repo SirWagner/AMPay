@@ -117,7 +117,10 @@ public enum CreditEnquiryStatus
     Failed = 2
 }
 
-/// <summary>Notes tab - diary notes against the client file.</summary>
+/// <summary>
+/// Notes tab - the client's contact history: every call, message and visit, and when to get
+/// back to them. The lender's CRM, one client at a time; open follow-ups are listed together.
+/// </summary>
 public class ClientNote
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -125,9 +128,23 @@ public class ClientNote
     public Client? Client { get; set; }
 
     public string Body { get; set; } = string.Empty;
+
+    /// <summary>How the contact happened: one of <see cref="ContactChannels.All"/>.</summary>
     public string? Category { get; set; }
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public string? CreatedByUserId { get; set; }
+
+    /// <summary>When to get back to the client. Null for a note that needs nothing more.</summary>
+    public DateTime? FollowUpOn { get; set; }
+    public DateTime? FollowUpDoneUtc { get; set; }
+    public string? FollowUpDoneBy { get; set; }
+
+    public bool FollowUpOpen => FollowUpOn is not null && FollowUpDoneUtc is null;
+}
+
+public static class ContactChannels
+{
+    public static readonly string[] All = { "Phone call", "WhatsApp", "SMS", "Email", "Branch visit", "Note" };
 }
 
 /// <summary>
