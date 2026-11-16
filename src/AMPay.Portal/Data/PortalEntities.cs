@@ -70,6 +70,20 @@ public class Applicant
     public const int MaxIdAttempts = 5;
 }
 
+/// <summary>A file in the client's account - a signed agreement - as AM-Pay sent it. Bytes kept here, never served by URL.</summary>
+public class ClientAccountDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ClientAccountId { get; set; }
+    public string Key { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? LoanNumber { get; set; }
+    public string ContentType { get; set; } = "application/pdf";
+    public byte[] Data { get; set; } = Array.Empty<byte>();
+    public DateTime DatedUtc { get; set; }
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+}
+
 public enum LinkRequestStatus { Pending = 0, Approved = 1, Rejected = 2 }
 
 /// <summary>"I am already a client": waits for the lender to confirm before any account is shown.</summary>

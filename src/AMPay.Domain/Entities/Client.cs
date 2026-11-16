@@ -60,6 +60,9 @@ public class Client
     /// <summary>Fingerprint of the statement last sent, so an unchanged account is not sent again.</summary>
     public string? PortalStatementHash { get; set; }
 
+    /// <summary>Document keys the portal already holds (signed agreements), so each PDF is sent once.</summary>
+    public string? PortalDocumentKeys { get; set; }
+
     public string FullName => string.Join(' ',
         new[] { FirstName, MiddleNames, Surname }.Where(s => !string.IsNullOrWhiteSpace(s)));
 

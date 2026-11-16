@@ -249,6 +249,52 @@ namespace AMPay.Portal.Data.Migrations
                     b.ToTable("ClientAccounts");
                 });
 
+            modelBuilder.Entity("AMPay.Portal.Data.ClientAccountDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClientAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTime>("DatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("LoanNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientAccountId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("AccountDocuments");
+                });
+
             modelBuilder.Entity("AMPay.Portal.Data.Lender", b =>
                 {
                     b.Property<Guid>("Id")
@@ -607,6 +653,15 @@ namespace AMPay.Portal.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Lender");
+                });
+
+            modelBuilder.Entity("AMPay.Portal.Data.ClientAccountDocument", b =>
+                {
+                    b.HasOne("AMPay.Portal.Data.ClientAccount", null)
+                        .WithMany()
+                        .HasForeignKey("ClientAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("AMPay.Portal.Data.LenderLogo", b =>

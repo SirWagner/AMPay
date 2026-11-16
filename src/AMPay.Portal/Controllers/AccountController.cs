@@ -154,6 +154,55 @@ public class AccountController : PortalControllerBase
         return View(new LoanDetailModel { Statement = statement, Loan = loan, UpdatedUtc = account.GeneratedUtc });
     }
 
+    // ---------------------------------------------------------------- documents
+
+    [HttpGet("document/{key}")]
+    public async Task<IActionResult> Document([FromRoute] string code, string key)
+    {
+        var account = await LinkedAccountAsync();
+        if (account is null) return RedirectToAction(nameof(Index), new { code });
+
+        var doc = await Db.AccountDocuments.AsNoTracking().FirstOrDefaultAsync(d => d.ClientAccountId == account.Id && d.Key == key);
+        if (doc is null) return NotFound();
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(doc.Data, doc.ContentType, $"{doc.Title}.pdf".Replace('/', '-'));
+    }
+
+    /// <summary>A statement of account for one loan over a period, ready to print or save as PDF.</summary>
+    [HttpGet("loan/{loanNumber}/statement")]
+    public async Task<IActionResult> Statement([FromRoute] string code, string loanNumber, DateTime? from, DateTime? to)
+    {
+        var account = await LinkedAccountAsync();
+        if (account is null) return RedirectToAction(nameof(Index), new { code });
+
+        var statement = Read(account);
+        var loan = statement.Loans.FirstOrDefault(l => string.Equals(l.LoanNumber, loanNumber, StringComparison.OrdinalIgnoreCase));
+        if (loan is null) return RedirectToAction(nameof(Index), new { code });
+
+        var start = (from ?? loan.DisbursedUtc?.AddHours(2).Date ?? loan.AgreementDate ?? account.GeneratedUtc.AddMonths(-3)).Date;
+        var end = (to ?? account.GeneratedUtc.AddHours(2)).Date;
+        if (end < start) (start, end) = (end, start);
+
+        ViewData["Title"] = $"Statement {loan.LoanNumber}";
+        return View(new StatementModel { Statement = statement, Loan = loan, From = start, To = end, UpdatedUtc = account.GeneratedUtc });
+    }
+
+    /// <summary>The paid-up letter for a loan paid in full.</summary>
+    [HttpGet("loan/{loanNumber}/paid-up")]
+    public async Task<IActionResult> PaidUp([FromRoute] string code, string loanNumber)
+    {
+        var account = await LinkedAccountAsync();
+        if (account is null) return RedirectToAction(nameof(Index), new { code });
+
+        var statement = Read(account);
+        var loan = statement.Loans.FirstOrDefault(l => string.Equals(l.LoanNumber, loanNumber, StringComparison.OrdinalIgnoreCase) && l.Status == "Paid up");
+        if (loan is null) return RedirectToAction(nameof(Index), new { code });
+
+        ViewData["Title"] = $"Paid-up letter {loan.LoanNumber}";
+        return View(new LoanDetailModel { Statement = statement, Loan = loan, UpdatedUtc = account.GeneratedUtc });
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /// <summary>

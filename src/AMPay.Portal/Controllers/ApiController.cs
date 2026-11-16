@@ -238,6 +238,40 @@ public class ApiController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Stores or replaces one file in the client's account, e.g. a signed agreement (PDF only).</summary>
+    [HttpPut("clients/{clientId:guid}/documents/{key}")]
+    [RequestSizeLimit(15 * 1024 * 1024)]
+    public async Task<IActionResult> PutClientDocument(Guid clientId, string key, Guid tenantId, PortalDocumentUpload body)
+    {
+        if (key.Length is 0 or > 80 || !key.All(c => char.IsLetterOrDigit(c) || c == '-')) return BadRequest("Invalid document key.");
+
+        var lender = await _db.Lenders.FirstOrDefaultAsync(l => l.AmpayTenantId == tenantId);
+        var account = lender is null ? null
+            : await _db.ClientAccounts.FirstOrDefaultAsync(a => a.LenderId == lender.Id && a.AmpayClientId == clientId);
+        if (account is null) return NotFound("Send the client's account first.");
+
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(body.Base64); }
+        catch (FormatException) { return BadRequest("The file is not valid base64."); }
+        if (bytes.Length is 0 or > 10 * 1024 * 1024 || !bytes.AsSpan().StartsWith("%PDF"u8))
+            return BadRequest("Only a PDF of 10 MB or less is accepted.");
+
+        var doc = await _db.AccountDocuments.FirstOrDefaultAsync(d => d.ClientAccountId == account.Id && d.Key == key);
+        if (doc is null)
+        {
+            doc = new ClientAccountDocument { ClientAccountId = account.Id, Key = key };
+            _db.AccountDocuments.Add(doc);
+        }
+        doc.Title = body.Title.Length > 200 ? body.Title[..200] : body.Title;
+        doc.LoanNumber = body.LoanNumber;
+        doc.ContentType = "application/pdf";
+        doc.Data = bytes;
+        doc.DatedUtc = body.DatedUtc;
+        doc.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
     /// <summary>The lender withdrew the client's access. Anyone linked to it is unlinked.</summary>
     [HttpDelete("clients/{clientId:guid}")]
     public async Task<IActionResult> DeleteClient(Guid clientId, Guid tenantId)

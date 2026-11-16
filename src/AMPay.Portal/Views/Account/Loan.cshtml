@@ -64,6 +64,33 @@
     </div>
 </div>
 
+@{
+    var docs = (s.Documents ?? new List<PortalDocumentInfo>()).Where(d => d.LoanNumber == loan.LoanNumber).ToList();
+    var thisMonth = new DateTime(Model.UpdatedUtc.AddHours(2).Year, Model.UpdatedUtc.AddHours(2).Month, 1);
+}
+<div class="card no-print">
+    <h2>Documents</h2>
+    <ul class="loan-list">
+        @foreach (var d in docs)
+        {
+            <li><a href="/a/@l.PublicCode/account/document/@d.Key"><span class="loan-head"><span><strong>@d.Title</strong><br /><span class="small muted">PDF · @Fmt.Sast(d.DatedUtc)</span></span><span class="pill pill-done">Download</span></span></a></li>
+        }
+        @if (loan.Stage != "Pending")
+        {
+            <li><a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber/statement"><span class="loan-head"><span><strong>Full statement of account</strong><br /><span class="small muted">Every instalment and payment since the start</span></span><span class="pill pill-todo">Open</span></span></a></li>
+            <li><a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber/statement?from=@thisMonth.AddMonths(-1).ToString("yyyy-MM-dd")&to=@thisMonth.AddDays(-1).ToString("yyyy-MM-dd")"><span class="loan-head"><span><strong>Last month's statement</strong><br /><span class="small muted">@thisMonth.AddMonths(-1).ToString("MMMM yyyy")</span></span><span class="pill pill-todo">Open</span></span></a></li>
+        }
+        @if (loan.Status == "Paid up")
+        {
+            <li><a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber/paid-up"><span class="loan-head"><span><strong>Paid-up letter</strong><br /><span class="small muted">Confirms the loan is paid in full</span></span><span class="pill pill-done">Open</span></span></a></li>
+        }
+        @if (!docs.Any() && loan.Stage != "Pending")
+        {
+            <li class="small muted" style="padding:10px 0;">Your signed agreement appears here once it is signed.</li>
+        }
+    </ul>
+</div>
+
 <div class="card">
     <h2>What you borrowed and what it costs</h2>
     <table class="money">

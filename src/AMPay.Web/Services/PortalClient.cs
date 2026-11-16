@@ -45,6 +45,9 @@ public interface IPortalApi
     /// <summary>Removes the client's account view; anyone signed in to it loses it.</summary>
     Task DeleteClientAsync(Guid tenantId, Guid clientId, CancellationToken ct = default) => throw new NotSupportedException();
 
+    /// <summary>Stores a file - a signed agreement PDF - in the client's account on the portal.</summary>
+    Task PutClientDocumentAsync(Guid tenantId, Guid clientId, string key, PortalDocumentUpload body, CancellationToken ct = default) => Task.CompletedTask;
+
     /// <summary>"I am already a client" requests waiting for the lender.</summary>
     Task<IReadOnlyList<PortalLinkRequest>> LinkRequestsAsync(Guid tenantId, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<PortalLinkRequest>>(Array.Empty<PortalLinkRequest>());
@@ -135,6 +138,9 @@ public class PortalClient : IPortalApi
 
     public Task DeleteClientAsync(Guid tenantId, Guid clientId, CancellationToken ct = default) =>
         SendAsync(() => _http.DeleteAsync($"{PortalApi.ClientsPath}/{clientId}?tenantId={tenantId}", ct));
+
+    public Task PutClientDocumentAsync(Guid tenantId, Guid clientId, string key, PortalDocumentUpload body, CancellationToken ct = default) =>
+        SendAsync(() => _http.PutAsJsonAsync($"{PortalApi.ClientsPath}/{clientId}/documents/{key}?tenantId={tenantId}", body, ct));
 
     public async Task<IReadOnlyList<PortalLinkRequest>> LinkRequestsAsync(Guid tenantId, CancellationToken ct = default) =>
         await GetAsync<List<PortalLinkRequest>>($"{PortalApi.LinkRequestsPath}?tenantId={tenantId}", ct) ?? new();

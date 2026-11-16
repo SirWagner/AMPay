@@ -1,0 +1,38 @@
+@model LoanDetailModel
+@{
+    var l = (Lender)ViewData["Lender"]!;
+    var loan = Model.Loan;
+    var s = Model.Statement;
+    var paidOn = loan.SettledOrClosedUtc?.AddHours(2) ?? loan.Schedule.Max(e => e.PaidUtc)?.AddHours(2);
+}
+
+<p class="no-print"><a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber">&larr; Loan @loan.LoanNumber</a></p>
+
+<div class="card">
+    <div class="loan-head no-print" style="justify-content:flex-end;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">Print or save as PDF</button>
+    </div>
+    <p><strong>@l.Name</strong><br />
+        @if (!string.IsNullOrWhiteSpace(l.NcrNumber)) { <text>Registered credit provider @l.NcrNumber<br /></text> }
+        @if (l.ContactNumber is not null) { <text>@l.ContactNumber<br /></text> }
+        @if (l.ContactEmail is not null) { <text>@l.ContactEmail</text> }
+    </p>
+    <p>@Fmt.Sast(Model.UpdatedUtc)</p>
+    <p>To: <strong>@s.FullName</strong> (client @s.ClientNumber)</p>
+
+    <h1>Paid-up letter: loan @loan.LoanNumber</h1>
+    <p>
+        This confirms that the credit agreement @loan.LoanNumber@(loan.AgreementDate is null ? "" : $", dated {Fmt.D(loan.AgreementDate)},")
+        between @l.Name and @s.FullName has been paid in full@(paidOn is null ? "" : $" on {Fmt.D(paidOn)}").
+    </p>
+    <dl class="summary">
+        <dt>Amount borrowed</dt><dd>@Fmt.R(loan.Principal)</dd>
+        <dt>Total repaid</dt><dd>@Fmt.R(loan.PaidToDate)</dd>
+        <dt>Balance owing</dt><dd>@Fmt.R(0m)</dd>
+    </dl>
+    <p>
+        No further amount is owed under this agreement. Any debit order for it has no further instalments to collect.
+        As the National Credit Act requires, @l.DisplayName will update the credit bureaus to show this account as paid up.
+    </p>
+    <p class="small muted">Generated from @l.DisplayName's records as at @Fmt.Sast(Model.UpdatedUtc). For a signed copy, contact @l.DisplayName.</p>
+</div>

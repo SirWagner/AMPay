@@ -40,6 +40,28 @@ public class LoanDetailModel
     public DateTime UpdatedUtc { get; init; }
 }
 
+public class StatementModel
+{
+    public required PortalClientStatement Statement { get; init; }
+    public required PortalLoanStatement Loan { get; init; }
+    public DateTime From { get; init; }
+    public DateTime To { get; init; }
+    public DateTime UpdatedUtc { get; init; }
+
+    public IEnumerable<PortalPayment> Payments =>
+        Loan.Payments.Where(p => p.Date >= From && p.Date <= To).OrderBy(p => p.Date);
+
+    public IEnumerable<PortalInstalment> Due =>
+        Loan.Schedule.Where(e => e.DueDate >= From && e.DueDate <= To);
+
+    /// <summary>Received before the period: what the opening balance has already had taken off.</summary>
+    public decimal ReceivedBefore => Loan.Payments.Where(p => p.Status == "Received" && p.Date < From).Sum(p => p.Amount);
+    public decimal ReceivedInPeriod => Payments.Where(p => p.Status == "Received").Sum(p => p.Amount);
+
+    public decimal OpeningBalance => Loan.TotalRepayable - ReceivedBefore;
+    public decimal ClosingBalance => Loan.TotalRepayable - ReceivedBefore - ReceivedInPeriod;
+}
+
 /// <summary>Formatting shared by the account pages, so every amount and date reads the same.</summary>
 public static class Fmt
 {

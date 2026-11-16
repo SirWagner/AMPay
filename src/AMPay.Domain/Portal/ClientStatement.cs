@@ -23,7 +23,14 @@ public record PortalClientStatement(
     /// <summary>See <see cref="ClientStatementBuilder.IdNumberHash"/>. The ID number itself never leaves AM-Pay.</summary>
     string IdNumberHash,
     DateTime GeneratedUtc,
-    IReadOnlyList<PortalLoanStatement> Loans);
+    IReadOnlyList<PortalLoanStatement> Loans,
+    /// <summary>Signed agreements the client may download; the files follow separately.</summary>
+    IReadOnlyList<PortalDocumentInfo>? Documents = null);
+
+/// <summary>A document in the client's account. <see cref="Key"/> names the file sent with <see cref="PortalDocumentUpload"/>.</summary>
+public record PortalDocumentInfo(string Key, string? LoanNumber, string Title, DateTime DatedUtc);
+
+public record PortalDocumentUpload(string Title, string? LoanNumber, string ContentType, string Base64, DateTime DatedUtc);
 
 public record PortalLoanStatement(
     string LoanNumber,
@@ -138,7 +145,8 @@ public static class ClientStatementBuilder
     public static bool IsShown(Loan loan) => loan.Status != LoanStatus.Draft;
 
     /// <param name="today">Today's South African date.</param>
-    public static PortalClientStatement Build(Client client, IEnumerable<Loan> loans, DateTime today, DateTime nowUtc)
+    public static PortalClientStatement Build(Client client, IEnumerable<Loan> loans, DateTime today, DateTime nowUtc,
+        IEnumerable<PortalDocumentInfo>? documents = null)
     {
         var mobile = MobileOf(client) ?? "";
         var name = string.Join(" ", new[] { client.FirstName, client.Surname }.Where(s => !string.IsNullOrWhiteSpace(s)));
@@ -149,8 +157,12 @@ public static class ClientStatementBuilder
             loans.Where(IsShown)
                 .OrderByDescending(l => l.AgreementDate ?? l.CreatedUtc)
                 .Select(l => Loan(l, today))
-                .ToList());
+                .ToList(),
+            documents?.OrderByDescending(d => d.DatedUtc).ToList() ?? new List<PortalDocumentInfo>());
     }
+
+    /// <summary>The portal's key for a signed agreement.</summary>
+    public static string AgreementKey(Guid contractId) => "agreement-" + contractId.ToString("N");
 
     public static PortalLoanStatement Loan(Loan l, DateTime today)
     {

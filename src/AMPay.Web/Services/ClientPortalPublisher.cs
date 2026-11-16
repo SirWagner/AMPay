@@ -24,14 +24,22 @@ public class ClientPortalPublisher
     private readonly IPortalApi _portal;
     private readonly IMessageSender _messages;
     private readonly ILogger<ClientPortalPublisher> _log;
+    private readonly AMPay.Infrastructure.Contracts.ContractService? _contracts;
 
-    public ClientPortalPublisher(AppDbContext db, IPortalApi portal, IMessageSender messages, ILogger<ClientPortalPublisher> log)
+    public ClientPortalPublisher(AppDbContext db, IPortalApi portal, IMessageSender messages, ILogger<ClientPortalPublisher> log,
+        AMPay.Infrastructure.Contracts.ContractService? contracts = null)
     {
         _db = db;
         _portal = portal;
         _messages = messages;
         _log = log;
+        _contracts = contracts;
     }
+
+    private Task<List<LoanContract>> SignedContractsAsync(Guid clientId, CancellationToken ct) =>
+        _db.LoanContracts.AsNoTracking().Include(c => c.Loan)
+            .Where(c => c.ClientId == clientId && c.Status == ContractStatus.Signed)
+            .ToListAsync(ct);
 
     public bool IsConfigured => _portal.IsConfigured;
 
@@ -54,8 +62,12 @@ public class ClientPortalPublisher
             .AsSplitQuery()
             .ToListAsync(ct);
 
+        var documents = (await SignedContractsAsync(client.Id, ct))
+            .Select(c => new PortalDocumentInfo(ClientStatementBuilder.AgreementKey(c.Id), c.Loan?.LoanNumber,
+                $"Signed credit agreement {c.Reference}", c.SignedUtc ?? c.CreatedUtc));
+
         var now = DateTime.UtcNow;
-        return ClientStatementBuilder.Build(client, loans, Sast.DateOf(now), now);
+        return ClientStatementBuilder.Build(client, loans, Sast.DateOf(now), now, documents);
     }
 
     /// <summary>
@@ -115,6 +127,7 @@ public class ClientPortalPublisher
         client.PortalAccessUtc = null;
         client.PortalPublishedUtc = null;
         client.PortalStatementHash = null;
+        client.PortalDocumentKeys = null;
         _db.ClientNotes.Add(new ClientNote
         {
             ClientId = client.Id, Category = "Client portal", Body = "Online account access withdrawn.", CreatedByUserId = userId
@@ -150,8 +163,35 @@ public class ClientPortalPublisher
 
         client.PortalStatementHash = hash;
         client.PortalPublishedUtc = statement.GeneratedUtc;
+        await SendDocumentsAsync(client, force, ct);
         await _db.SaveChangesAsync(ct);
         return null;
+    }
+
+    /// <summary>Sends each signed agreement the portal does not hold yet, as the client's copy of the PDF.</summary>
+    private async Task SendDocumentsAsync(Client client, bool force, CancellationToken ct)
+    {
+        if (_contracts is null) return;
+        var sent = new HashSet<string>((client.PortalDocumentKeys ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries));
+
+        foreach (var contract in await SignedContractsAsync(client.Id, ct))
+        {
+            var key = ClientStatementBuilder.AgreementKey(contract.Id);
+            if (!force && sent.Contains(key)) continue;
+            try
+            {
+                var pdf = _contracts.RenderPublicPdf(contract);
+                await _portal.PutClientDocumentAsync(client.TenantId, client.Id, key, new PortalDocumentUpload(
+                    $"Signed credit agreement {contract.Reference}", contract.Loan?.LoanNumber, "application/pdf",
+                    Convert.ToBase64String(pdf), contract.SignedUtc ?? contract.CreatedUtc), ct);
+                sent.Add(key);
+            }
+            catch (Exception ex) when (ex is PortalUnavailableException or InvalidOperationException)
+            {
+                _log.LogWarning("Agreement {Reference} not sent to the portal: {Message}", contract.Reference, ex.Message);
+            }
+        }
+        client.PortalDocumentKeys = sent.Count == 0 ? null : string.Join(',', sent);
     }
 
     /// <summary>Publishes the given clients, those with access only. Used after loans or payments change.</summary>
@@ -222,6 +262,7 @@ public class ClientPortalChangeTracker : SaveChangesInterceptor
                 case ClientAddress a: _queue.Client(a.ClientId); break;
                 case LoanCollection c: _queue.Loan(c.LoanId); break;
                 case LoanScheduleEntry s: _queue.Loan(s.LoanId); break;
+                case LoanContract k: _queue.Client(k.ClientId); break;
             }
         }
     }
