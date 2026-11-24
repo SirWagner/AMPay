@@ -49,8 +49,12 @@ public record MandateGate(Guid LoanId, string LoanNumber, bool QuoteAccepted, bo
         return gates;
     }
 
+    /// <summary>An eMandate the client has not answered: it may be sent again.</summary>
+    public static bool IsUnsignedEMandate(DebiCheckMandate? m) =>
+        m is { MandateType: MandateType.NetcashEMandate, Status: MandateStatus.AwaitingDebtorAuthentication };
+
     /// <summary>Why a mandate cannot be raised for this loan now, or null when it can.</summary>
-    public static async Task<string?> ProblemForAsync(AppDbContext db, Loan loan, CancellationToken ct = default)
+    public static async Task<string?> ProblemForAsync(AppDbContext db, Loan loan, CancellationToken ct = default, bool resendEMandate = false)
     {
         if (loan.Status is not (LoanStatus.Approved or LoanStatus.Disbursed))
             return "A debit mandate can only be originated for an approved loan.";
@@ -58,9 +62,9 @@ public record MandateGate(Guid LoanId, string LoanNumber, bool QuoteAccepted, bo
         // A mandate that failed, was rejected or expired collects nothing, so it does not block another try.
         if (loan.MandateId is not null)
         {
-            var existing = await db.Mandates.AsNoTracking().Where(m => m.Id == loan.MandateId)
-                .Select(m => (MandateStatus?)m.Status).FirstOrDefaultAsync(ct);
-            if (existing is not null && !MandatesController.IsDeadMandate(existing.Value))
+            var existing = await db.Mandates.AsNoTracking().FirstOrDefaultAsync(m => m.Id == loan.MandateId, ct);
+            if (existing is not null && !MandatesController.IsDeadMandate(existing.Status) &&
+                !(resendEMandate && IsUnsignedEMandate(existing)))
                 return "This loan already has a debit mandate.";
         }
 

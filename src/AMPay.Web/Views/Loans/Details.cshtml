@@ -220,6 +220,13 @@ else if (Model.Status == LoanStatus.Approved)
             {
                 <span class="muted small">@gate.Problem</span>
             }
+            @if (canCapture && gate.Ready && AMPay.Web.Services.MandateGate.IsUnsignedEMandate(Model.Mandate))
+            {
+                <form asp-controller="EMandates" asp-action="Send" asp-route-loanId="@Model.Id" method="post" style="display:inline"
+                      onsubmit="return confirm('Send a new eMandate? It replaces the one the client has not signed.');">
+                    <button type="submit" class="btn btn-outline">Send eMandate again</button>
+                </form>
+            }
             @if (!hasLiveMandate && canCapture && gate.Ready)
             {
                 <a asp-controller="Mandates" asp-action="Create"

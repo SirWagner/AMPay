@@ -55,7 +55,7 @@ public class EMandatesController : Controller
         var mobile = ClientStatementBuilder.MobileOf(client);
         var first = loan.FirstCollectionDate ?? loan.Schedule.OrderBy(s => s.InstalmentNumber).FirstOrDefault()?.DueDate;
 
-        var problem = await MandateGate.ProblemForAsync(_db, loan) is { } blocked ? blocked
+        var problem = await MandateGate.ProblemForAsync(_db, loan, resendEMandate: true) is { } blocked ? blocked
             : bank is null ? "Capture the client's bank account first (Banking step)."
             : mobile is null ? "Capture the client's cell number first - Netcash sends the signing PIN to it."
             : first is null ? "The loan has no first collection date yet."
@@ -70,7 +70,6 @@ public class EMandatesController : Controller
         var reference = NetcashReference.Clean(loan.LoanNumber);
         var amount = loan.Schedule.Count > 0 ? loan.Schedule.Max(s => s.InstalmentTotal) : loan.FirstInstalment;
         var day = loan.CollectionDay is { Length: > 0 } d && (d == "LDOM" || int.TryParse(d, out _)) ? (d == "LDOM" ? d : d.PadLeft(2, '0')) : first.Value.Day.ToString("00");
-        var email = client.Addresses.Select(a => a.EmailAddress).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
 
         // The loan's own business key - not whichever business the user has selected.
         var slot = await _db.Tenants.AsNoTracking().Where(t => t.Id == loan.TenantId)
@@ -89,7 +88,7 @@ public class EMandatesController : Controller
             Surname = client.Surname,
             IdNumber = client.IdNumber,
             MobileNumber = "0" + mobile![2..],
-            EmailAddress = email,
+            // No email: given one, Netcash sends the signing PIN there instead of to the cell (seen 2026-11-24).
             DebitFrequency = loan.Frequency,
             CommencementMonth = first.Value.Month,
             CommencementDay = day,
@@ -119,6 +118,15 @@ public class EMandatesController : Controller
             FirstCollectionDate = first, SigningUrl = url, SubmittedUtc = DateTime.UtcNow,
             CreatedByUserId = User.Identity?.Name
         };
+        // Sent again: the unanswered one is superseded here, so only the new link is shown.
+        var previous = loan.MandateId is { } previousId ? await _db.Mandates.FirstOrDefaultAsync(m => m.Id == previousId) : null;
+        if (MandateGate.IsUnsignedEMandate(previous))
+        {
+            _db.Add(new MandateEvent { MandateId = previous!.Id, EventType = "eMandateSuperseded", FromStatus = previous.Status, ToStatus = MandateStatus.Cancelled, Detail = "Replaced by a newer eMandate.", UserId = User.Identity?.Name });
+            previous.Status = MandateStatus.Cancelled;
+            previous.CancelledUtc = DateTime.UtcNow;
+        }
+
         _db.Mandates.Add(mandate);
         _db.Add(new MandateEvent { MandateId = mandate.Id, EventType = "eMandateSent", ToStatus = mandate.Status, Detail = $"Netcash eMandate created; agreement {agreement ?? loan.LoanNumber}.", UserId = User.Identity?.Name });
         loan.MandateId = mandate.Id;
