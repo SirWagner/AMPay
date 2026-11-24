@@ -306,6 +306,9 @@ public class ContractService
     }
 
     /// <summary>Sends a fresh six-digit PIN to the cell number on the pack. Returns the masked number.</summary>
+    /// <summary>The PIN just sent, only while messages are stubbed (test systems). Null otherwise.</summary>
+    public string? TestPin { get; private set; }
+
     public async Task<string> SendPinAsync(LoanContract contract, CancellationToken ct = default)
     {
         if (!contract.IsOpen) throw new ContractException("This agreement can no longer be signed.");
@@ -323,6 +326,8 @@ public class ContractService
             throw new ContractException("A PIN was sent less than a minute ago. Wait a moment before asking for another.");
 
         var pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        // With no SMS provider the PIN reaches nobody; on a test system it is shown on screen instead.
+        TestPin = _messages.IsStubbed ? pin : null;
         contract.OtpHash = PinHash(contract.Id, pin);
         contract.OtpExpiresUtc = now + PinLifetime;
         contract.OtpSentUtc = now;

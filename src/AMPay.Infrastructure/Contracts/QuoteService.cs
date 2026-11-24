@@ -235,6 +235,9 @@ public class QuoteService
     }
 
     /// <summary>Sends a fresh six-digit PIN to the cell number on the quote. Returns the masked number.</summary>
+    /// <summary>The PIN just sent, only while messages are stubbed (test systems). Null otherwise.</summary>
+    public string? TestPin { get; private set; }
+
     public async Task<string> SendPinAsync(CreditQuote quote, CancellationToken ct = default)
     {
         EnsureOpen(quote);
@@ -259,6 +262,8 @@ public class QuoteService
             throw new ContractException("Three PINs have been sent in the last hour. Try again later.");
 
         var pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        // With no SMS provider the PIN reaches nobody; on a test system it is shown on screen instead.
+        TestPin = _messages.IsStubbed ? pin : null;
         quote.OtpHash = PinHash(quote.Id, pin);
         quote.OtpExpiresUtc = now + PinLifetime;
         quote.OtpSentUtc = now;

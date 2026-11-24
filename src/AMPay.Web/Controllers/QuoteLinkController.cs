@@ -60,7 +60,8 @@ public class QuoteLinkController : Controller
         try
         {
             var masked = await _quotes.SendPinAsync(quote);
-            TempData["QuoteNotice"] = $"A PIN has been sent to {masked}. It expires in 5 minutes.";
+            TempData["QuoteNotice"] = $"A PIN has been sent to {masked}. It expires in 5 minutes." +
+                (_quotes.TestPin is { } p ? $" Test system - no SMS was sent. Your PIN is {p}." : "");
         }
         catch (ContractException ex)
         {
