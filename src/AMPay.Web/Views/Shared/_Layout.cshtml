@@ -94,7 +94,6 @@
             var unread = await NotificationCounter.UnreadAsync(
                 User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, CurrentTenant.TenantId);
         }
-        <a class="nav-link @Active("Notifications")" asp-controller="Notifications" asp-action="Index">Notifications@if (unread > 0) {<span class="badge badge-red" style="margin-left:6px;">@(unread > 99 ? "99+" : unread.ToString())</span>}</a>
         @if (!isReviewerOnly)
         {
             <a class="nav-link @Active("Clients")" asp-controller="Clients" asp-action="Index">Clients</a>
@@ -155,19 +154,36 @@
                     @ViewData["Title"]
                 </strong>
             </div>
-            <div style="display:flex;align-items:center;gap:1rem;">
-                <div class="who">
-                    <strong>@(User.Identity?.Name ?? "Not signed in")</strong>
-                    @if (User.IsInRole(AppRoles.SuperAdmin)) { <span>Super administrator</span> }
-                    else if (User.IsInRole(AppRoles.TenantAdmin)) { <span>Customer administrator</span> }
-                    else if (User.IsInRole(AppRoles.Capturer)) { <span>Capturer</span> }
-                    else if (User.IsInRole(AppRoles.Reviewer)) { <span>Document reviewer</span> }
-                    else { <span>Viewer</span> }
-                </div>
-                <a asp-controller="Account" asp-action="ChangePassword" class="btn btn-outline btn-sm">Change password</a>
-                <form asp-controller="Account" asp-action="Logout" method="post">
-                    <button type="submit" class="btn btn-outline btn-sm">Sign out</button>
-                </form>
+            @{
+                var roleLabel = User.IsInRole(AppRoles.SuperAdmin) ? "Super administrator"
+                    : User.IsInRole(AppRoles.TenantAdmin) ? "Customer administrator"
+                    : User.IsInRole(AppRoles.Capturer) ? "Capturer"
+                    : User.IsInRole(AppRoles.Reviewer) ? "Document reviewer" : "Viewer";
+                var userName = User.Identity?.Name ?? "Not signed in";
+            }
+            <div class="topbar-actions">
+                <a class="topbar-bell @(Active("Notifications"))" asp-controller="Notifications" asp-action="Index"
+                   title="Notifications@(unread > 0 ? $" - {unread} new" : "")" aria-label="Notifications@(unread > 0 ? $", {unread} new" : "")">
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    @if (unread > 0) { <span class="topbar-count">@(unread > 99 ? "99+" : unread.ToString())</span> }
+                </a>
+                <details class="account-menu">
+                    <summary aria-label="Account">
+                        <span class="account-avatar" aria-hidden="true">@(userName.Length > 0 ? char.ToUpperInvariant(userName[0]) : '?')</span>
+                        <span class="account-name">@userName</span>
+                        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="account-pop" role="menu">
+                        <div class="account-who"><strong>@userName</strong><span>@roleLabel</span></div>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <a role="menuitem" asp-controller="Account" asp-action="ChangePassword">Change password</a>
+                            <form asp-controller="Account" asp-action="Logout" method="post">
+                                <button type="submit" role="menuitem">Sign out</button>
+                            </form>
+                        }
+                    </div>
+                </details>
             </div>
         </header>
 

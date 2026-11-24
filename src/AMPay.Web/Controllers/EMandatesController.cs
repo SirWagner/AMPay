@@ -37,7 +37,8 @@ public class EMandatesController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPolicies.CanCapture)]
-    public async Task<IActionResult> Send(Guid loanId, [FromServices] INetcashDebitOrderService netcash, [FromServices] ClientPortalPublisher publisher)
+    public async Task<IActionResult> Send(Guid loanId, [FromServices] INetcashDebitOrderService netcash, [FromServices] ClientPortalPublisher publisher,
+        [FromServices] INetcashSecretStore secrets)
     {
         var loan = await _db.Loans
             .Include(l => l.Client).ThenInclude(c => c!.Addresses)
@@ -70,7 +71,14 @@ public class EMandatesController : Controller
         var day = loan.CollectionDay is { Length: > 0 } d && (d == "LDOM" || int.TryParse(d, out _)) ? (d == "LDOM" ? d : d.PadLeft(2, '0')) : first.Value.Day.ToString("00");
         var email = client.Addresses.Select(a => a.EmailAddress).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
 
-        var result = await netcash.AddMandateAsync(string.Empty, new AddMandateRequest
+        // The loan's own business key - not whichever business the user has selected.
+        var slot = await _db.Tenants.AsNoTracking().Where(t => t.Id == loan.TenantId)
+            .Select(t => new { t.NetcashAccountNumber, Key = t.ServiceKeys.Where(k => k.ServiceId == NetcashServiceId.DebitOrders).Select(k => new { k.SecretName, k.IsActive }).FirstOrDefault() })
+            .FirstAsync();
+        var serviceKey = slot.Key is { IsActive: false } ? null
+            : await secrets.ResolveServiceKeyAsync(slot.Key?.SecretName ?? "", slot.NetcashAccountNumber, NetcashServiceId.DebitOrders);
+
+        var result = await netcash.AddMandateAsync(serviceKey ?? string.Empty, new AddMandateRequest
         {
             AccountReference = reference,
             MandateName = $"{client.FirstName} {client.Surname}".Trim(),
