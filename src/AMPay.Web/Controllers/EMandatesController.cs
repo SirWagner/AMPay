@@ -91,7 +91,7 @@ public class EMandatesController : Controller
             BranchCode = bank.BranchCode,
             BankAccountType = bank.AccountType,
             Field1 = loan.LoanNumber,
-            Notes = $"Loan {loan.LoanNumber}",
+
             AddToMasterFile = true,
             MandateActive = true
         });

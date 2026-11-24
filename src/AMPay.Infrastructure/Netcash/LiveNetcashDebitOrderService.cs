@@ -75,7 +75,9 @@ public class LiveNetcashDebitOrderService : INetcashDebitOrderService
         E("CommencementDay", r.CommencementDay);
         E("AgreementDate", r.AgreementDate.ToString("yyyyMMdd", inv));
         E("AgreementReferenceNumber", r.AgreementReferenceNumber);
-        E("Notes", r.Notes);
+        // Netcash refuses AddMandate without Notes, and accepts only digits in it ("Notes invalid" for any text,
+        // checked against the live service on 2026-11-24). Our own reference travels in Field1 instead.
+        E("Notes", r.Notes is { Length: > 0 } n && n.All(char.IsDigit) ? n : "0");
         E("Field1", r.Field1);
         E("BankDetailType", ((int)r.BankDetailType).ToString(inv));
         E("BankAccountName", r.BankAccountName);
