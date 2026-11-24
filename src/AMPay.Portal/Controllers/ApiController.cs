@@ -301,7 +301,7 @@ public class ApiController : ControllerBase
             .Where(r => r.LenderId == lender.Id && r.Status == LinkRequestStatus.Pending)
             .OrderBy(r => r.CreatedUtc)
             .Take(200)
-            .Select(r => new PortalLinkRequest(r.Id, tenantId, r.Mobile, r.Email, r.FullName, r.CreatedUtc))
+            .Select(r => new PortalLinkRequest(r.Id, tenantId, r.Mobile, r.Email, r.FullName, r.CreatedUtc, r.IdNumber))
             .ToListAsync();
     }
 

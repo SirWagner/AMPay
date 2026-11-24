@@ -86,8 +86,9 @@
                 }
                 <form asp-action="Send" asp-route-id="@c.Id" method="post">
                     @Html.AntiForgeryToken()
-                    <label class="check"><input type="checkbox" name="sms" value="true" checked /> SMS to @(Model.Document.Snapshot.Borrower.Mobile ?? "no cell number on file")</label>
-                    <label class="check"><input type="checkbox" name="email" value="true" checked /> Email to @(Model.Document.Snapshot.Borrower.Email ?? "no email on file")</label>
+                    <label class="check"><input type="checkbox" name="app" value="true" checked /> The client's app (My loans on your self-service link)</label>
+                    <label class="check"><input type="checkbox" name="sms" value="true" /> SMS to @(Model.Document.Snapshot.Borrower.Mobile ?? "no cell number on file")</label>
+                    <label class="check"><input type="checkbox" name="email" value="true" /> Email to @(Model.Document.Snapshot.Borrower.Email ?? "no email on file")</label>
                     <p class="muted small">The client gets a link to read the agreement and mandate, download them, and sign with a PIN sent to their cell.</p>
                     <button type="submit" class="btn btn-primary">@(c.SentUtc is null ? "Send to client" : "Send again (new link)")</button>
                 </form>

@@ -36,6 +36,27 @@
     </div>
 </div>
 
+@if (s.Pending is { Count: > 0 } pending)
+{
+    <div class="card" style="border:2px solid var(--accent);">
+        <h2>Waiting for you</h2>
+        <ul class="loan-list">
+            @foreach (var p in pending)
+            {
+                <li>
+                    <a href="@p.Link" rel="noopener">
+                        <span class="loan-head">
+                            <span><strong>@p.Title</strong><br /><span class="small muted">@p.Reference@(p.LoanNumber is null ? "" : " · loan " + p.LoanNumber)@(p.ValidUntilUtc is null ? "" : " · open until " + Fmt.Sast(p.ValidUntilUtc))</span></span>
+                            <span class="pill pill-warn">@(p.Kind == "Quote" ? "Read and accept" : "Read and sign")</span>
+                        </span>
+                    </a>
+                </li>
+            }
+        </ul>
+        <p class="small muted">A PIN is sent to your cell number to confirm it is you. Nothing is signed until you enter it.</p>
+    </div>
+}
+
 @if (!s.Loans.Any())
 {
     <div class="card">

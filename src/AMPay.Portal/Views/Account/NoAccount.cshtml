@@ -9,7 +9,7 @@
         <h1>Client already exists</h1>
         <p class="status-big">Wait for login validation</p>
         <p>
-            You asked to see your account as an existing client of @l.DisplayName (@request.Email).
+            You asked to see your account as an existing client of @l.DisplayName.
             They will confirm it is you, and your loans will then show here when you sign in. Nothing is shown before that.
         </p>
         <p class="small muted">Asked on @request.CreatedUtc.AddHours(2).ToString("d MMM yyyy HH:mm").</p>
@@ -24,12 +24,12 @@ else
         <h1>My loans</h1>
         @if (request?.Status == LinkRequestStatus.Rejected)
         {
-            <div class="alert alert-error" role="alert">@l.DisplayName could not confirm your last request. Check the email address, or contact them.</div>
+            <div class="alert alert-error" role="alert">@l.DisplayName could not confirm your last request. Check your ID number, or contact them.</div>
         }
         <p class="lede">@l.DisplayName has no online account for this cell number yet.</p>
 
         <h2>Already a client of @l.DisplayName?</h2>
-        <p class="small muted">Give the email address they have for you. They confirm it is you before your loans show here.</p>
+        <p class="small muted">Give your ID number. @l.DisplayName finds you and confirms it is you before your loans show here.</p>
         <form method="post" action="/a/@l.PublicCode/account/claim" autocomplete="on">
             @Html.AntiForgeryToken()
             <div class="field">
@@ -37,8 +37,12 @@ else
                 <input id="fullName" name="fullName" maxlength="200" autocomplete="name" />
             </div>
             <div class="field">
-                <label for="email">Email address</label>
-                <input id="email" name="email" type="email" maxlength="254" required autocomplete="email" />
+                <label for="idNumber">Your ID number</label>
+                <input id="idNumber" name="idNumber" inputmode="numeric" maxlength="13" required autocomplete="off" />
+            </div>
+            <div class="field">
+                <label for="email">Email address (optional)</label>
+                <input id="email" name="email" type="email" maxlength="254" autocomplete="email" />
             </div>
             <div class="actions">
                 <button type="submit" class="btn btn-primary">I am already a client</button>

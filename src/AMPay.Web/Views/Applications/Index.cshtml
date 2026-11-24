@@ -37,7 +37,7 @@ else if (!Model.HasLink)
             <p class="small muted">Someone signed in on your self-service link says they are already your client. Check it is them, then validate - they see that client's loans from then on.</p>
             <div class="table-wrap">
                 <table class="data">
-                    <thead><tr><th>Asked</th><th>Cell</th><th>Email</th><th>Matching client</th><th></th></tr></thead>
+                    <thead><tr><th>Asked</th><th>Cell</th><th>ID number / email</th><th>Matching client</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var r in Model.LinkRequests)
                         {
@@ -45,18 +45,18 @@ else if (!Model.HasLink)
                             <tr>
                                 <td>@r.CreatedUtc.AddHours(2).ToString("d MMM HH:mm")<br /><span class="small muted">@r.FullName</span></td>
                                 <td>@AMPay.Domain.Portal.PortalApi.DisplayMobile(r.Mobile)</td>
-                                <td>@r.Email</td>
+                                <td>@r.IdNumber<br /><span class="small muted">@r.Email</span></td>
                                 <td>
                                     @if (matches.Count == 0)
                                     {
-                                        <span class="badge badge-amber">No client with this email or cell</span>
+                                        <span class="badge badge-amber">No client with this ID, email or cell - capture the client first</span>
                                     }
                                     @foreach (var c in matches)
                                     {
                                         <form asp-action="ApproveLink" asp-route-id="@r.Id" method="post" style="display:flex;gap:8px;align-items:center;margin:0 0 6px;">
                                             <input type="hidden" name="clientId" value="@c.ClientId" />
                                             <a asp-controller="Clients" asp-action="Details" asp-route-id="@c.ClientId">@c.Name</a>
-                                            <span class="small muted">@c.ClientNumber · @(c.EmailMatches ? "email matches" : "cell matches")</span>
+                                            <span class="small muted">@c.ClientNumber · @c.MatchedOn</span>
                                             <button type="submit" class="btn btn-primary btn-sm">Validate login</button>
                                         </form>
                                     }

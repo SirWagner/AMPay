@@ -140,6 +140,7 @@ public class PortalDbContext : DbContext
             e.Property(x => x.Mobile).HasMaxLength(15).IsRequired();
             e.Property(x => x.Email).HasMaxLength(254).IsRequired();
             e.Property(x => x.FullName).HasMaxLength(200);
+            e.Property(x => x.IdNumber).HasMaxLength(20);
         });
 
         b.Entity<OtpChallenge>(e =>

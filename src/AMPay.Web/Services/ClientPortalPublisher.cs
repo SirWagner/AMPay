@@ -67,7 +67,22 @@ public class ClientPortalPublisher
                 $"Signed credit agreement {c.Reference}", c.SignedUtc ?? c.CreatedUtc));
 
         var now = DateTime.UtcNow;
-        return ClientStatementBuilder.Build(client, loans, Sast.DateOf(now), now, documents);
+        var pending = new List<PortalPendingAction>();
+        pending.AddRange((await _db.CreditQuotes.AsNoTracking().Include(q => q.Loan)
+                .Where(q => q.ClientId == client.Id && q.ClientAppLink != null &&
+                            (q.Status == QuoteStatus.Sent || q.Status == QuoteStatus.Viewed) && q.ValidUntilUtc > now)
+                .ToListAsync(ct))
+            .Select(q => new PortalPendingAction("Quote", q.Reference, q.Loan?.LoanNumber,
+                "Your loan quote is ready - read it and accept or decline", q.ClientAppLink!, q.ValidUntilUtc)));
+        pending.AddRange((await _db.LoanContracts.AsNoTracking().Include(c => c.Loan)
+                .Where(c => c.ClientId == client.Id && c.ClientAppLink != null &&
+                            (c.Status == ContractStatus.Sent || c.Status == ContractStatus.Viewed) &&
+                            (c.AccessExpiresUtc == null || c.AccessExpiresUtc > now))
+                .ToListAsync(ct))
+            .Select(c => new PortalPendingAction("Agreement", c.Reference, c.Loan?.LoanNumber,
+                "Your credit agreement is ready to read and sign", c.ClientAppLink!, c.AccessExpiresUtc)));
+
+        return ClientStatementBuilder.Build(client, loans, Sast.DateOf(now), now, documents, pending);
     }
 
     /// <summary>
@@ -134,6 +149,22 @@ public class ClientPortalPublisher
         });
         await _db.SaveChangesAsync(ct);
         return null;
+    }
+
+    /// <summary>
+    /// After a quote or agreement is sent to the client's app: opens the client's online account
+    /// if it is not open yet (the sign-in link goes by SMS), else updates it at once. Returns a note for staff.
+    /// </summary>
+    public async Task<string> ShowInAppAsync(Guid clientId, CancellationToken ct = default)
+    {
+        var client = await _db.Clients.Include(c => c.Addresses).FirstAsync(c => c.Id == clientId, ct);
+        var error = client.PortalAccessUtc is null
+            ? await GrantAccessAsync(client, null, ct)
+            : await PublishAsync(client, force: true, ct);
+        var tenant = await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == client.TenantId, ct);
+        return error is null
+            ? $"It is waiting in the client's app: they sign in at {AccountLink(tenant)} with a code to their cell."
+            : "Not shown in the client's app: " + error;
     }
 
     /// <summary>
@@ -263,6 +294,7 @@ public class ClientPortalChangeTracker : SaveChangesInterceptor
                 case LoanCollection c: _queue.Loan(c.LoanId); break;
                 case LoanScheduleEntry s: _queue.Loan(s.LoanId); break;
                 case LoanContract k: _queue.Client(k.ClientId); break;
+                case CreditQuote q: _queue.Client(q.ClientId); break;
             }
         }
     }

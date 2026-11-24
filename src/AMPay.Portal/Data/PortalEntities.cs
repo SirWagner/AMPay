@@ -95,6 +95,9 @@ public class AccountLinkRequest
     public string Mobile { get; set; } = "";
     public string Email { get; set; } = "";
     public string? FullName { get; set; }
+
+    /// <summary>The SA ID number the person gave: the lender matches its client on it.</summary>
+    public string? IdNumber { get; set; }
     public LinkRequestStatus Status { get; set; }
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? DecidedUtc { get; set; }

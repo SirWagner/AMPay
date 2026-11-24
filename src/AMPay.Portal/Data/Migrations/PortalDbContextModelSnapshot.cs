@@ -46,6 +46,10 @@ namespace AMPay.Portal.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("IdNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<Guid>("LenderId")
                         .HasColumnType("uniqueidentifier");
 

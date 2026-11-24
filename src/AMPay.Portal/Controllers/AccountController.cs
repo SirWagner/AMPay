@@ -113,12 +113,18 @@ public class AccountController : PortalControllerBase
     [HttpPost("claim")]
     [ValidateAntiForgeryToken]
     [EnableRateLimiting(PortalRateLimits.Codes)]
-    public async Task<IActionResult> Claim([FromRoute] string code, string? email, string? fullName)
+    public async Task<IActionResult> Claim([FromRoute] string code, string? idNumber, string? email, string? fullName)
     {
-        email = email?.Trim();
-        if (string.IsNullOrEmpty(email) || email.Length > 254 || !email.Contains('@'))
+        var id = new string((idNumber ?? "").Where(char.IsDigit).ToArray());
+        if (!AMPay.Domain.Validation.SaIdNumber.IsValid(id))
         {
-            TempData["Error"] = "Enter the email address you gave " + _lender.DisplayName + ".";
+            TempData["Error"] = "Enter your 13-digit South African ID number.";
+            return RedirectToAction(nameof(Index), new { code });
+        }
+        email = email?.Trim();
+        if (!string.IsNullOrEmpty(email) && (email.Length > 254 || !email.Contains('@')))
+        {
+            TempData["Error"] = "That email address does not look right.";
             return RedirectToAction(nameof(Index), new { code });
         }
 
@@ -128,7 +134,8 @@ public class AccountController : PortalControllerBase
             pending = new AccountLinkRequest { LenderId = _lender.Id, ApplicantId = _applicant.Id, Mobile = _applicant.Mobile };
             Db.LinkRequests.Add(pending);
         }
-        pending.Email = email.ToLowerInvariant();
+        pending.Email = email?.ToLowerInvariant() ?? "";
+        pending.IdNumber = id;
         var name = fullName?.Trim();
         pending.FullName = string.IsNullOrEmpty(name) ? null : name[..Math.Min(name.Length, 200)];
         pending.CreatedUtc = DateTime.UtcNow;

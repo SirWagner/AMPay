@@ -131,12 +131,12 @@ public class QuoteService
 
     /// <summary>Creates a fresh link - any earlier one stops working - and sends it.</summary>
     public async Task<ContractService.SendOutcome> SendAsync(
-        Guid quoteId, bool bySms, bool byEmail, string publicBaseUrl, string? userId, CancellationToken ct = default)
+        Guid quoteId, bool bySms, bool byEmail, string publicBaseUrl, string? userId, CancellationToken ct = default, bool byApp = false)
     {
         var quote = await LoadOpenAsync(quoteId, ct);
 
-        if (!bySms && !byEmail)
-            throw new ContractException("Choose SMS, email or both.");
+        if (!bySms && !byEmail && !byApp)
+            throw new ContractException("Choose the client app, SMS or email.");
 
         var snapshot = ReadSnapshot(quote);
         var tenant = await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == quote.TenantId, ct);
@@ -189,6 +189,10 @@ public class QuoteService
                 sentTo.Add("email");
             }
         }
+
+        // The client's online account shows the link; the PIN still goes to their cell.
+        quote.ClientAppLink = byApp ? link : null;
+        if (byApp) sentTo.Add("client app");
 
         if (sentTo.Count == 0)
             throw new ContractException($"Nothing was sent. {string.Join("; ", skipped)}. Capture the contact details and issue the quote again.");

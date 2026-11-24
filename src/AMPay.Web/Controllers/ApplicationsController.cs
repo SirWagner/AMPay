@@ -67,16 +67,18 @@ public class ApplicationsController : Controller
                 .ToDictionaryAsync(c => c.IdNumber, c => (c.Id, c.ClientNumber));
         }
 
-        // Login requests from existing clients: matched by email first, then by cell number.
+        // Login requests from existing clients: matched by ID number, then email, then cell number.
         foreach (var r in model.LinkRequests)
         {
-            var email = r.Email.ToLower();
+            var email = string.IsNullOrEmpty(r.Email) ? "\u0000" : r.Email.ToLower();
+            var id = r.IdNumber ?? "\u0000";
             var display = PortalApi.DisplayMobile(r.Mobile);
             model.LinkMatches[r.Id] = await _db.Clients.AsNoTracking()
-                .Where(c => c.TenantId == tenantId && c.Addresses.Any(a =>
-                    (a.EmailAddress != null && a.EmailAddress.ToLower() == email) || a.MobileNumber == display || a.MobileNumber == r.Mobile))
+                .Where(c => c.TenantId == tenantId && (c.IdNumber == id || c.Addresses.Any(a =>
+                    (a.EmailAddress != null && a.EmailAddress.ToLower() == email) || a.MobileNumber == display || a.MobileNumber == r.Mobile)))
                 .Select(c => new LinkMatch(c.Id, c.ClientNumber, c.FirstName + " " + c.Surname,
-                    c.Addresses.Any(a => a.EmailAddress != null && a.EmailAddress.ToLower() == email)))
+                    c.IdNumber == id ? "ID number matches"
+                    : c.Addresses.Any(a => a.EmailAddress != null && a.EmailAddress.ToLower() == email) ? "email matches" : "cell matches"))
                 .Take(5)
                 .ToListAsync();
         }
@@ -242,4 +244,4 @@ public class ApplicationsPage
     public Dictionary<Guid, List<LinkMatch>> LinkMatches { get; set; } = new();
 }
 
-public record LinkMatch(Guid ClientId, string ClientNumber, string Name, bool EmailMatches);
+public record LinkMatch(Guid ClientId, string ClientNumber, string Name, string MatchedOn);

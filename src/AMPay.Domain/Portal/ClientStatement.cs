@@ -25,7 +25,12 @@ public record PortalClientStatement(
     DateTime GeneratedUtc,
     IReadOnlyList<PortalLoanStatement> Loans,
     /// <summary>Signed agreements the client may download; the files follow separately.</summary>
-    IReadOnlyList<PortalDocumentInfo>? Documents = null);
+    IReadOnlyList<PortalDocumentInfo>? Documents = null,
+    /// <summary>Quotes to accept and agreements to sign, waiting for the client.</summary>
+    IReadOnlyList<PortalPendingAction>? Pending = null);
+
+/// <summary>Something waiting for the client: a quote to accept, an agreement to sign. The link opens it; the PIN goes to their cell.</summary>
+public record PortalPendingAction(string Kind, string Reference, string? LoanNumber, string Title, string Link, DateTime? ValidUntilUtc);
 
 /// <summary>A document in the client's account. <see cref="Key"/> names the file sent with <see cref="PortalDocumentUpload"/>.</summary>
 public record PortalDocumentInfo(string Key, string? LoanNumber, string Title, DateTime DatedUtc);
@@ -146,7 +151,7 @@ public static class ClientStatementBuilder
 
     /// <param name="today">Today's South African date.</param>
     public static PortalClientStatement Build(Client client, IEnumerable<Loan> loans, DateTime today, DateTime nowUtc,
-        IEnumerable<PortalDocumentInfo>? documents = null)
+        IEnumerable<PortalDocumentInfo>? documents = null, IEnumerable<PortalPendingAction>? pending = null)
     {
         var mobile = MobileOf(client) ?? "";
         var name = string.Join(" ", new[] { client.FirstName, client.Surname }.Where(s => !string.IsNullOrWhiteSpace(s)));
@@ -158,7 +163,8 @@ public static class ClientStatementBuilder
                 .OrderByDescending(l => l.AgreementDate ?? l.CreatedUtc)
                 .Select(l => Loan(l, today))
                 .ToList(),
-            documents?.OrderByDescending(d => d.DatedUtc).ToList() ?? new List<PortalDocumentInfo>());
+            documents?.OrderByDescending(d => d.DatedUtc).ToList() ?? new List<PortalDocumentInfo>(),
+            pending?.ToList() ?? new List<PortalPendingAction>());
     }
 
     /// <summary>The portal's key for a signed agreement.</summary>
@@ -310,6 +316,6 @@ public static class ClientStatementBuilder
 /// is tied to their cell number. The lender matches them (by email or cell) and approves or
 /// rejects - until then the portal tells them to wait for login validation.
 /// </summary>
-public record PortalLinkRequest(Guid Id, Guid TenantId, string Mobile, string Email, string? FullName, DateTime CreatedUtc);
+public record PortalLinkRequest(Guid Id, Guid TenantId, string Mobile, string Email, string? FullName, DateTime CreatedUtc, string? IdNumber = null);
 
 public record PortalLinkApproval(Guid AmpayClientId);
