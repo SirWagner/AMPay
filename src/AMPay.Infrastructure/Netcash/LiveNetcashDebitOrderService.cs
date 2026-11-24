@@ -125,6 +125,9 @@ public class LiveNetcashDebitOrderService : INetcashDebitOrderService
         }
     }
 
+    /// <summary>Requests Netcash is still preparing, by service key, so another look carries on instead of starting over.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Token, DateTime At)> Pending = new();
+
     public async Task<NetcashResult<IReadOnlyList<MandateDataStatus>>> GetMandateStatusesAsync(string debitOrderServiceKey, CancellationToken ct = default)
     {
         NetcashResult<IReadOnlyList<MandateDataStatus>> Fail(string message) =>
@@ -132,11 +135,18 @@ public class LiveNetcashDebitOrderService : INetcashDebitOrderService
 
         if (string.IsNullOrWhiteSpace(debitOrderServiceKey)) return Fail("This business's Netcash debit order key is not loaded.");
 
-        var (token, error) = await TextAsync("RequestMandateData", $"<ServiceKey>{SecurityElement.Escape(debitOrderServiceKey)}</ServiceKey>", ct);
-        if (error is not null) return Fail(error);
-        if (token is null || token.Length <= 5) return Fail($"Netcash did not accept the request for mandate data (code {token}).");
+        string? token;
+        if (Pending.TryGetValue(debitOrderServiceKey, out var p) && DateTime.UtcNow - p.At < TimeSpan.FromMinutes(10))
+            token = p.Token;
+        else
+        {
+            (token, var error) = await TextAsync("RequestMandateData", $"<ServiceKey>{SecurityElement.Escape(debitOrderServiceKey)}</ServiceKey>", ct);
+            if (error is not null) return Fail(error);
+            if (token is null || token.Length <= 5) return Fail($"Netcash did not accept the request for mandate data (code {token}).");
+            Pending[debitOrderServiceKey] = (token, DateTime.UtcNow);
+        }
 
-        // The file takes Netcash a little while (about 20 seconds when measured).
+        // The file takes Netcash a while (20 to 70 seconds when measured).
         for (var attempt = 0; attempt < 8; attempt++)
         {
             await Task.Delay(TimeSpan.FromSeconds(attempt == 0 ? 3 : 7), ct);
@@ -145,13 +155,15 @@ public class LiveNetcashDebitOrderService : INetcashDebitOrderService
             if (problem is not null) return Fail(problem);
             if (data is null || !data.Contains("###BEGIN", StringComparison.Ordinal)) continue;
 
+            Pending.TryRemove(debitOrderServiceKey, out _);
+
             // Only status and reference are read; the rest is personal information we already hold.
             return NetcashResult<IReadOnlyList<MandateDataStatus>>.Ok(data.Split('\n')
                 .Where(l => !l.StartsWith("###", StringComparison.Ordinal))
                 .Select(l => l.Split('\t')).Where(c => c.Length > 2)
                 .Select(c => new MandateDataStatus(c[1].Trim(), c[0].Trim())).ToList());
         }
-        return Fail("Netcash is still preparing the answer. Try again in a minute.");
+        return Fail("Netcash is still preparing the answer. AM-Pay keeps checking - refresh this page in a minute or two.");
     }
 
     private async Task<(string? Text, string? Error)> TextAsync(string operation, string parameters, CancellationToken ct)

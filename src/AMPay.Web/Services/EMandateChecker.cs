@@ -93,7 +93,7 @@ public class EMandateChecker
 /// <summary>After an eMandate is sent, checks on it for about an hour. Nothing runs otherwise.</summary>
 public class EMandateWatcher
 {
-    private static readonly int[] MinutesBetween = { 2, 3, 5, 5, 10, 15, 20 };
+    private static readonly int[] MinutesBetween = { 1, 2, 3, 5, 5, 10, 15, 20 };
 
     private readonly IServiceScopeFactory _scopes;
     private readonly IHostApplicationLifetime _life;

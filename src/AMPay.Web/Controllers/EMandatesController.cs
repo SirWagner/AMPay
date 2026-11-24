@@ -143,7 +143,7 @@ public class EMandatesController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPolicies.CanCapture)]
-    public async Task<IActionResult> Check(Guid id, [FromServices] EMandateChecker checker)
+    public async Task<IActionResult> Check(Guid id, [FromServices] EMandateChecker checker, [FromServices] EMandateWatcher watcher)
     {
         var mandate = await _db.Mandates.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id);
         if (mandate is null) return NotFound();
@@ -151,7 +151,8 @@ public class EMandatesController : Controller
         _tenant.EnsureCanAccess(mandate.TenantId);
 
         var outcome = await checker.CheckAsync(mandate.TenantId);
-        if (outcome.Error is not null) TempData["Error"] = outcome.Error;
+        if (outcome.StillWaiting > 0) watcher.Watch(mandate.TenantId);
+        if (outcome.Error is not null) TempData["Info"] = outcome.Error;
         else TempData["Success"] = outcome.Updated > 0
             ? $"Updated from Netcash: {outcome.Updated} eMandate(s)."
             : "Netcash shows no change: the client has not signed or declined yet.";
