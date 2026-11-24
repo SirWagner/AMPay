@@ -754,7 +754,7 @@ public partial class ClientsController : Controller
             serviceKey: string.Empty, // resolved inside the live client from the tenant key
             new AvsRequest
             {
-                AccountReference = client.ClientNumber,
+                AccountReference = AMPay.Domain.Portal.NetcashReference.Clean(client.ClientNumber),
                 AccountNumber = account.AccountNumber,
                 BranchCode = account.BranchCode,
                 AccountType = account.AccountType,

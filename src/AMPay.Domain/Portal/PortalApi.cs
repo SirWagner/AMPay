@@ -176,3 +176,19 @@ public record PortalCallback(
     string? Message,
     DateTime CreatedUtc,
     DateTime? HandledUtc);
+
+/// <summary>
+/// Netcash account references (field 101). Netcash refuses some characters ("Account reference
+/// invalid") and documents AN22 for batches and AN32 for real time, so references are kept to
+/// letters and digits, 22 at most: DL-000320 becomes DL000320.
+/// </summary>
+public static class NetcashReference
+{
+    public const int MaxLength = 22;
+
+    public static string Clean(string? value)
+    {
+        var s = new string((value ?? "").Where(char.IsAsciiLetterOrDigit).ToArray()).ToUpperInvariant();
+        return s.Length <= MaxLength ? s : s[..MaxLength];
+    }
+}

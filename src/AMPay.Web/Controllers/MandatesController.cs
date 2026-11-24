@@ -104,7 +104,7 @@ public class MandatesController : Controller
             ClientId = client.Id,
             ClientName = $"{client.FirstName} {client.Surname}".Trim(),
             ClientNumber = client.ClientNumber,
-            AccountReference = client.ClientNumber,
+            AccountReference = AMPay.Domain.Portal.NetcashReference.Clean(client.ClientNumber),
             CollectionAmount = client.Payback?.InstalmentAmount ?? 0m,
             Frequency = client.Payback?.Frequency ?? DebitFrequency.Monthly,
             CollectionDayCode = client.Payback?.CollectionDayCode,
@@ -140,7 +140,7 @@ public class MandatesController : Controller
 
             // Each loan gets its own reference: field 101 must be unique in the Netcash
             // masterfile, and a client with two loans needs two mandates.
-            model.AccountReference = loan.LoanNumber;
+            model.AccountReference = AMPay.Domain.Portal.NetcashReference.Clean(loan.LoanNumber);
 
             // The first instalment is the largest, because credit life falls with the
             // balance - so it is the ceiling the mandate must allow.
@@ -269,7 +269,7 @@ public class MandatesController : Controller
             ClientId = client.Id,
             BankAccountId = account!.Id,
             MandateType = model.MandateType,
-            AccountReference = model.AccountReference.Trim(),
+            AccountReference = AMPay.Domain.Portal.NetcashReference.Clean(model.AccountReference),
             MandateTemplateId = model.MandateTemplateId,
             CollectionAmount = model.CollectionAmount,
             FirstCollectionDiffers = model.FirstCollectionDiffers,
