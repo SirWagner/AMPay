@@ -119,6 +119,10 @@ public interface INetcashDebitOrderService
         AddMandateRequest request,
         CancellationToken ct = default);
 
+    /// <summary>RequestMandateData / RetrieveMandateData - where each eMandate stands. Read-only.</summary>
+    Task<NetcashResult<IReadOnlyList<MandateDataStatus>>> GetMandateStatusesAsync(string debitOrderServiceKey, CancellationToken ct = default) =>
+        Task.FromResult(NetcashResult<IReadOnlyList<MandateDataStatus>>.Fail(NetcashCodes.GeneralServiceError, "Netcash is not live on this system."));
+
     /// <summary>RequestActionDate - confirm a date is a valid banking action date before submitting.</summary>
     Task<NetcashResult<DateTime>> RequestActionDateAsync(
         string debitOrderServiceKey,

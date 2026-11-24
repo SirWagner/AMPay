@@ -132,6 +132,9 @@ public class AddMandateRequest
     public bool MandateActive { get; set; } = true;
 }
 
+/// <summary>One eMandate in Netcash's mandate data. Status 2 awaiting, 3 expired, 4 failed, 5 declined, 6 accepted.</summary>
+public record MandateDataStatus(string AccountReference, string Status);
+
 /// <summary>AddMandate returns a hosted URL where the debtor signs, not a completed mandate.</summary>
 public class AddMandateResponse
 {

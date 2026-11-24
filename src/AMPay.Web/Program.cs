@@ -108,6 +108,8 @@ builder.Services.AddScoped<ClientPortalPublisher>();
 // The lender's notification feed, written as each change is saved.
 builder.Services.AddSingleton<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor, ActivityRecorder>();
 builder.Services.AddScoped<NotificationCounter>();
+builder.Services.AddScoped<EMandateChecker>();
+builder.Services.AddSingleton<EMandateWatcher>();
 builder.Services.AddHostedService<ClientPortalSyncService>();
 
 // The lender dashboard: one set of aggregate queries per tenant, cached for a minute.

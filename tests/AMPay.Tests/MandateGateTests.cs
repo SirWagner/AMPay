@@ -54,6 +54,16 @@ public class MandateGateTests
         Assert.Contains("already", await MandateGate.ProblemForAsync(db, new Loan { Status = LoanStatus.Approved, MandateId = m.Id }));
     }
 
+    [Theory]
+    [InlineData("6", MandateStatus.Authenticated)]
+    [InlineData("5", MandateStatus.Rejected)]
+    [InlineData("3", MandateStatus.Expired)]
+    [InlineData("2", null)]
+    [InlineData("5,2", null)]   // declined, then sent again: still open
+    [InlineData("", null)]
+    public void NetcashsAnswer_DecidesTheMandate(string statuses, MandateStatus? expected) =>
+        Assert.Equal(expected, EMandateChecker.Decide(statuses.Split(',', StringSplitOptions.RemoveEmptyEntries)));
+
     private static AppDbContext Db() =>
         new(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase($"gate-{Guid.NewGuid()}").Options);
 }

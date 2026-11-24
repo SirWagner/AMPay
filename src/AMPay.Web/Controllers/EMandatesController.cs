@@ -38,7 +38,7 @@ public class EMandatesController : Controller
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPolicies.CanCapture)]
     public async Task<IActionResult> Send(Guid loanId, [FromServices] INetcashDebitOrderService netcash, [FromServices] ClientPortalPublisher publisher,
-        [FromServices] INetcashSecretStore secrets)
+        [FromServices] INetcashSecretStore secrets, [FromServices] EMandateWatcher watcher)
     {
         var loan = await _db.Loans
             .Include(l => l.Client).ThenInclude(c => c!.Addresses)
@@ -132,9 +132,30 @@ public class EMandatesController : Controller
         loan.MandateId = mandate.Id;
         await _db.SaveChangesAsync();
 
+        watcher.Watch(loan.TenantId);
+
         var shown = await publisher.ShowInAppAsync(client.Id);
         TempData["Success"] = "eMandate created at Netcash. The client signs it in their app with a PIN Netcash sends to their cell. " + shown;
         return back;
+    }
+
+    /// <summary>Asks Netcash where this business's unsigned eMandates stand.</summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = AppPolicies.CanCapture)]
+    public async Task<IActionResult> Check(Guid id, [FromServices] EMandateChecker checker)
+    {
+        var mandate = await _db.Mandates.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id);
+        if (mandate is null) return NotFound();
+        await _tenant.LoadAsync();
+        _tenant.EnsureCanAccess(mandate.TenantId);
+
+        var outcome = await checker.CheckAsync(mandate.TenantId);
+        if (outcome.Error is not null) TempData["Error"] = outcome.Error;
+        else TempData["Success"] = outcome.Updated > 0
+            ? $"Updated from Netcash: {outcome.Updated} eMandate(s)."
+            : "Netcash shows no change: the client has not signed or declined yet.";
+        return RedirectToAction("Details", "Mandates", new { id });
     }
 
     /// <summary>For administrators: the address to paste into Netcash (NetConnector → Debit orders → eMandate postback).</summary>
@@ -157,9 +178,16 @@ public class EMandatesController : Controller
         var expected = _config[LiveNetcashPayNowService.SecretSetting];
         if (string.IsNullOrEmpty(expected) || !CryptographicOperations.FixedTimeEquals(
                 SHA256.HashData(Encoding.UTF8.GetBytes(secret)), SHA256.HashData(Encoding.UTF8.GetBytes(expected))))
+        {
+            _log.LogWarning("eMandate postback refused: the secret in the address is wrong.");
             return NotFound();
+        }
 
-        if (!Request.HasFormContentType) return Ok();
+        if (!Request.HasFormContentType)
+        {
+            _log.LogWarning("eMandate postback ignored: content type {ContentType}.", Request.ContentType);
+            return Ok();
+        }
         var f = await Request.ReadFormAsync();
         string? F(string k) => f.TryGetValue(k, out var v) ? v.ToString().Trim() : null;
 

@@ -68,11 +68,17 @@ public class NotificationsController : Controller
         {
             try
             {
-                model.PortalApplications = (await _portal.ApplicationsAsync(tenantId)).Count(a => a.Status == Domain.Portal.PortalApplicationStatus.Submitted);
-                model.PortalCallbacks = (await _portal.CallbacksAsync(tenantId)).Count;
-                model.PortalLoginRequests = (await _portal.LinkRequestsAsync(tenantId)).Count;
+                // Never hold the page for a sleeping portal.
+                using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                var apps = _portal.ApplicationsAsync(tenantId, limit.Token);
+                var calls = _portal.CallbacksAsync(tenantId, limit.Token);
+                var logins = _portal.LinkRequestsAsync(tenantId, limit.Token);
+                await Task.WhenAll(apps, calls, logins);
+                model.PortalApplications = apps.Result.Count(a => a.Status == Domain.Portal.PortalApplicationStatus.Submitted);
+                model.PortalCallbacks = calls.Result.Count;
+                model.PortalLoginRequests = logins.Result.Count;
             }
-            catch (PortalUnavailableException) { model.PortalError = true; }
+            catch (Exception ex) when (ex is PortalUnavailableException or OperationCanceledException) { model.PortalError = true; }
         }
 
         // Opening the page marks everything up to now as seen.
