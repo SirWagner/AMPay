@@ -55,7 +55,8 @@ public class EMandatesController : Controller
         var mobile = ClientStatementBuilder.MobileOf(client);
         var first = loan.FirstCollectionDate ?? loan.Schedule.OrderBy(s => s.InstalmentNumber).FirstOrDefault()?.DueDate;
 
-        var problem = bank is null ? "Capture the client's bank account first (Banking step)."
+        var problem = await MandateGate.ProblemForAsync(_db, loan) is { } blocked ? blocked
+            : bank is null ? "Capture the client's bank account first (Banking step)."
             : mobile is null ? "Capture the client's cell number first - Netcash sends the signing PIN to it."
             : first is null ? "The loan has no first collection date yet."
             : null;

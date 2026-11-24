@@ -10,6 +10,8 @@
     var hasLiveMandate = Model.Mandate is not null &&
                          !AMPay.Web.Controllers.MandatesController.IsDeadMandate(Model.Mandate.Status);
 
+    var gate = (AMPay.Web.Services.MandateGate)ViewBag.MandateGate;
+
     string Who(string? id) => id is not null && names.TryGetValue(id, out var n) ? n : "unknown";
     string Pct(decimal f, int dp = 2) => (f * 100m).ToString("N" + dp) + "%";
     string R(decimal v) => "R " + v.ToString("N2");
@@ -196,6 +198,8 @@ else if (Model.Status == LoanStatus.Approved)
                 Approved by @Who(Model.DecidedByUserId) on @Model.DecidedUtc?.ToLocalTime().ToString("dd MMM yyyy HH:mm").
             </p>
             <ol class="steps">
+                <li>Send the quote and wait for the client to accept it.@(gate.QuoteAccepted ? " Accepted." : "")</li>
+                <li>Issue the agreement, send it to the client and wait for it to show as signed.@(gate.AgreementSigned ? " Signed." : "")</li>
                 <li>
                     @if (!hasLiveMandate)
                     {
@@ -207,13 +211,16 @@ else if (Model.Status == LoanStatus.Approved)
                             <a asp-controller="Mandates" asp-action="Details" asp-route-id="@Model.MandateId">view it</a>.</text>
                     }
                 </li>
-                <li>Issue the contract and send it to the client with the mandate. Wait for it to show as signed.</li>
                 <li>Pay the loan amount of @R(Model.Principal) to the client.</li>
                 <li>Mark the loan as disbursed.</li>
             </ol>
         </div>
         <div class="card-foot">
-            @if (!hasLiveMandate && canCapture)
+            @if (!hasLiveMandate && canCapture && !gate.Ready)
+            {
+                <span class="muted small">@gate.Problem</span>
+            }
+            @if (!hasLiveMandate && canCapture && gate.Ready)
             {
                 <a asp-controller="Mandates" asp-action="Create"
                    asp-route-clientId="@Model.ClientId" asp-route-loanId="@Model.Id"
@@ -248,7 +255,11 @@ else if (Model.Status is LoanStatus.Disbursed)
         @if (!hasLiveMandate)
         {
             <text>No DebiCheck mandate is linked yet &mdash; instalments cannot be collected until one is.</text>
-            @if (canCapture)
+            @if (!gate.Ready)
+            {
+                <text>@gate.Problem</text>
+            }
+            else if (canCapture)
             {
                 <a asp-controller="Mandates" asp-action="Create"
                    asp-route-clientId="@Model.ClientId" asp-route-loanId="@Model.Id">Originate it now</a>

@@ -383,6 +383,7 @@ public class LoansController : Controller
             AgreementSigned = contracts.Any(c => c.Status == ContractStatus.Signed)
         };
 
+        ViewBag.MandateGate = await AMPay.Web.Services.MandateGate.ForAsync(_db, loan);
         ViewBag.Contracts = new LoanContractsPanel
         {
             LoanId = loan.Id,

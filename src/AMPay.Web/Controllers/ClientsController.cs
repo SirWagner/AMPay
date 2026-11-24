@@ -1345,6 +1345,7 @@ public partial class ClientsController : Controller
 
         var publisher = HttpContext.RequestServices.GetRequiredService<AMPay.Web.Services.ClientPortalPublisher>();
         ViewBag.PortalConfigured = publisher.IsConfigured;
+        ViewBag.MandateGates = await AMPay.Web.Services.MandateGate.WaitingAsync(_db, client.Id);
         ViewBag.PortalLink = AccountLinkFor(publisher, client.TenantId);
 
         await PopulateWizardAsync(id);

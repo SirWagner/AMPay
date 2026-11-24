@@ -85,6 +85,19 @@ public class MandatesController : Controller
         await _tenant.LoadAsync();
         _tenant.EnsureCanAccess(client.TenantId);
 
+        // A mandate always collects one loan's signed agreement.
+        if (loanId is null)
+        {
+            var waiting = await AMPay.Web.Services.MandateGate.WaitingAsync(_db, client.Id);
+            loanId = waiting.FirstOrDefault(g => g.Ready)?.LoanId;
+            if (loanId is null)
+            {
+                TempData["Error"] = waiting.FirstOrDefault()?.Problem
+                    ?? "This client has no approved loan waiting for a debit mandate.";
+                return RedirectToAction("Details", "Clients", new { id = clientId });
+            }
+        }
+
         if (client.BankAccounts.Count == 0)
         {
             TempData["Error"] = "Capture a bank account before creating a mandate.";
@@ -158,7 +171,7 @@ public class MandatesController : Controller
 
     /// <summary>
     /// The loan a mandate may be raised for: same client, approved or disbursed, and not
-    /// already carrying one. Returns the reason when it cannot be used.
+    /// already carrying one, with the quote accepted and the agreement signed. Returns the reason when it cannot be used.
     /// </summary>
     private async Task<(Loan? Loan, string? Problem)> LoanForMandateAsync(Guid loanId, Guid clientId)
     {
@@ -169,21 +182,8 @@ public class MandatesController : Controller
 
         _tenant.EnsureCanAccess(loan.TenantId);
 
-        if (loan.Status is not (LoanStatus.Approved or LoanStatus.Disbursed))
-            return (null, "A DebiCheck mandate can only be originated for an approved loan.");
-
-        // A mandate that failed, was rejected by the debtor, or expired unauthenticated does
-        // not collect anything - so it must not stand in the way of trying again.
-        if (loan.MandateId is not null)
-        {
-            var existing = await _db.Mandates.AsNoTracking()
-                .Where(m => m.Id == loan.MandateId)
-                .Select(m => (MandateStatus?)m.Status)
-                .FirstOrDefaultAsync();
-
-            if (existing is not null && !IsDeadMandate(existing.Value))
-                return (null, "This loan already has a DebiCheck mandate.");
-        }
+        if (await AMPay.Web.Services.MandateGate.ProblemForAsync(_db, loan) is { } blocked)
+            return (null, blocked);
 
         return (loan, null);
     }
@@ -237,6 +237,11 @@ public class MandatesController : Controller
         {
             (loan, var problem) = await LoanForMandateAsync(model.LoanId.Value, client.Id);
             if (loan is null) ModelState.AddModelError(string.Empty, problem!);
+        }
+        else
+        {
+            ModelState.AddModelError(string.Empty,
+                "Originate the mandate from its loan, once the client has accepted the quote and signed the agreement.");
         }
 
         if (!ModelState.IsValid)

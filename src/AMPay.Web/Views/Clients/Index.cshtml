@@ -103,11 +103,6 @@
                         <td>
                             <div class="row-actions">
                                 <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-outline btn-sm">Edit</a>
-                                @if (ClientStatusInfo.CanBorrow(c.Status))
-                                {
-                                    <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@c.Id"
-                                       class="btn btn-primary btn-sm">New mandate</a>
-                                }
                             </div>
                         </td>
                     </tr>
