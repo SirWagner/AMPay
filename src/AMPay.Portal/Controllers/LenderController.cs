@@ -75,13 +75,13 @@ public class LenderController : PortalControllerBase
     // ---------------------------------------------------------------- sign in
 
     [HttpGet("start")]
-    public async Task<IActionResult> Start([FromRoute] string code)
+    public async Task<IActionResult> Start([FromRoute] string code, string? to = null)
     {
         var lender = await LenderAsync(code);
         if (lender is null) return NotFoundPage();
-        if (SignedInFor(lender)) return RedirectToAction("Index", "Application", new { code });
+        if (SignedInFor(lender)) return RedirectToAction("Index", to == "account" ? "Account" : "Application", new { code });
 
-        return View(new StartModel());
+        return View(new StartModel { To = to == "account" ? to : null });
     }
 
     [HttpPost("start")]
@@ -108,11 +108,11 @@ public class LenderController : PortalControllerBase
         if (issued!.TestCode is not null) TempData["TestCode"] = issued.TestCode;
         TempData["Mobile"] = PortalApi.DisplayMobile(mobile!);
 
-        return RedirectToAction(nameof(Verify), new { code, c = issued.ChallengeId });
+        return RedirectToAction(nameof(Verify), new { code, c = issued.ChallengeId, to = model.To == "account" ? model.To : null });
     }
 
     [HttpGet("verify")]
-    public async Task<IActionResult> Verify([FromRoute] string code, Guid c)
+    public async Task<IActionResult> Verify([FromRoute] string code, Guid c, string? to = null)
     {
         var lender = await LenderAsync(code);
         if (lender is null) return NotFoundPage();
@@ -121,7 +121,8 @@ public class LenderController : PortalControllerBase
         {
             ChallengeId = c,
             MaskedMobile = TempData["Mobile"] as string ?? "your phone",
-            TestCode = TempData["TestCode"] as string
+            TestCode = TempData["TestCode"] as string,
+            To = to == "account" ? to : null
         });
     }
 
@@ -158,7 +159,12 @@ public class LenderController : PortalControllerBase
         }, ApplicantClaims.Scheme);
 
         await HttpContext.SignInAsync(ApplicantClaims.Scheme, new ClaimsPrincipal(identity));
-        return RedirectToAction("Index", "Application", new { code });
+
+        // An existing client lands on their loans; anyone else on their application.
+        var isClient = await Db.ClientAccounts.AnyAsync(a => a.LenderId == lender.Id && a.Mobile == applicant.Mobile);
+        return isClient || model.To == "account"
+            ? RedirectToAction("Index", "Account", new { code })
+            : RedirectToAction("Index", "Application", new { code });
     }
 
     [HttpPost("signout")]

@@ -499,7 +499,8 @@ public class CreateMandateModel
     [Display(Name = "Authentication route")]
     public MandateType MandateType { get; set; } = MandateType.DebiCheckTt1RealTime;
 
-    [Required, Display(Name = "Account reference"), StringLength(32)]
+    [Required, Display(Name = "Account reference"), StringLength(22)]
+    [RegularExpression("^[A-Za-z0-9]+$", ErrorMessage = "Letters and numbers only - Netcash refuses dashes, spaces and other characters.")]
     public string AccountReference { get; set; } = "";
 
     [Display(Name = "Mandate template"), StringLength(14)]

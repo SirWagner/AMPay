@@ -50,6 +50,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<DebiCheckMandate> Mandates => Set<DebiCheckMandate>();
     public DbSet<MandateEvent> MandateEvents => Set<MandateEvent>();
     public DbSet<PayNowTransaction> PayNowTransactions => Set<PayNowTransaction>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationSeen> NotificationsSeen => Set<NotificationSeen>();
     public DbSet<NetcashBatch> NetcashBatches => Set<NetcashBatch>();
     public DbSet<NetcashBatchError> NetcashBatchErrors => Set<NetcashBatchError>();
 
@@ -63,6 +65,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         b.Entity<ClientBankAccount>().Ignore(x => x.MaskedAccountNumber);
         b.Entity<TenantServiceKey>().Ignore(x => x.NeedsRevalidation);
         b.Entity<DebiCheckMandate>().Ignore(x => x.IsCollectable);
+        b.Entity<DebiCheckMandate>().Property(x => x.SigningUrl).HasMaxLength(500);
+        b.Entity<DebiCheckMandate>().Property(x => x.SignedPdfUrl).HasMaxLength(500);
         b.Entity<LoanContract>().Ignore(x => x.IsOpen);
         b.Entity<CreditQuote>().Ignore(x => x.IsOpen);
 
@@ -191,12 +195,29 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
                 .HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        b.Entity<Notification>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.CreatedUtc });
+            e.Property(x => x.Kind).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Body).HasMaxLength(1000);
+            e.Property(x => x.Link).HasMaxLength(300);
+        });
+
+        b.Entity<NotificationSeen>(e =>
+        {
+            e.HasKey(x => new { x.UserId, x.TenantId });
+            e.Property(x => x.UserId).HasMaxLength(450);
+        });
+
         b.Entity<Client>(e =>
         {
             e.Property(x => x.ClientNumber).HasMaxLength(32).IsRequired();
             e.Property(x => x.FirstName).HasMaxLength(100).IsRequired();
             e.Property(x => x.Surname).HasMaxLength(100).IsRequired();
             e.Property(x => x.IdNumber).HasMaxLength(20).IsRequired();
+            e.Property(x => x.PortalStatementHash).HasMaxLength(64);
+            e.Property(x => x.PortalDocumentKeys).HasMaxLength(4000);
 
             // Field 101 must be unique in the tenant Netcash masterfile, so enforce it here too.
             e.HasIndex(x => new { x.TenantId, x.ClientNumber }).IsUnique();

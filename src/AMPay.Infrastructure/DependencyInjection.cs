@@ -21,10 +21,14 @@ public static class DependencyInjection
     public static IServiceCollection AddAMPayInfrastructure(
         this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<AppDbContext>(options =>
+        // Interceptors registered by the host (the web app's portal change tracker) join in.
+        services.AddDbContext<AppDbContext>((sp, options) =>
+        {
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.EnableRetryOnFailure()));
+                sql => sql.EnableRetryOnFailure());
+            options.AddInterceptors(sp.GetServices<Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor>());
+        });
 
         services.Configure<NetcashOptions>(configuration.GetSection(NetcashOptions.SectionName));
 
@@ -87,7 +91,12 @@ public static class DependencyInjection
                 services.AddScoped<INetcashDebiCheckService, LiveNetcashDebiCheckService>();
             else
                 services.AddScoped<INetcashDebiCheckService, StubNetcashDebiCheckService>();
-            services.AddScoped<INetcashDebitOrderService, StubNetcashDebitOrderService>();
+            // The eMandate (AddMandate) is live with DebiCheck: same debit order service key.
+            services.AddScoped<StubNetcashDebitOrderService>();
+            if (netcash.Live.DebiCheck)
+                services.AddScoped<INetcashDebitOrderService, LiveNetcashDebitOrderService>();
+            else
+                services.AddScoped<INetcashDebitOrderService>(sp => sp.GetRequiredService<StubNetcashDebitOrderService>());
             // Bank, ID and AVS checks: the live client answers its switched-on half and hands the
             // rest to the stub. It needs INetcashKeyProvider, which the web app registers.
             services.AddScoped<StubNetcashValidationService>();

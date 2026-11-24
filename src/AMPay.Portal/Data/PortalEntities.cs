@@ -49,7 +49,82 @@ public class Applicant
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? LastSignInUtc { get; set; }
 
+    /// <summary>
+    /// The lender's client this person proved they are, by their ID number, after signing in
+    /// with this cell number. Only honoured while the account still carries the same number.
+    /// </summary>
+    public Guid? ClientAccountId { get; set; }
+    public DateTime? AccountLinkedUtc { get; set; }
+
+    /// <summary>
+    /// The lender confirmed this person is their client although the cell number differs from
+    /// the one on file (an approved <see cref="AccountLinkRequest"/>).
+    /// </summary>
+    public bool LinkApprovedByLender { get; set; }
+
+    /// <summary>Wrong ID numbers typed in a row. Five locks the account view until the lender helps.</summary>
+    public int FailedIdAttempts { get; set; }
+
     public ICollection<LoanApplication> Applications { get; set; } = new List<LoanApplication>();
+
+    public const int MaxIdAttempts = 5;
+}
+
+/// <summary>A file in the client's account - a signed agreement - as AM-Pay sent it. Bytes kept here, never served by URL.</summary>
+public class ClientAccountDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ClientAccountId { get; set; }
+    public string Key { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? LoanNumber { get; set; }
+    public string ContentType { get; set; } = "application/pdf";
+    public byte[] Data { get; set; } = Array.Empty<byte>();
+    public DateTime DatedUtc { get; set; }
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
+}
+
+public enum LinkRequestStatus { Pending = 0, Approved = 1, Rejected = 2 }
+
+/// <summary>"I am already a client": waits for the lender to confirm before any account is shown.</summary>
+public class AccountLinkRequest
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid LenderId { get; set; }
+    public Guid ApplicantId { get; set; }
+    public string Mobile { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string? FullName { get; set; }
+
+    /// <summary>The SA ID number the person gave: the lender matches its client on it.</summary>
+    public string? IdNumber { get; set; }
+    public LinkRequestStatus Status { get; set; }
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? DecidedUtc { get; set; }
+}
+
+/// <summary>
+/// A client's account with one lender, as AM-Pay last sent it: loans, schedule and payments.
+/// The portal only shows it; AM-Pay replaces it whenever the account changes.
+/// </summary>
+public class ClientAccount
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid LenderId { get; set; }
+    public Lender? Lender { get; set; }
+
+    public Guid AmpayClientId { get; set; }
+    public string ClientNumber { get; set; } = "";
+    public string FullName { get; set; } = "";
+
+    /// <summary>27XXXXXXXXX - only this number may sign in to the account.</summary>
+    public string Mobile { get; set; } = "";
+    public string IdNumberHash { get; set; } = "";
+
+    /// <summary>The PortalClientStatement as JSON.</summary>
+    public string StatementJson { get; set; } = "{}";
+    public DateTime GeneratedUtc { get; set; }
+    public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 }
 
 public class LoanApplication

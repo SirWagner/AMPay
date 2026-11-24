@@ -126,6 +126,8 @@ public class LoanContract
     /// a copy of the database is not a set of working signing links.
     /// </summary>
     public string? AccessTokenHash { get; set; }
+    /// <summary>The link as shown in the client's online account, when sent there. Null otherwise.</summary>
+    public string? ClientAppLink { get; set; }
     public DateTime? AccessExpiresUtc { get; set; }
 
     public DateTime? FirstViewedUtc { get; set; }
@@ -241,6 +243,8 @@ public class CreditQuote
 
     /// <summary>SHA-256 of the link token. The token itself is never stored.</summary>
     public string? AccessTokenHash { get; set; }
+    /// <summary>The link as shown in the client's online account, when sent there. Null otherwise.</summary>
+    public string? ClientAppLink { get; set; }
     public DateTime? FirstViewedUtc { get; set; }
 
     // ---- The acceptance PIN ----

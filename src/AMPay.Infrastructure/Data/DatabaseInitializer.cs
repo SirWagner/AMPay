@@ -50,7 +50,8 @@ public static class DatabaseInitializer
             ["20261007092442_ContractPacksAndMessaging"] = "LoanContracts",
             ["20261114072200_GoodToGoScreening"] = "Employers",
             ["20261114174506_LoanWording"] = "LoanWordings",
-            ["20261114223245_StatementReviews"] = "StatementReviews"
+            ["20261114223245_StatementReviews"] = "StatementReviews",
+            ["20261116173745_NotificationsAndPortalDocuments"] = "Notifications"
         };
 
     public static async Task InitialiseAsync(

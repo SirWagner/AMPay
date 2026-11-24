@@ -131,12 +131,12 @@ public class QuoteService
 
     /// <summary>Creates a fresh link - any earlier one stops working - and sends it.</summary>
     public async Task<ContractService.SendOutcome> SendAsync(
-        Guid quoteId, bool bySms, bool byEmail, string publicBaseUrl, string? userId, CancellationToken ct = default)
+        Guid quoteId, bool bySms, bool byEmail, string publicBaseUrl, string? userId, CancellationToken ct = default, bool byApp = false)
     {
         var quote = await LoadOpenAsync(quoteId, ct);
 
-        if (!bySms && !byEmail)
-            throw new ContractException("Choose SMS, email or both.");
+        if (!bySms && !byEmail && !byApp)
+            throw new ContractException("Choose the client app, SMS or email.");
 
         var snapshot = ReadSnapshot(quote);
         var tenant = await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == quote.TenantId, ct);
@@ -190,6 +190,10 @@ public class QuoteService
             }
         }
 
+        // The client's online account shows the link; the PIN still goes to their cell.
+        quote.ClientAppLink = byApp ? link : null;
+        if (byApp) sentTo.Add("client app");
+
         if (sentTo.Count == 0)
             throw new ContractException($"Nothing was sent. {string.Join("; ", skipped)}. Capture the contact details and issue the quote again.");
 
@@ -231,6 +235,9 @@ public class QuoteService
     }
 
     /// <summary>Sends a fresh six-digit PIN to the cell number on the quote. Returns the masked number.</summary>
+    /// <summary>The PIN just sent, only while messages are stubbed (test systems). Null otherwise.</summary>
+    public string? TestPin { get; private set; }
+
     public async Task<string> SendPinAsync(CreditQuote quote, CancellationToken ct = default)
     {
         EnsureOpen(quote);
@@ -255,6 +262,8 @@ public class QuoteService
             throw new ContractException("Three PINs have been sent in the last hour. Try again later.");
 
         var pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        // With no SMS provider the PIN reaches nobody; on a test system it is shown on screen instead.
+        TestPin = _messages.IsStubbed ? pin : null;
         quote.OtpHash = PinHash(quote.Id, pin);
         quote.OtpExpiresUtc = now + PinLifetime;
         quote.OtpSentUtc = now;

@@ -65,14 +65,15 @@ public class QuotesController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPolicies.CanCapture)]
-    public async Task<IActionResult> Send(Guid id, bool sms, bool email)
+    public async Task<IActionResult> Send(Guid id, bool sms, bool email, bool app, [FromServices] AMPay.Web.Services.ClientPortalPublisher publisher)
     {
         var loanId = await LoanOfAsync(id);
         if (loanId is null) return NotFound();
 
         try
         {
-            var outcome = await _quotes.SendAsync(id, sms, email, PublicBaseUrl(), _users.GetUserId(User));
+            var outcome = await _quotes.SendAsync(id, sms, email, PublicBaseUrl(), _users.GetUserId(User), byApp: app);
+            if (app) TempData["Info"] = await publisher.ShowInAppAsync(_db.CreditQuotes.Where(q => q.Id == id).Select(q => q.ClientId).First());
 
             var sent = string.Join(" and ", outcome.SentTo);
             var skipped = outcome.Skipped.Count == 0 ? "" : $" Not sent: {string.Join("; ", outcome.Skipped)}.";

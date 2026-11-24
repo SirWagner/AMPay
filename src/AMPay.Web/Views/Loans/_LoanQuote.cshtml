@@ -92,8 +92,9 @@
                     }
                     <form asp-controller="Quotes" asp-action="Send" asp-route-id="@current.Id" method="post">
                         @Html.AntiForgeryToken()
-                        <label class="check"><input type="checkbox" name="sms" value="true" checked /> SMS to @(snapshot.Borrower.Mobile ?? "no cell number on file")</label>
-                        <label class="check"><input type="checkbox" name="email" value="true" checked /> Email to @(snapshot.Borrower.Email ?? "no email on file")</label>
+                        <label class="check"><input type="checkbox" name="app" value="true" checked /> The client's app (My loans on your self-service link)</label>
+                        <label class="check"><input type="checkbox" name="sms" value="true" /> SMS to @(snapshot.Borrower.Mobile ?? "no cell number on file")</label>
+                        <label class="check"><input type="checkbox" name="email" value="true" /> Email to @(snapshot.Borrower.Email ?? "no email on file")</label>
                         <p class="muted small">The client reads the quote and accepts it with three ticks and a PIN sent to their cell, or declines it.</p>
                         <button type="submit" class="btn btn-primary">@(current.SentUtc is null ? "Send quote to client" : "Send again (new link)")</button>
                     </form>

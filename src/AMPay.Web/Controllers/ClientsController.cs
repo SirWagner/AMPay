@@ -754,7 +754,7 @@ public partial class ClientsController : Controller
             serviceKey: string.Empty, // resolved inside the live client from the tenant key
             new AvsRequest
             {
-                AccountReference = client.ClientNumber,
+                AccountReference = AMPay.Domain.Portal.NetcashReference.Clean(client.ClientNumber),
                 AccountNumber = account.AccountNumber,
                 BranchCode = account.BranchCode,
                 AccountType = account.AccountType,
@@ -1342,6 +1342,11 @@ public partial class ClientsController : Controller
         ViewBag.Screening = await _screening.EvaluateAsync(id, ScreeningTrigger.DetailsChanged, User.Identity?.Name);
         ViewBag.RecentNotes = await _db.ClientNotes.AsNoTracking()
             .Where(n => n.ClientId == id).OrderByDescending(n => n.CreatedUtc).Take(4).ToListAsync();
+
+        var publisher = HttpContext.RequestServices.GetRequiredService<AMPay.Web.Services.ClientPortalPublisher>();
+        ViewBag.PortalConfigured = publisher.IsConfigured;
+        ViewBag.MandateGates = await AMPay.Web.Services.MandateGate.WaitingAsync(_db, client.Id);
+        ViewBag.PortalLink = AccountLinkFor(publisher, client.TenantId);
 
         await PopulateWizardAsync(id);
         return View(client);

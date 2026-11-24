@@ -13,8 +13,15 @@
 
 @if (Model.Status == PortalApplicationStatus.Draft)
 {
-    <h1>Your application</h1>
-    <p class="lede">Reference <strong>@Model.Reference</strong>. Your answers are saved as you go - you can stop and come back with the same cell number.</p>
+    var done = new[] { detailsDone, incomeDone, loanDone, docsDone }.Count(d => d);
+    var resume = !detailsDone ? "details" : !incomeDone ? "income" : !loanDone ? "loan" : !docsDone ? "documents" : "review";
+    <div class="card">
+        <h1>@(done == 0 ? "Apply for a loan" : "Finish your application")</h1>
+        <p class="muted">@done of 4 parts done. Everything is saved, so you can stop and come back.</p>
+        <span class="progress" aria-hidden="true"><span style="width:@(done * 25)%"></span></span>
+        <a class="btn btn-primary btn-block" style="margin-top:16px;" href="@basePath/@resume">@(done == 0 ? "Start" : done == 4 ? "Check and send" : "Continue")</a>
+        <p class="small muted" style="margin:12px 0 0;">Reference @Model.Reference</p>
+    </div>
 
     <div class="card">
         <ul class="steps">
@@ -55,9 +62,4 @@ else
     </div>
 }
 
-<div class="card">
-    <h2>Questions?</h2>
-    <div class="actions" style="margin-top:0;">
-        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Talk to an advisor</a>
-    </div>
-</div>
+<p class="small muted">Already have a loan with @l.DisplayName? <a href="/a/@l.PublicCode/account">See my loans</a></p>

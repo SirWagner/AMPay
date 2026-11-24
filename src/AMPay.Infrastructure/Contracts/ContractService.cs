@@ -196,7 +196,7 @@ public class ContractService
     /// chosen channels. The link is returned so staff can also hand it over another way.
     /// </summary>
     public async Task<SendOutcome> SendAsync(
-        Guid contractId, bool bySms, bool byEmail, string publicBaseUrl, string? userId, CancellationToken ct = default)
+        Guid contractId, bool bySms, bool byEmail, string publicBaseUrl, string? userId, CancellationToken ct = default, bool byApp = false)
     {
         var contract = await _db.LoanContracts.FirstOrDefaultAsync(c => c.Id == contractId, ct)
                        ?? throw new ContractException("The contract was not found.");
@@ -206,8 +206,8 @@ public class ContractService
 
         EnsureWordingMaySign(contract);
 
-        if (!bySms && !byEmail)
-            throw new ContractException("Choose SMS, email or both.");
+        if (!bySms && !byEmail && !byApp)
+            throw new ContractException("Choose the client app, SMS or email.");
 
         var snapshot = ReadSnapshot(contract);
         var tenant = await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == contract.TenantId, ct);
@@ -261,6 +261,10 @@ public class ContractService
             }
         }
 
+        // The client's online account shows the link; the PIN still goes to their cell.
+        contract.ClientAppLink = byApp ? link : null;
+        if (byApp) sentTo.Add("client app");
+
         if (sentTo.Count == 0)
             throw new ContractException($"Nothing was sent. {string.Join("; ", skipped)}. Capture the contact details and issue the contract again.");
 
@@ -302,6 +306,9 @@ public class ContractService
     }
 
     /// <summary>Sends a fresh six-digit PIN to the cell number on the pack. Returns the masked number.</summary>
+    /// <summary>The PIN just sent, only while messages are stubbed (test systems). Null otherwise.</summary>
+    public string? TestPin { get; private set; }
+
     public async Task<string> SendPinAsync(LoanContract contract, CancellationToken ct = default)
     {
         if (!contract.IsOpen) throw new ContractException("This agreement can no longer be signed.");
@@ -319,6 +326,8 @@ public class ContractService
             throw new ContractException("A PIN was sent less than a minute ago. Wait a moment before asking for another.");
 
         var pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        // With no SMS provider the PIN reaches nobody; on a test system it is shown on screen instead.
+        TestPin = _messages.IsStubbed ? pin : null;
         contract.OtpHash = PinHash(contract.Id, pin);
         contract.OtpExpiresUtc = now + PinLifetime;
         contract.OtpSentUtc = now;

@@ -14,6 +14,8 @@
     // Status alone is not enough: clients onboarded before document review existed carry
     // the Onboarded status with no documents on file. Mirrors the check LoansController makes.
     var canRaiseLoan = ClientStatusInfo.CanBorrow(Model.Status) && idAccepted && payslipAccepted;
+    var mandateGates = ViewBag.MandateGates as List<AMPay.Web.Services.MandateGate> ?? new List<AMPay.Web.Services.MandateGate>();
+    var readyGate = mandateGates.FirstOrDefault(g => g.Ready);
     var screening = ViewBag.Screening as ClientScreening;
     var recentNotes = ViewBag.RecentNotes as List<ClientNote> ?? new List<ClientNote>();
 }
@@ -125,6 +127,19 @@
                                 : "<span class='badge badge-amber'>Outstanding</span>")</td>
                         <td class="muted small">Both are required before a loan can be raised.</td>
                     </tr>
+                    @foreach (var gate in mandateGates)
+                    {
+                        <tr>
+                            <td>Quote accepted</td>
+                            <td>@Html.Raw(gate.QuoteAccepted ? "<span class='badge badge-green'>Accepted</span>" : "<span class='badge badge-amber'>Waiting for the client</span>")</td>
+                            <td class="muted small"><a asp-controller="Loans" asp-action="Details" asp-route-id="@gate.LoanId">@gate.LoanNumber</a></td>
+                        </tr>
+                        <tr>
+                            <td>Agreement signed</td>
+                            <td>@Html.Raw(gate.AgreementSigned ? "<span class='badge badge-green'>Signed</span>" : "<span class='badge badge-amber'>Waiting for the client</span>")</td>
+                            <td class="muted small">@gate.LoanNumber: both are required before its debit mandate.</td>
+                        </tr>
+                    }
                     </tbody>
                 </table>
             </div>
@@ -183,6 +198,73 @@
                         </table>
                     }
                 </div>
+            </div>
+        </div>
+
+        @{
+            var portalLink = ViewBag.PortalLink as string;
+            var portalReady = ViewBag.PortalConfigured is true && portalLink is not null;
+            var cell = AMPay.Domain.Portal.ClientStatementBuilder.MobileOf(Model);
+        }
+        <div class="card">
+            <div class="card-head flex-between">
+                <h3>Client's online account</h3>
+                @if (Model.PortalAccessUtc is not null)
+                {
+                    <span class="badge badge-green">Open</span>
+                }
+                else
+                {
+                    <span class="badge">Not opened</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (Model.PortalAccessUtc is not null)
+                {
+                    <p class="small">
+                        The client signs in at <a href="@portalLink" target="_blank" rel="noopener">@portalLink</a> with a code to
+                        @(cell is null ? "their cell number" : AMPay.Domain.Portal.PortalApi.DisplayMobile(cell)) and sees every loan, cost,
+                        instalment and payment - unpaid debits included. It updates by itself when a loan or payment changes.
+                    </p>
+                    <p class="muted small">Opened @Model.PortalAccessUtc.Value.AddHours(2).ToString("d MMM yyyy") · last sent @(Model.PortalPublishedUtc?.AddHours(2).ToString("d MMM yyyy HH:mm") ?? "not yet")</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <a asp-action="PortalPreview" asp-route-id="@Model.Id" class="btn btn-outline btn-sm">See what the client sees</a>
+                        <form asp-action="PortalPublish" asp-route-id="@Model.Id" method="post" style="display:inline;margin:0;">
+                            <button type="submit" class="btn btn-outline btn-sm">Update now</button>
+                        </form>
+                        <form asp-action="PortalRevoke" asp-route-id="@Model.Id" method="post" style="display:inline;margin:0;"
+                              onsubmit="return confirm('Withdraw the client\'s online access? They will no longer see their loans online.');">
+                            <button type="submit" class="btn btn-outline btn-sm">Withdraw access</button>
+                        </form>
+                    </div>
+                }
+                else if (!portalReady)
+                {
+                    <p class="small muted">
+                        Clients can see their own loans and payments online once you have a self-service link
+                        (<a asp-controller="SelfService" asp-action="Index">Self-service link</a>).
+                    </p>
+                }
+                else
+                {
+                    <p class="small">
+                        Give the client their own view of their loans, costs, instalments and payments. They are sent the link by SMS,
+                        sign in with a code to @(cell is null ? "their cell number" : AMPay.Domain.Portal.PortalApi.DisplayMobile(cell)) and confirm their ID number once.
+                    </p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <a asp-action="PortalPreview" asp-route-id="@Model.Id" class="btn btn-outline btn-sm">Preview</a>
+                        @if (cell is null)
+                        {
+                            <span class="small muted">Capture a cell number on the Address step first.</span>
+                        }
+                        else
+                        {
+                            <form asp-action="PortalAccess" asp-route-id="@Model.Id" method="post" style="display:inline;margin:0;">
+                                <button type="submit" class="btn btn-primary btn-sm">Open online account and send link</button>
+                            </form>
+                        }
+                    </div>
+                }
             </div>
         </div>
 
@@ -277,10 +359,14 @@
         <div class="card">
             <div class="card-head">
                 <h3>DebiCheck mandates</h3>
-                @if (ClientStatusInfo.CanBorrow(Model.Status))
+                @if (ClientStatusInfo.CanBorrow(Model.Status) && readyGate is not null)
                 {
-                    <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id"
-                       class="btn btn-primary btn-sm">New mandate</a>
+                    <a asp-controller="Mandates" asp-action="Create" asp-route-clientId="@Model.Id" asp-route-loanId="@readyGate.LoanId"
+                       class="btn btn-primary btn-sm">New mandate for @readyGate.LoanNumber</a>
+                }
+                else
+                {
+                    <span class="muted small">@(mandateGates.FirstOrDefault()?.Problem ?? "No approved loan is waiting for a mandate.")</span>
                 }
             </div>
             @if (Model.Mandates.Count == 0)

@@ -46,6 +46,9 @@ public class QuoteLinkController : Controller
         if (quote is null) return Gone();
 
         await _quotes.RecordViewAsync(quote);
+        if (quote.ClientAppLink is not null)
+            ViewData["ClientAppLink"] = HttpContext.RequestServices.GetRequiredService<AMPay.Web.Services.ClientPortalPublisher>()
+                .AccountLink(await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == quote.TenantId));
         return View(await PageAsync(token, quote, TempData["QuoteError"] as string, TempData["QuoteNotice"] as string));
     }
 
@@ -60,7 +63,8 @@ public class QuoteLinkController : Controller
         try
         {
             var masked = await _quotes.SendPinAsync(quote);
-            TempData["QuoteNotice"] = $"A PIN has been sent to {masked}. It expires in 5 minutes.";
+            TempData["QuoteNotice"] = $"A PIN has been sent to {masked}. It expires in 5 minutes." +
+                (_quotes.TestPin is { } p ? $" Test system - no SMS was sent. Your PIN is {p}." : "");
         }
         catch (ContractException ex)
         {

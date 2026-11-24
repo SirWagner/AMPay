@@ -170,14 +170,15 @@ public class ContractsController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = AppPolicies.CanCapture)]
-    public async Task<IActionResult> Send(Guid id, bool sms, bool email)
+    public async Task<IActionResult> Send(Guid id, bool sms, bool email, bool app, [FromServices] AMPay.Web.Services.ClientPortalPublisher publisher)
     {
         var contract = await LoadAsync(id);
         if (contract is null) return NotFound();
 
         try
         {
-            var outcome = await _contracts.SendAsync(id, sms, email, PublicBaseUrl(), _users.GetUserId(User));
+            var outcome = await _contracts.SendAsync(id, sms, email, PublicBaseUrl(), _users.GetUserId(User), byApp: app);
+            if (app) TempData["Info"] = await publisher.ShowInAppAsync(_db.LoanContracts.Where(c => c.Id == id).Select(c => c.ClientId).First());
 
             var sent = string.Join(" and ", outcome.SentTo);
             var skipped = outcome.Skipped.Count == 0 ? "" : $" Not sent: {string.Join("; ", outcome.Skipped)}.";

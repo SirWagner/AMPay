@@ -47,7 +47,16 @@ builder.Services.AddAuthentication(ApplicantClaims.Scheme)
         // Sign-in is per lender, so there is no single login page; the controllers redirect.
         o.Events = new CookieAuthenticationEvents
         {
-            OnRedirectToLogin = ctx => { ctx.Response.Redirect("/"); return Task.CompletedTask; }
+            OnRedirectToLogin = ctx =>
+            {
+                // /a/{code}/account or /application: sign in with that lender, then land there.
+                var parts = (ctx.Request.Path.Value ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
+                var valid = parts.Length >= 2 && parts[0] == "a" && AMPay.Domain.Portal.PortalApi.IsValidLenderCode(parts[1].ToUpperInvariant());
+                ctx.Response.Redirect(valid
+                    ? $"/a/{parts[1]}/start" + (parts.Length > 2 && parts[2] == "account" ? "?to=account" : "")
+                    : "/");
+                return Task.CompletedTask;
+            }
         };
     });
 

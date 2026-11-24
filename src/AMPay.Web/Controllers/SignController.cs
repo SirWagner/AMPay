@@ -53,6 +53,9 @@ public class SignController : Controller
         if (contract is null) return Gone();
 
         await _contracts.RecordViewAsync(contract);
+        if (contract.ClientAppLink is not null)
+            ViewData["ClientAppLink"] = HttpContext.RequestServices.GetRequiredService<AMPay.Web.Services.ClientPortalPublisher>()
+                .AccountLink(await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == contract.TenantId));
         return View(await PageAsync(token, contract, TempData["SignError"] as string, TempData["SignNotice"] as string));
     }
 
@@ -67,7 +70,8 @@ public class SignController : Controller
         try
         {
             var masked = await _contracts.SendPinAsync(contract);
-            TempData["SignNotice"] = $"A PIN has been sent to {masked}. It expires in 10 minutes.";
+            TempData["SignNotice"] = $"A PIN has been sent to {masked}. It expires in 10 minutes." +
+                (_contracts.TestPin is { } p ? $" Test system - no SMS was sent. Your PIN is {p}." : "");
         }
         catch (ContractException ex)
         {

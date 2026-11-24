@@ -1,0 +1,96 @@
+@model AccountOverviewModel
+@{
+    var l = (Lender)ViewData["Lender"]!;
+    var s = Model.Statement;
+    var next = Model.NextPayment;
+    var first = s.FullName.Split(' ')[0];
+}
+
+<h1 class="hello">Hello @first</h1>
+
+@if (s.Pending is { Count: > 0 } pending)
+{
+    <section class="card todo" aria-label="Waiting for you">
+        <h2>@(pending.Count == 1 ? "1 thing needs you" : $"{pending.Count} things need you")</h2>
+        @foreach (var p in pending)
+        {
+            <div class="todo-item">
+                <div>
+                    <strong>@(p.Kind == "Quote" ? "Your quote" : p.Kind == "Agreement" ? "Your loan agreement" : "Your debit order")</strong>
+                    <span class="small muted">@(p.LoanNumber ?? p.Reference)@(p.ValidUntilUtc is null ? "" : " · until " + Fmt.D(p.ValidUntilUtc.Value.AddHours(2)))</span>
+                </div>
+                <a class="btn btn-primary" href="@p.Link" rel="noopener">@(p.Kind == "Quote" ? "Read and answer" : "Read and sign")</a>
+                @if (p.Kind == "DebitOrder") { <p class="small muted">Signed it already? It can take a few minutes to clear here.</p> }
+            </div>
+        }
+    </section>
+}
+
+@if (Model.TotalArrears > 0)
+{
+    <div class="alert alert-error" role="alert">
+        <strong>@Fmt.R(Model.TotalArrears) is overdue.</strong> Call @l.DisplayName to arrange payment@(l.ContactNumber is null ? "." : ": ")
+        @if (l.ContactNumber is not null) { <a href="tel:@l.ContactNumber">@l.ContactNumber</a> }
+    </div>
+}
+
+@if (Model.Active.Any())
+{
+    <section class="card next" aria-label="Next payment">
+        <span class="muted">Next payment</span>
+        @if (next is { } n)
+        {
+            <span class="next-amount">@Fmt.R(n.Amount)</span>
+            <span>@n.Date.ToString("dddd d MMMM yyyy")</span>
+        }
+        else
+        {
+            <span class="next-amount">Nothing due</span>
+        }
+        <span class="next-total"><span>Still to pay</span><strong>@Fmt.R(Model.TotalRemaining)</strong></span>
+    </section>
+}
+
+@if (!s.Loans.Any())
+{
+    <div class="card">
+        <p style="margin-top:0;">You have no loans with @l.DisplayName yet.</p>
+        <a class="btn btn-primary btn-block" href="/a/@l.PublicCode/application">Apply for a loan</a>
+    </div>
+}
+
+@foreach (var group in new[] { ("My loans", Model.Active), ("In progress", Model.Pending), ("Closed", Model.Closed) })
+{
+    if (!group.Item2.Any()) continue;
+    <h2 class="section">@group.Item1</h2>
+    @foreach (var loan in group.Item2)
+    {
+        var done = loan.Schedule.Count == 0 ? 0 : (int)Math.Round(100.0 * loan.InstalmentsPaid / loan.Schedule.Count);
+        <a class="card loan-card" href="/a/@l.PublicCode/account/loan/@loan.LoanNumber">
+            <span class="loan-head">
+                <strong>@Fmt.R(loan.Principal) loan</strong>
+                <span class="pill @Fmt.StatusClass(loan.Status)">@loan.Status</span>
+            </span>
+            @if (loan.Stage == "Active")
+            {
+                <span class="progress" aria-hidden="true"><span style="width:@done%"></span></span>
+                <span class="small muted">@loan.InstalmentsPaid of @loan.Schedule.Count paid · @Fmt.R(loan.RemainingInstalments) to go</span>
+                @if (loan.ArrearsAmount > 0) { <strong class="small text-bad">@Fmt.R(loan.ArrearsAmount) overdue</strong> }
+            }
+            else
+            {
+                <span class="small muted">@loan.LoanNumber</span>
+            }
+        </a>
+    }
+}
+
+<details class="fold">
+    <summary>Questions, complaints and your rights</summary>
+    <p>You may ask @l.DisplayName at any time for a statement, a settlement amount or a copy of your agreement. If a complaint is not resolved, you may approach the National Credit Regulator or the Credit Ombud.</p>
+    <div class="actions">
+        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask a question</a>
+        @if (l.ContactNumber is not null) { <a class="btn btn-outline" href="tel:@l.ContactNumber">Call @l.ContactNumber</a> }
+    </div>
+</details>
+<p class="small muted">Client number @s.ClientNumber · updated @Fmt.Sast(Model.UpdatedUtc)</p>

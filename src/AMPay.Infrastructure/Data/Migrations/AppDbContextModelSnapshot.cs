@@ -205,6 +205,20 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("Nationality")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("PortalAccessUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PortalDocumentKeys")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime?>("PortalPublishedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PortalStatementHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("PreferredLanguage")
                         .HasColumnType("nvarchar(max)");
 
@@ -1102,6 +1116,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("ClientAppLink")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1302,6 +1319,14 @@ namespace AMPay.Infrastructure.Data.Migrations
 
                     b.Property<bool?>("RmsApplied")
                         .HasColumnType("bit");
+
+                    b.Property<string>("SignedPdfUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SigningUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -1666,6 +1691,9 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<string>("AccessTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ClientAppLink")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ClientId")
                         .HasColumnType("uniqueidentifier");
@@ -2037,6 +2065,66 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.HasIndex("BatchId");
 
                     b.ToTable("NetcashBatchErrors");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("Tone")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CreatedUtc");
+
+                    b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("AMPay.Domain.Entities.NotificationSeen", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("LastSeenUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("UserId", "TenantId");
+
+                    b.ToTable("NotificationsSeen");
                 });
 
             modelBuilder.Entity("AMPay.Domain.Entities.OutboundMessage", b =>

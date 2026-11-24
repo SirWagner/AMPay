@@ -63,6 +63,20 @@
                 <tbody>
                 <tr><td class="muted">Contract reference</td><td class="mono">@(Model.ContractReference ?? "-")</td></tr>
                 <tr><td class="muted">Mandate reference</td><td class="mono">@(Model.MandateReference ?? "-")</td></tr>
+                @if (AMPay.Web.Services.MandateGate.IsUnsignedEMandate(Model))
+                {
+                    <tr>
+                        <td class="muted">Not up to date?</td>
+                        <td>
+                            <form asp-controller="EMandates" asp-action="Check" asp-route-id="@Model.Id" method="post" style="margin:0;">
+                                <button type="submit" class="btn btn-outline btn-sm">Check with Netcash</button>
+                                <span class="muted small">takes up to a minute</span>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (Model.SigningUrl is not null) { <tr><td class="muted">Netcash signing page</td><td><a href="@Model.SigningUrl" target="_blank" rel="noopener">Open what the client signs</a></td></tr> }
+                @if (Model.SignedPdfUrl is not null) { <tr><td class="muted">Signed mandate</td><td><a href="@Model.SignedPdfUrl" target="_blank" rel="noopener">Download the signed PDF from Netcash</a></td></tr> }
                 <tr><td class="muted">Error code</td><td class="mono">@(Model.ErrorCode ?? "-")</td></tr>
                 <tr><td class="muted">Bank response</td><td class="mono">@(Model.BankResponseCode ?? "-")</td></tr>
                 <tr><td class="muted">Bankserv response</td><td class="mono">@(Model.BankservResponseCode ?? "-")</td></tr>
