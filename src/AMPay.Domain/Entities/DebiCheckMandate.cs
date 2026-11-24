@@ -82,6 +82,12 @@ public class DebiCheckMandate
     /// <summary>File token from BatchFileUpload on the TT2 route.</summary>
     public string? FileToken { get; set; }
 
+    /// <summary>eMandate: Netcash's page where the account holder reads and signs (AddMandate MandateUrl).</summary>
+    public string? SigningUrl { get; set; }
+
+    /// <summary>eMandate: Netcash's link to the signed mandate PDF, from the postback.</summary>
+    public string? SignedPdfUrl { get; set; }
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime? SubmittedUtc { get; set; }
     public DateTime? AuthenticatedUtc { get; set; }

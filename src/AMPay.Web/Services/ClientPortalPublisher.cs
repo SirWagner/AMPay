@@ -82,6 +82,13 @@ public class ClientPortalPublisher
             .Select(c => new PortalPendingAction("Agreement", c.Reference, c.Loan?.LoanNumber,
                 "Your credit agreement is ready to read and sign", c.ClientAppLink!, c.AccessExpiresUtc)));
 
+        pending.AddRange(await _db.Mandates.AsNoTracking()
+            .Where(m => m.ClientId == client.Id && m.MandateType == MandateType.NetcashEMandate &&
+                        m.Status == MandateStatus.AwaitingDebtorAuthentication && m.SigningUrl != null)
+            .Select(m => new PortalPendingAction("DebitOrder", m.AccountReference, null,
+                "Sign your debit order mandate", m.SigningUrl!, null))
+            .ToListAsync(ct));
+
         return ClientStatementBuilder.Build(client, loans, Sast.DateOf(now), now, documents, pending);
     }
 

@@ -1,0 +1,26 @@
+@{
+    var url = ViewBag.Url as string;
+}
+<div class="page-head">
+    <h1>eMandate setup</h1>
+    <p class="lede">Netcash tells AM-Pay when a client signs or declines an eMandate. Give Netcash this address once.</p>
+</div>
+<div class="card">
+    <div class="card-body">
+        @if (url is null)
+        {
+            <div class="alert alert-warn">The callback secret is not set (Netcash:PayNowCallbackSecret), so the address cannot be shown. Run deploy/azure-netcash-live.ps1.</div>
+        }
+        else
+        {
+            <ol>
+                <li>Netcash portal → Account profile → NetConnector → <strong>Debit orders</strong>.</li>
+                <li>Paste this as the <strong>eMandate postback URL</strong> (Netcash recommends it differs from the normal debit-order postback):
+                    <p><input type="text" readonly value="@url" style="width:100%;font-family:monospace;" onclick="this.select()" /></p>
+                </li>
+                <li>Make sure eMandates are active on the account.</li>
+            </ol>
+            <p class="small muted">Keep this address private: it contains a secret that proves a postback came from Netcash.</p>
+        }
+    </div>
+</div>

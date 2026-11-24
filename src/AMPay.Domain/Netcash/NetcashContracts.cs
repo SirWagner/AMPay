@@ -110,6 +110,26 @@ public class AddMandateRequest
     public BankingDetailType BankDetailType { get; set; } = BankingDetailType.BankAccount;
     public string? BankAccountNumber { get; set; }
     public string? BranchCode { get; set; }
+
+    // ---- added for the live call (names as in the NIWS_NIF WSDL) ----
+
+    /// <summary>The credit agreement the mandate pays for - shown to the account holder.</summary>
+    public string AgreementReferenceNumber { get; set; } = string.Empty;
+
+    /// <summary>The individual's SA ID number (sent as RegistrationNumber with IsIdNumber=true).</summary>
+    public string? IdNumber { get; set; }
+
+    public string? BankAccountName { get; set; }
+    public BankAccountType BankAccountType { get; set; } = BankAccountType.Cheque;
+
+    public string? Notes { get; set; }
+
+    /// <summary>Our own reference (the loan number), echoed back on the postback as Field1.</summary>
+    public string? Field1 { get; set; }
+
+    /// <summary>Put the signed mandate on the debit order masterfile, active, without a separate upload.</summary>
+    public bool AddToMasterFile { get; set; } = true;
+    public bool MandateActive { get; set; } = true;
 }
 
 /// <summary>AddMandate returns a hosted URL where the debtor signs, not a completed mandate.</summary>

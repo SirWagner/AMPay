@@ -65,6 +65,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
         b.Entity<ClientBankAccount>().Ignore(x => x.MaskedAccountNumber);
         b.Entity<TenantServiceKey>().Ignore(x => x.NeedsRevalidation);
         b.Entity<DebiCheckMandate>().Ignore(x => x.IsCollectable);
+        b.Entity<DebiCheckMandate>().Property(x => x.SigningUrl).HasMaxLength(500);
+        b.Entity<DebiCheckMandate>().Property(x => x.SignedPdfUrl).HasMaxLength(500);
         b.Entity<LoanContract>().Ignore(x => x.IsOpen);
         b.Entity<CreditQuote>().Ignore(x => x.IsOpen);
 

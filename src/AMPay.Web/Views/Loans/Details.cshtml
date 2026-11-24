@@ -218,6 +218,11 @@ else if (Model.Status == LoanStatus.Approved)
                 <a asp-controller="Mandates" asp-action="Create"
                    asp-route-clientId="@Model.ClientId" asp-route-loanId="@Model.Id"
                    class="btn btn-primary">Originate DebiCheck mandate</a>
+                <form asp-controller="EMandates" asp-action="Send" asp-route-loanId="@Model.Id" method="post" style="display:inline"
+                      onsubmit="return confirm('Send a Netcash eMandate? The client signs it in their app with a PIN Netcash sends to their cell, and it goes onto the debit order masterfile.');">
+                    <button type="submit" class="btn btn-outline">Send eMandate (client signs online)</button>
+                </form>
+                <a asp-controller="EMandates" asp-action="Setup" class="small">eMandate setup</a>
             }
             @if (canDecide)
             {

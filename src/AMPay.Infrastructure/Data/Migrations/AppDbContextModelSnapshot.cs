@@ -1320,6 +1320,14 @@ namespace AMPay.Infrastructure.Data.Migrations
                     b.Property<bool?>("RmsApplied")
                         .HasColumnType("bit");
 
+                    b.Property<string>("SignedPdfUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SigningUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
