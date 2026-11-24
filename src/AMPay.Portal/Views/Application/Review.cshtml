@@ -7,8 +7,7 @@
     string R(decimal? v) => v is null ? "-" : "R " + v.Value.ToString("N2");
 }
 
-<p class="small"><a href="@basePath">&larr; Your application</a></p>
-<h1>Check and submit</h1>
+<partial name="_Step" model='(5, "Check and send", "")' />
 
 @if (!a.IsEditable)
 {

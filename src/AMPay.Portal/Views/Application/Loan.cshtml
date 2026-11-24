@@ -5,21 +5,16 @@
     var r = Model.Range;
 }
 
-<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
-<h1>The loan you need</h1>
-@if (r is not null)
-{
-    <p class="lede">@l.DisplayName lends R @r.MinAmount.ToString("N0") to R @r.MaxAmount.ToString("N0"), repaid over @r.MinTerm to @r.MaxTerm months.</p>
-}
+<partial name="_Step" model='(3, "The loan you need", r is null ? "" : $"R {r.MinAmount:N0} to R {r.MaxAmount:N0}, over {r.MinTerm} to {r.MaxTerm} months.")' />
 
-<form method="post" action="/a/@l.PublicCode/application/loan" class="card" novalidate>
+<form method="post" action="/a/@l.PublicCode/application/loan" class="card" novalidate data-loan>
     @Html.AntiForgeryToken()
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
 
     <div class="grid-2">
         <div class="field">
             <label asp-for="Amount"></label>
-            <input asp-for="Amount" type="number" inputmode="numeric" min="@r?.MinAmount" max="@r?.MaxAmount" step="100" />
+            <span class="rand"><input asp-for="Amount" type="number" inputmode="numeric" min="@r?.MinAmount" max="@r?.MaxAmount" step="100" /></span>
             <span asp-validation-for="Amount" class="field-error"></span>
         </div>
         <div class="field">
@@ -38,9 +33,10 @@
         </div>
     </div>
 
+    <div data-estimate aria-live="polite">
     @if (Model.Estimate is { } e)
     {
-        <div class="estimate" aria-live="polite">
+        <div class="estimate">
             <div class="small muted">Estimated repayment</div>
             <div class="big">R @e.Instalment.ToString("N2") <span class="small muted">a month</span></div>
             <dl class="small">
@@ -53,9 +49,29 @@
             </p>
         </div>
     }
-
-    <div class="actions" style="margin-top:0;">
-        <button type="submit" name="command" value="estimate" class="btn btn-outline">See the estimate</button>
-        <button type="submit" name="command" value="save" class="btn btn-primary">Save and continue</button>
     </div>
+
+    <button type="submit" name="command" value="save" class="btn btn-primary btn-block">Save and continue</button>
+    <noscript><button type="submit" name="command" value="estimate" class="btn btn-outline btn-block" style="margin-top:10px;">See the estimate</button></noscript>
 </form>
+
+@section Scripts {
+<script>
+// The estimate follows the amount and term as they change.
+(function () {
+    var form = document.querySelector('[data-loan]'), box = form.querySelector('[data-estimate]'), timer, turn = 0;
+    function refresh() {
+        var data = new FormData(form), mine = ++turn;
+        if (!data.get('Amount') || !data.get('Term')) { box.innerHTML = ''; return; }
+        data.set('command', 'estimate');
+        fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (h) {
+            if (mine !== turn || !h) return;
+            var found = new DOMParser().parseFromString(h, 'text/html').querySelector('[data-estimate]');
+            box.innerHTML = found ? found.innerHTML : '';
+        }).catch(function () { });
+    }
+    form.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(refresh, 600); });
+    if (!box.querySelector('.estimate')) refresh();
+})();
+</script>
+}

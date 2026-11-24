@@ -4,26 +4,35 @@
     var l = (Lender)ViewData["Lender"]!;
 }
 
-<div class="card">
+<div class="card narrow">
     <h1>Enter your code</h1>
-    <p class="lede">We sent a 6-digit code to @Model.MaskedMobile. It works for 10 minutes.</p>
+    <p class="lede">Sent to @Model.MaskedMobile. It works for 10 minutes.</p>
 
     @if (Model.TestCode is not null)
     {
-        <div class="alert alert-warn">Test system - no SMS was sent. Your code is <strong style="letter-spacing:.15em;">@Model.TestCode</strong>.</div>
+        <div class="alert alert-warn">Test code: <strong style="letter-spacing:.15em;">@Model.TestCode</strong></div>
     }
 
     <form method="post" action="/a/@l.PublicCode/verify" novalidate>
         @Html.AntiForgeryToken()
         <input type="hidden" asp-for="ChallengeId" />
         <input type="hidden" asp-for="MaskedMobile" />
+        <input type="hidden" asp-for="To" />
         <div class="field">
             <label asp-for="Code"></label>
-            <input asp-for="Code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+            <input asp-for="Code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus data-code />
             <span asp-validation-for="Code" class="field-error"></span>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Continue</button>
+        <button type="submit" class="btn btn-primary btn-block">Sign in</button>
     </form>
 
-    <p class="small" style="margin-top:16px;"><a href="/a/@l.PublicCode/start">Didn't get it? Send a new code</a></p>
+    <p class="small" style="margin-top:16px;"><a href="/a/@l.PublicCode/start@(Model.To == "account" ? "?to=account" : "")">No code, or wrong number? Try again</a></p>
 </div>
+
+@section Scripts {
+<script>
+// The sixth digit signs you in.
+var code = document.querySelector('[data-code]'), sent = false;
+code.addEventListener('input', function () { if (!sent && /^\d{6}$/.test(code.value.trim())) { sent = true; code.form.submit(); } });
+</script>
+}

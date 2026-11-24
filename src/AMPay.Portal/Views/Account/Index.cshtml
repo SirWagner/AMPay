@@ -3,110 +3,94 @@
     var l = (Lender)ViewData["Lender"]!;
     var s = Model.Statement;
     var next = Model.NextPayment;
+    var first = s.FullName.Split(' ')[0];
 }
 
-<div class="card">
-    <h1>Hello @s.FullName</h1>
-    <p class="muted small">Client number <strong>@s.ClientNumber</strong> with @l.DisplayName · figures as at @Fmt.Sast(Model.UpdatedUtc)</p>
-
-    @if (Model.TotalArrears > 0)
-    {
-        <div class="alert alert-error" role="alert">
-            You are behind by <strong>@Fmt.R(Model.TotalArrears)</strong>. Contact @l.DisplayName to arrange payment -
-            the sooner you do, the fewer costs you face.
-        </div>
-    }
-
-    <div class="kpis">
-        <div class="kpi">
-            <span class="kpi-label">Next payment</span>
-            <span class="kpi-value">@(next is { } n ? Fmt.R(n.Amount) : "None due")</span>
-            @if (next is { } nx) { <span class="kpi-sub">@Fmt.D(nx.Date) · @nx.LoanNumber</span> }
-        </div>
-        <div class="kpi">
-            <span class="kpi-label">Still to pay</span>
-            <span class="kpi-value">@Fmt.R(Model.TotalRemaining)</span>
-            <span class="kpi-sub">all remaining instalments</span>
-        </div>
-        <div class="kpi @(Model.TotalArrears > 0 ? "kpi-bad" : "")">
-            <span class="kpi-label">Overdue</span>
-            <span class="kpi-value">@Fmt.R(Model.TotalArrears)</span>
-            <span class="kpi-sub">@(Model.TotalArrears > 0 ? "please pay or call" : "nothing overdue")</span>
-        </div>
-    </div>
-</div>
+<h1 class="hello">Hello @first</h1>
 
 @if (s.Pending is { Count: > 0 } pending)
 {
-    <div class="card" style="border:2px solid var(--accent);">
-        <h2>Waiting for you</h2>
-        <ul class="loan-list">
-            @foreach (var p in pending)
-            {
-                <li>
-                    <a href="@p.Link" rel="noopener">
-                        <span class="loan-head">
-                            <span><strong>@p.Title</strong><br /><span class="small muted">@p.Reference@(p.LoanNumber is null ? "" : " · loan " + p.LoanNumber)@(p.ValidUntilUtc is null ? "" : " · open until " + Fmt.Sast(p.ValidUntilUtc))</span></span>
-                            <span class="pill pill-warn">@(p.Kind == "Quote" ? "Read and accept" : "Read and sign")</span>
-                        </span>
-                    </a>
-                </li>
-            }
-        </ul>
-        <p class="small muted">A PIN is sent to your cell number to confirm it is you. Nothing is signed until you enter it.</p>
+    <section class="card todo" aria-label="Waiting for you">
+        <h2>@(pending.Count == 1 ? "1 thing needs you" : $"{pending.Count} things need you")</h2>
+        @foreach (var p in pending)
+        {
+            <div class="todo-item">
+                <div>
+                    <strong>@(p.Kind == "Quote" ? "Your quote" : p.Kind == "Agreement" ? "Your loan agreement" : "Your debit order")</strong>
+                    <span class="small muted">@(p.LoanNumber ?? p.Reference)@(p.ValidUntilUtc is null ? "" : " · until " + Fmt.D(p.ValidUntilUtc.Value.AddHours(2)))</span>
+                </div>
+                <a class="btn btn-primary" href="@p.Link" rel="noopener">@(p.Kind == "Quote" ? "Read and answer" : "Read and sign")</a>
+                @if (p.Kind == "DebitOrder") { <p class="small muted">Signed it already? It can take a few minutes to clear here.</p> }
+            </div>
+        }
+    </section>
+}
+
+@if (Model.TotalArrears > 0)
+{
+    <div class="alert alert-error" role="alert">
+        <strong>@Fmt.R(Model.TotalArrears) is overdue.</strong> Call @l.DisplayName to arrange payment@(l.ContactNumber is null ? "." : ": ")
+        @if (l.ContactNumber is not null) { <a href="tel:@l.ContactNumber">@l.ContactNumber</a> }
     </div>
+}
+
+@if (Model.Active.Any())
+{
+    <section class="card next" aria-label="Next payment">
+        <span class="muted">Next payment</span>
+        @if (next is { } n)
+        {
+            <span class="next-amount">@Fmt.R(n.Amount)</span>
+            <span>@n.Date.ToString("dddd d MMMM yyyy")</span>
+        }
+        else
+        {
+            <span class="next-amount">Nothing due</span>
+        }
+        <span class="next-total"><span>Still to pay</span><strong>@Fmt.R(Model.TotalRemaining)</strong></span>
+    </section>
 }
 
 @if (!s.Loans.Any())
 {
     <div class="card">
-        <p>You have no loans with @l.DisplayName yet.</p>
+        <p style="margin-top:0;">You have no loans with @l.DisplayName yet.</p>
+        <a class="btn btn-primary btn-block" href="/a/@l.PublicCode/application">Apply for a loan</a>
     </div>
 }
 
-@foreach (var group in new[] { ("Active loans", Model.Active), ("Waiting for a decision or pay-out", Model.Pending), ("Closed loans", Model.Closed) })
+@foreach (var group in new[] { ("My loans", Model.Active), ("In progress", Model.Pending), ("Closed", Model.Closed) })
 {
     if (!group.Item2.Any()) continue;
-    <div class="card">
-        <h2>@group.Item1</h2>
-        <ul class="loan-list">
-            @foreach (var loan in group.Item2)
+    <h2 class="section">@group.Item1</h2>
+    @foreach (var loan in group.Item2)
+    {
+        var done = loan.Schedule.Count == 0 ? 0 : (int)Math.Round(100.0 * loan.InstalmentsPaid / loan.Schedule.Count);
+        <a class="card loan-card" href="/a/@l.PublicCode/account/loan/@loan.LoanNumber">
+            <span class="loan-head">
+                <strong>@Fmt.R(loan.Principal) loan</strong>
+                <span class="pill @Fmt.StatusClass(loan.Status)">@loan.Status</span>
+            </span>
+            @if (loan.Stage == "Active")
             {
-                var done = loan.Schedule.Count == 0 ? 0 : (int)Math.Round(100.0 * loan.InstalmentsPaid / loan.Schedule.Count);
-                <li>
-                    <a href="/a/@l.PublicCode/account/loan/@loan.LoanNumber">
-                        <span class="loan-head">
-                            <span><strong>@loan.LoanNumber</strong> · @Fmt.R(loan.Principal) over @loan.NumberOfInstalments instalment@(loan.NumberOfInstalments == 1 ? "" : "s")</span>
-                            <span class="pill @Fmt.StatusClass(loan.Status)">@loan.Status</span>
-                        </span>
-                        @if (loan.Stage == "Active")
-                        {
-                            <span class="progress" role="img" aria-label="@loan.InstalmentsPaid of @loan.Schedule.Count instalments paid"><span style="width:@done%"></span></span>
-                            <span class="small muted">
-                                @loan.InstalmentsPaid of @loan.Schedule.Count paid · @Fmt.R(loan.RemainingInstalments) to go
-                                @if (loan.NextDueDate is not null) { <text> · next @Fmt.R(loan.NextDueAmount) on @Fmt.D(loan.NextDueDate)</text> }
-                                @if (loan.ArrearsAmount > 0) { <strong class="text-bad"> · @Fmt.R(loan.ArrearsAmount) overdue</strong> }
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="small muted">Total repayable @Fmt.R(loan.TotalRepayable) · paid @Fmt.R(loan.PaidToDate)</span>
-                        }
-                    </a>
-                </li>
+                <span class="progress" aria-hidden="true"><span style="width:@done%"></span></span>
+                <span class="small muted">@loan.InstalmentsPaid of @loan.Schedule.Count paid · @Fmt.R(loan.RemainingInstalments) to go</span>
+                @if (loan.ArrearsAmount > 0) { <strong class="small text-bad">@Fmt.R(loan.ArrearsAmount) overdue</strong> }
             }
-        </ul>
-    </div>
+            else
+            {
+                <span class="small muted">@loan.LoanNumber</span>
+            }
+        </a>
+    }
 }
 
-<div class="card">
-    <h2>Questions or a complaint?</h2>
-    <p class="muted small">
-        You may ask @l.DisplayName at any time for a statement, a settlement amount or a copy of your agreement - the National Credit Act gives you that right.
-        If a complaint is not resolved, you may approach the National Credit Regulator or the Credit Ombud.
-    </p>
-    <div class="actions" style="margin-top:0;">
+<details class="fold">
+    <summary>Questions, complaints and your rights</summary>
+    <p>You may ask @l.DisplayName at any time for a statement, a settlement amount or a copy of your agreement. If a complaint is not resolved, you may approach the National Credit Regulator or the Credit Ombud.</p>
+    <div class="actions">
         <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Ask a question</a>
         @if (l.ContactNumber is not null) { <a class="btn btn-outline" href="tel:@l.ContactNumber">Call @l.ContactNumber</a> }
     </div>
-</div>
+</details>
+<p class="small muted">Client number @s.ClientNumber · updated @Fmt.Sast(Model.UpdatedUtc)</p>

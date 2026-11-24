@@ -46,6 +46,9 @@ public class QuoteLinkController : Controller
         if (quote is null) return Gone();
 
         await _quotes.RecordViewAsync(quote);
+        if (quote.ClientAppLink is not null)
+            ViewData["ClientAppLink"] = HttpContext.RequestServices.GetRequiredService<AMPay.Web.Services.ClientPortalPublisher>()
+                .AccountLink(await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == quote.TenantId));
         return View(await PageAsync(token, quote, TempData["QuoteError"] as string, TempData["QuoteNotice"] as string));
     }
 

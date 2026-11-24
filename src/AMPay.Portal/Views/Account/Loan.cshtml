@@ -4,72 +4,96 @@
     var loan = Model.Loan;
     var s = Model.Statement;
     var collecting = loan.Stage == "Active";
-}
-
-<p class="no-print"><a href="/a/@l.PublicCode/account">&larr; All my loans</a></p>
-
-<div class="card">
-    <div class="loan-head">
-        <h1 style="margin:0;">Loan @loan.LoanNumber</h1>
-        <span class="pill @Fmt.StatusClass(loan.Status)">@loan.Status</span>
-    </div>
-    <p class="muted small">
-        @s.FullName · client @s.ClientNumber · @l.Name@(string.IsNullOrWhiteSpace(l.NcrNumber) ? "" : $" (NCR {l.NcrNumber})")<br />
-        Statement as at @Fmt.Sast(Model.UpdatedUtc)
-    </p>
-
-    @if (loan.ArrearsAmount > 0)
-    {
-        <div class="alert alert-error" role="alert">
-            <strong>@Fmt.R(loan.ArrearsAmount)</strong> is overdue, the oldest by @loan.DaysPastDue day@(loan.DaysPastDue == 1 ? "" : "s").
-            Contact @l.DisplayName to arrange payment.
-        </div>
-    }
-
-    @if (collecting)
-    {
-        <div class="kpis">
-            <div class="kpi">
-                <span class="kpi-label">Next instalment</span>
-                <span class="kpi-value">@Fmt.R(loan.NextDueAmount)</span>
-                <span class="kpi-sub">@Fmt.D(loan.NextDueDate)</span>
-            </div>
-            <div class="kpi">
-                <span class="kpi-label">Paid so far</span>
-                <span class="kpi-value">@Fmt.R(loan.PaidToDate)</span>
-                <span class="kpi-sub">@loan.InstalmentsPaid of @loan.Schedule.Count instalments</span>
-            </div>
-            <div class="kpi">
-                <span class="kpi-label">Remaining instalments</span>
-                <span class="kpi-value">@Fmt.R(loan.RemainingInstalments)</span>
-                <span class="kpi-sub">if paid as scheduled</span>
-            </div>
-        </div>
-        <p class="small muted">
-            "Remaining instalments" includes interest and fees for months still to come. To pay the loan off early you
-            pay less: ask @l.DisplayName for a settlement amount - you are entitled to one.
-        </p>
-    }
-    else if (loan.Status == "Paid up")
-    {
-        <p class="status-big">Paid in full@(loan.SettledOrClosedUtc is null ? "" : " on " + Fmt.D(loan.SettledOrClosedUtc.Value.AddHours(2)))</p>
-        <p class="small muted">You may ask @l.DisplayName for a paid-up letter.</p>
-    }
-    else if (loan.Status == "Written off")
-    {
-        <p>@l.DisplayName wrote this loan off@(loan.SettledOrClosedUtc is null ? "" : " on " + Fmt.D(loan.SettledOrClosedUtc.Value.AddHours(2))) with @Fmt.R(loan.WrittenOffAmount) unpaid. Contact them about what this means for you.</p>
-    }
-    <div class="actions no-print" style="margin-top:8px;">
-        <button type="button" class="btn btn-outline btn-sm" onclick="window.print()">Print or save as PDF</button>
-    </div>
-</div>
-
-@{
     var docs = (s.Documents ?? new List<PortalDocumentInfo>()).Where(d => d.LoanNumber == loan.LoanNumber).ToList();
     var thisMonth = new DateTime(Model.UpdatedUtc.AddHours(2).Year, Model.UpdatedUtc.AddHours(2).Month, 1);
 }
-<div class="card no-print">
-    <h2>Documents</h2>
+
+<p class="no-print"><a class="back" href="/a/@l.PublicCode/account">&larr; My loans</a></p>
+
+<section class="card next">
+    <div class="loan-head">
+        <h1 style="margin:0;">@Fmt.R(loan.Principal) loan</h1>
+        <span class="pill @Fmt.StatusClass(loan.Status)">@loan.Status</span>
+    </div>
+    @if (loan.ArrearsAmount > 0)
+    {
+        <div class="alert alert-error" role="alert" style="margin:8px 0 0;">
+            <strong>@Fmt.R(loan.ArrearsAmount) is overdue</strong>, by @loan.DaysPastDue day@(loan.DaysPastDue == 1 ? "" : "s").
+            @if (l.ContactNumber is not null) { <text>Call <a href="tel:@l.ContactNumber">@l.ContactNumber</a>.</text> }
+        </div>
+    }
+    @if (collecting)
+    {
+        <span class="muted">Next payment</span>
+        <span class="next-amount">@(loan.NextDueAmount is null ? "Nothing due" : Fmt.R(loan.NextDueAmount))</span>
+        @if (loan.NextDueDate is { } due) { <span>@due.ToString("dddd d MMMM yyyy")</span> }
+        <span class="next-total"><span>Paid so far</span><strong>@Fmt.R(loan.PaidToDate)</strong></span>
+        <span class="next-total"><span>Still to pay</span><strong>@Fmt.R(loan.RemainingInstalments)</strong></span>
+        <span class="small muted">Paying off early costs less, because future interest and fees fall away. Ask @l.DisplayName for a settlement amount.</span>
+    }
+    else if (loan.Status == "Paid up")
+    {
+        <span>Paid in full@(loan.SettledOrClosedUtc is null ? "" : " on " + Fmt.D(loan.SettledOrClosedUtc.Value.AddHours(2))).</span>
+    }
+    else if (loan.Status == "Written off")
+    {
+        <span>Written off@(loan.SettledOrClosedUtc is null ? "" : " on " + Fmt.D(loan.SettledOrClosedUtc.Value.AddHours(2))) with @Fmt.R(loan.WrittenOffAmount) unpaid. Ask @l.DisplayName what this means for you.</span>
+    }
+    <span class="small muted">@loan.LoanNumber · @s.FullName · updated @Fmt.Sast(Model.UpdatedUtc)</span>
+</section>
+
+<details class="fold" open>
+    <summary>Payments <span class="muted">@loan.Payments.Count</span></summary>
+    @if (!loan.Payments.Any())
+    {
+        <p class="muted">No payments yet.</p>
+    }
+    <ul class="rows">
+        @foreach (var p in loan.Payments)
+        {
+            <li>
+                <span class="row-line"><strong>@Fmt.R(p.Amount)</strong><span class="pill @Fmt.StatusClass(p.Status)">@p.Status</span></span>
+                <span class="small muted">@Fmt.D(p.Date) · @p.Method@(p.InstalmentNumber is { } n ? $" · instalment {n}" : "")@(p.Reference is null ? "" : $" · ref {p.Reference}")</span>
+                @if (p.Reason is not null) { <span class="small">@p.Reason@(p.RecoveredLater ? ". Paid later another way." : "")</span> }
+            </li>
+        }
+    </ul>
+</details>
+
+@if (loan.Schedule.Any())
+{
+    <details class="fold" @(collecting ? "open" : null)>
+        <summary>Instalments <span class="muted">@loan.InstalmentsPaid of @loan.Schedule.Count paid</span></summary>
+        <ul class="rows">
+            @foreach (var e in loan.Schedule)
+            {
+                <li>
+                    <details class="inst">
+                        <summary>
+                            <span class="row-line"><span>@Fmt.D(e.DueDate)</span><strong>@Fmt.R(e.Total)</strong></span>
+                            <span class="pill @Fmt.StatusClass(e.Status)">@e.Status</span>
+                        </summary>
+                        <table class="money small">
+                            <tbody>
+                                <tr><th scope="row">Capital</th><td>@Fmt.R(e.Capital)</td></tr>
+                                <tr><th scope="row">Interest</th><td>@Fmt.R(e.Interest)</td></tr>
+                                <tr><th scope="row">Service fee</th><td>@Fmt.R(e.ServiceFee)</td></tr>
+                                <tr><th scope="row">Credit life</th><td>@Fmt.R(e.CreditLife)</td></tr>
+                                @if (loan.TotalVat > 0) { <tr><th scope="row">VAT</th><td>@Fmt.R(e.Vat)</td></tr> }
+                                <tr class="sub"><th scope="row">Paid</th><td>@Fmt.R(e.Paid)</td></tr>
+                                <tr><th scope="row">Balance after</th><td>@Fmt.R(e.ClosingBalance)</td></tr>
+                            </tbody>
+                        </table>
+                    </details>
+                </li>
+            }
+        </ul>
+        <p class="small muted">Tap an instalment to see what it is made of.</p>
+    </details>
+}
+
+<details class="fold" @(docs.Any() ? "open" : null)>
+    <summary>Documents</summary>
     <ul class="loan-list">
         @foreach (var d in docs)
         {
@@ -89,10 +113,26 @@
             <li class="small muted" style="padding:10px 0;">Your signed agreement appears here once it is signed.</li>
         }
     </ul>
-</div>
+</details>
 
-<div class="card">
-    <h2>What you borrowed and what it costs</h2>
+@if (loan.DebitOrder is { } m)
+{
+    <details class="fold">
+        <summary>Debit order <span class="pill @Fmt.StatusClass(m.Status)">@m.Status</span></summary>
+        @if (m.StatusHelp is not null) { <p class="small">@m.StatusHelp</p> }
+        <dl class="summary">
+            <dt>Amount</dt><dd>@Fmt.R(m.Amount) @m.Frequency.ToLowerInvariant()@(m.FirstAmount is { } fa ? $" (first debit {Fmt.R(fa)})" : "")</dd>
+            @if (m.FirstDate is not null) { <dt>First debit</dt><dd>@Fmt.D(m.FirstDate)</dd> }
+            @if (m.Bank is not null) { <dt>From your account</dt><dd>@m.Bank @m.MaskedAccount</dd> }
+            @if (m.MandateReference is not null) { <dt>Mandate reference</dt><dd>@m.MandateReference</dd> }
+            @if (m.ApprovedUtc is not null) { <dt>You approved it</dt><dd>@Fmt.Sast(m.ApprovedUtc)</dd> }
+        </dl>
+        <p class="small muted">This is a DebiCheck debit order: your bank only pays what you approved. It will show on your bank statement with the mandate reference.</p>
+    </details>
+}
+
+<details class="fold">
+    <summary>What it costs <span class="muted">@Fmt.R(loan.TotalRepayable) in total</span></summary>
     <table class="money">
         <tbody>
             <tr><th scope="row">Amount you received</th><td>@Fmt.R(loan.Principal)</td></tr>
@@ -117,112 +157,16 @@
         <dt>Paid out</dt><dd>@Fmt.Sast(loan.DisbursedUtc)</dd>
         <dt>First collection</dt><dd>@Fmt.D(loan.FirstCollectionDate)</dd>
     </dl>
+</details>
+
+<div class="actions no-print">
+    <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Something not right? Tell us</a>
+    <button type="button" class="btn btn-outline" onclick="window.print()">Print or save</button>
 </div>
 
-@if (loan.DebitOrder is { } m)
-{
-    <div class="card">
-        <div class="loan-head">
-            <h2 style="margin:0;">Your debit order</h2>
-            <span class="pill @Fmt.StatusClass(m.Status)">@m.Status</span>
-        </div>
-        @if (m.StatusHelp is not null) { <p class="small">@m.StatusHelp</p> }
-        <dl class="summary">
-            <dt>Amount</dt><dd>@Fmt.R(m.Amount) @m.Frequency.ToLowerInvariant()@(m.FirstAmount is { } fa ? $" (first debit {Fmt.R(fa)})" : "")</dd>
-            @if (m.FirstDate is not null) { <dt>First debit</dt><dd>@Fmt.D(m.FirstDate)</dd> }
-            @if (m.Bank is not null) { <dt>From your account</dt><dd>@m.Bank @m.MaskedAccount</dd> }
-            @if (m.MandateReference is not null) { <dt>Mandate reference</dt><dd>@m.MandateReference</dd> }
-            @if (m.ApprovedUtc is not null) { <dt>You approved it</dt><dd>@Fmt.Sast(m.ApprovedUtc)</dd> }
-        </dl>
-        <p class="small muted">This is a DebiCheck debit order: your bank only pays what you approved. It will show on your bank statement with the mandate reference.</p>
-    </div>
+@section Scripts {
+<script>
+// A printed loan shows everything, whatever was folded on screen.
+window.addEventListener('beforeprint', function () { document.querySelectorAll('details').forEach(function (d) { d.open = true; }); });
+</script>
 }
-
-<div class="card">
-    <h2>Payments and debits</h2>
-    @if (!loan.Payments.Any())
-    {
-        <p class="muted">No payments yet.</p>
-    }
-    else
-    {
-        <div class="table-scroll">
-            <table class="grid">
-                <thead><tr><th>Date</th><th>How</th><th class="num">Amount</th><th>Result</th></tr></thead>
-                <tbody>
-                    @foreach (var p in loan.Payments)
-                    {
-                        <tr>
-                            <td>@Fmt.D(p.Date)</td>
-                            <td>@p.Method@(p.InstalmentNumber is { } n ? $" · instalment {n}" : "")@if (p.Reference is not null) {<br /><span class="small muted">Ref @p.Reference</span>}</td>
-                            <td class="num">@Fmt.R(p.Amount)</td>
-                            <td>
-                                <span class="pill @Fmt.StatusClass(p.Status)">@p.Status</span>
-                                @if (p.Reason is not null) { <br /><span class="small">@p.Reason</span> }
-                                @if (p.RecoveredLater) { <br /><span class="small muted">Paid later another way</span> }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        <p class="small muted">Every debit is listed, including ones your bank returned unpaid, so nothing about your account is hidden from you.</p>
-    }
-</div>
-
-@if (loan.Schedule.Any())
-{
-    <div class="card">
-        <h2>Repayment schedule</h2>
-        <p class="small muted">What each instalment is made of, and what has been paid against it.</p>
-        <div class="table-scroll">
-            <table class="grid schedule">
-                <thead>
-                    <tr>
-                        <th>#</th><th>Due</th><th class="num">Interest</th><th class="num">Capital</th><th class="num">Fee</th>
-                        <th class="num">Credit life</th>@if (loan.TotalVat > 0) {<th class="num">VAT</th>}<th class="num">Instalment</th><th class="num">Paid</th><th class="num">Balance after</th><th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var e in loan.Schedule)
-                    {
-                        <tr>
-                            <td>@e.Number</td>
-                            <td>@Fmt.D(e.DueDate)</td>
-                            <td class="num">@Fmt.R(e.Interest)</td>
-                            <td class="num">@Fmt.R(e.Capital)</td>
-                            <td class="num">@Fmt.R(e.ServiceFee)</td>
-                            <td class="num">@Fmt.R(e.CreditLife)</td>
-                            @if (loan.TotalVat > 0) {<td class="num">@Fmt.R(e.Vat)</td>}
-                            <td class="num"><strong>@Fmt.R(e.Total)</strong></td>
-                            <td class="num">@Fmt.R(e.Paid)</td>
-                            <td class="num">@Fmt.R(e.ClosingBalance)</td>
-                            <td><span class="pill @Fmt.StatusClass(e.Status)">@e.Status</span></td>
-                        </tr>
-                    }
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <th colspan="2">Total</th>
-                        <td class="num">@Fmt.R(loan.Schedule.Sum(e => e.Interest))</td>
-                        <td class="num">@Fmt.R(loan.Schedule.Sum(e => e.Capital))</td>
-                        <td class="num">@Fmt.R(loan.Schedule.Sum(e => e.ServiceFee))</td>
-                        <td class="num">@Fmt.R(loan.Schedule.Sum(e => e.CreditLife))</td>
-                        @if (loan.TotalVat > 0) {<td class="num">@Fmt.R(loan.Schedule.Sum(e => e.Vat))</td>}
-                        <td class="num"><strong>@Fmt.R(loan.Schedule.Sum(e => e.Total))</strong></td>
-                        <td class="num">@Fmt.R(loan.Schedule.Sum(e => e.Paid))</td>
-                        <td></td><td></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    </div>
-}
-
-<div class="card no-print">
-    <h2>Something not right?</h2>
-    <p class="muted small">If a payment is missing or a figure looks wrong, tell @l.DisplayName - quote loan @loan.LoanNumber.</p>
-    <div class="actions" style="margin-top:0;">
-        <a class="btn btn-outline" href="/a/@l.PublicCode/advisor">Query this loan</a>
-    </div>
-</div>

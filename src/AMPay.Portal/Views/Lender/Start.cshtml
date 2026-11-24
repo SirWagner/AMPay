@@ -1,21 +1,22 @@
 @model StartModel
 @{
-    ViewData["Title"] = "Your cell number";
+    ViewData["Title"] = "Sign in";
     var l = (Lender)ViewData["Lender"]!;
 }
 
-<div class="card">
-    <h1>Your cell number</h1>
-    <p class="lede">We'll send a 6-digit code to this number. It keeps your application private - use the same number to come back later.</p>
+<div class="card narrow">
+    <h1>@(Model.To == "account" ? "See my loans" : "Apply for a loan")</h1>
+    <p class="lede">Enter your cell number and we'll send you a code. Use the same number each time.</p>
 
     <form method="post" action="/a/@l.PublicCode/start" novalidate>
         @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="To" />
         <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
         <div class="field">
             <label asp-for="Mobile"></label>
-            <input asp-for="Mobile" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" />
+            <input asp-for="Mobile" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" autofocus />
             <span asp-validation-for="Mobile" class="field-error"></span>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Send me a code</button>
+        <button type="submit" class="btn btn-primary btn-block">Send my code</button>
     </form>
 </div>

@@ -17,6 +17,9 @@ public class StartModel
     [Required(ErrorMessage = "Enter your cell number.")]
     [Display(Name = "Cell number")]
     public string Mobile { get; set; } = "";
+
+    /// <summary>"account" when the client came to see their loans rather than to apply.</summary>
+    public string? To { get; set; }
 }
 
 public class VerifyModel
@@ -30,6 +33,7 @@ public class VerifyModel
     public string Code { get; set; } = "";
 
     public string? TestCode { get; set; }
+    public string? To { get; set; }
 }
 
 public class AdvisorModel
@@ -125,7 +129,7 @@ public class IncomeModel
 
 public class LoanModel
 {
-    [Required(ErrorMessage = "Enter the amount you need."), Display(Name = "Amount you need (R)")]
+    [Required(ErrorMessage = "Enter the amount you need."), Display(Name = "Amount you need")]
     public decimal? Amount { get; set; }
 
     [Required(ErrorMessage = "Choose how many months to repay over."), Display(Name = "Repay over (months)")]

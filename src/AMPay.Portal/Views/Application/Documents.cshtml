@@ -7,9 +7,7 @@
     var maxMb = Model.MaxFileSizeBytes / (1024 * 1024);
 }
 
-<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
-<h1>Documents</h1>
-<p class="lede">A clear photo from your phone or a PDF, up to @maxMb MB each. Only @l.DisplayName sees these.</p>
+<partial name="_Step" model='(4, "Documents", $"A clear photo or a PDF, up to {maxMb} MB each.")' />
 
 @foreach (var kind in DocumentsModel.Kinds)
 {
@@ -39,10 +37,9 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="documentType" value="@kind.Type" />
                 <label class="dropzone" style="display:block;cursor:pointer;">
-                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,image/*" capture="environment"
-                           style="position:absolute;opacity:0;width:1px;height:1px;" />
-                    <strong>@(uploaded.Count == 0 ? "Choose a file or take a photo" : "Add another page")</strong><br />
-                    <span class="small muted">or drag it here</span>
+                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,image/*"
+                           class="sr-only" />
+                    <strong>@(uploaded.Count == 0 ? "Add a photo or file" : "Add another page")</strong>
                 </label>
                 <noscript><button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px;">Upload</button></noscript>
             </form>
@@ -51,7 +48,7 @@
 }
 
 <div class="actions">
-    <a class="btn btn-primary" href="/a/@l.PublicCode/application/review">Continue</a>
+    <a class="btn btn-primary btn-block" href="/a/@l.PublicCode/application/review">Continue</a>
 </div>
 
 @section Scripts {

@@ -4,9 +4,7 @@
     var l = (Lender)ViewData["Lender"]!;
 }
 
-<p class="small"><a href="/a/@l.PublicCode/application">&larr; Your application</a></p>
-<h1>Work and income</h1>
-<p class="lede">Use your latest payslip. @l.DisplayName must check that you can afford the repayments, and these figures are where it starts.</p>
+<partial name="_Step" model='(2, "Work and income", "Have your latest payslip with you.")' />
 
 <form method="post" action="/a/@l.PublicCode/application/income" class="card" novalidate>
     @Html.AntiForgeryToken()
@@ -44,27 +42,27 @@
     <div class="grid-2">
         <div class="field">
             <label asp-for="GrossMonthlyIncome"></label>
-            <input asp-for="GrossMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="rand"><input asp-for="GrossMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" /></span>
             <span asp-validation-for="GrossMonthlyIncome" class="field-error"></span>
         </div>
         <div class="field">
             <label asp-for="NetMonthlyIncome"></label>
-            <input asp-for="NetMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="rand"><input asp-for="NetMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" /></span>
             <span asp-validation-for="NetMonthlyIncome" class="field-error"></span>
         </div>
         <div class="field">
             <label asp-for="OtherMonthlyIncome"></label>
-            <input asp-for="OtherMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="rand"><input asp-for="OtherMonthlyIncome" type="number" inputmode="decimal" min="0" step="0.01" /></span>
         </div>
         <div class="field">
             <label asp-for="MonthlyExpenses"></label>
-            <input asp-for="MonthlyExpenses" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="rand"><input asp-for="MonthlyExpenses" type="number" inputmode="decimal" min="0" step="0.01" /></span>
             <span class="hint">Rent, food, transport, school fees, phone.</span>
             <span asp-validation-for="MonthlyExpenses" class="field-error"></span>
         </div>
         <div class="field">
             <label asp-for="MonthlyDebtRepayments"></label>
-            <input asp-for="MonthlyDebtRepayments" type="number" inputmode="decimal" min="0" step="0.01" />
+            <span class="rand"><input asp-for="MonthlyDebtRepayments" type="number" inputmode="decimal" min="0" step="0.01" /></span>
             <span class="hint">Other loans, store accounts, credit cards.</span>
         </div>
     </div>

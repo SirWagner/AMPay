@@ -43,7 +43,7 @@ public class AccountController : PortalControllerBase
         if (applicant is null)
         {
             await HttpContext.SignOutAsync(ApplicantClaims.Scheme);
-            context.Result = RedirectToAction("Start", "Lender", new { code });
+            context.Result = RedirectToAction("Start", "Lender", new { code, to = "account" });
             return;
         }
 

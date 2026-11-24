@@ -13,7 +13,14 @@
 <header class="public-top">
     <div class="public-top-inner">
         <strong>@(ViewData["Lender"] ?? "AM-Pay")</strong>
-        <span class="muted small">Secure document</span>
+        @if (ViewData["ClientAppLink"] is string appLink)
+        {
+            <a href="@appLink" class="btn btn-outline btn-sm">&larr; My loans</a>
+        }
+        else
+        {
+            <span class="muted small">Secure document</span>
+        }
     </div>
 </header>
 

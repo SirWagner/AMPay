@@ -1,0 +1,11 @@
+@model (int Number, string Title, string Lede)
+@{ var l = (Lender)ViewData["Lender"]!; }
+<div class="stephead">
+    <div class="stephead-row">
+        <a href="/a/@l.PublicCode/application">&larr; All steps</a>
+        <span>Step @Model.Number of 5</span>
+    </div>
+    <span class="progress" aria-hidden="true"><span style="width:@(Model.Number * 20)%"></span></span>
+    <h1>@Model.Title</h1>
+    @if (Model.Lede.Length > 0) { <p class="lede">@Model.Lede</p> }
+</div>
